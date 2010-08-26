@@ -1,7 +1,7 @@
 #------ GNU g++ -----------------------------------------------------
 
 CC         = g++
-CPPFLAGS     = -Wall -g -O3 
+CPPFLAGS     = -Wall -g -O3 -Iinclude
 
 LINKER      = g++
 LDFLAGS   = 
