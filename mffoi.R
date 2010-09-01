@@ -1,4 +1,4 @@
-mffoi <- function(lambda, mixing, gamma, mu)
+mffoi <- function(lambda, mixing, gamma, mu, density = FALSE, N = NA)
   {
     beta <- matrix(NA, nrow(mixing), ncol(mixing))
 
@@ -8,7 +8,11 @@ mffoi <- function(lambda, mixing, gamma, mu)
           beta[i,j]=b[mixing[i,j]]
         }
       }
-      r <- (lambda - (beta %*% (lambda/(lambda+mu+gamma))))
+      if (density) {
+        r <- (lambda - (beta %*% (N*lambda/(lambda+mu+gamma))))
+      } else {
+        r <- (lambda - (beta %*% (lambda/(lambda+mu+gamma))))
+      }
       as.vector(r)
     }
 
