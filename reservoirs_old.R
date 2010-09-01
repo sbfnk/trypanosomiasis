@@ -7,37 +7,52 @@
 library('getopt');
 
 opt = getopt(c(
-  'mixing', 'm', 1, "character"
+  'mixing', 'm', 1, "character",
+  'data', 'd', 1, "character"
 ));
+
+# read data
+stopifnot ( !is.null(opt$mixing) );
+data <- read.csv(file=opt$data, head=TRUE, sep=",")
 
 # estimate mixing matrix from data -- either assume random mixing or get 
 # structure of the mixing matrix from csv file
 stopifnot ( !is.null(opt$mixing) );
-  
+
+M <- data$pos_tbg + data$pos_tbg
+N <- data$N
+mu <- data$mortality
+gamma <- data$rec_rate
+
 if (opt$mixing == "random") {
-  
+  lambda <- M/(N-M)*(mu+gamma)
+  b <- lambda/sqrt(sum(lambda*lambda/(lambda+mu+gamma)))
+  beta <- b %o% b
 } else {
   mixing <- read.csv(file=opt$mixing, head=FALSE, sep=",")
+  if (max(mixing) == nrow(data)) {
+    # number of parameters equal to number of data rows -> estimate beta
+    lambda <- M/(N-M)*(mu+gamma)
+    beta <- mffoi(lambda, mixing, gamma, mu)
+  } else {
+    # number of parameters smaller than number of data rows -> estimate lambda
+    # this is more complicated -- will have to do some kind of sophisticated
+    # random walk
+    #lambda <- foifm(mixing, 
+  }
 }
 
+R <- beta %*% diag(1/(mu+lambda))
+R0 <- max(Re(eigen(R)$values))
 
-
-# tryps <- read.csv(file="epidemic.csv",head=TRUE,sep=",")
-# l=(tryps$pos_tbng + tryps$pos_tbg)/(tryps$N-(tryps$pos_tbng + tryps$pos_tbg)) * (tryps$mortality + tryps$rec_rate)
-#b=l/sqrt(sum(l*l/(l+tryps$mortality+tryps$rec_rate)))
-#a=l2/(b*sum(b*l2/(l2+tryps$mortality+tryps$rec_rate)))
-#a=l2/l
-#a[is.nan(a)] <- 0
-#R = ((a*b) %o% b) %*% diag(1/(tryps$mortality+tryps$rec_rate))
-#R0 = max(Re(eigen(R)$values))
-#cat ("R0 = ", R0, "\n")
-#unit=diag(1,38,38)
-#for (i in c(1:38)) {
-#  proj=matrix(0,38,38)
-#  proj[i,i]=1
-#  U=(unit-proj) %*% R
-#  V=proj %*% R
-#  usr=max(abs(eigen(U)$values))
-#  vsr=max(abs(eigen(V)$values))
-#  cat ("i = ", i, ", usr = ", usr, ", vsr = ", vsr, "\n")
-#}
+cat ("R0 = ", R0, "\n")
+unit=diag(1,38,38)
+for (i in c(1:38)) {
+  proj=matrix(0,38,38)
+  proj[i,i]=1
+  U=(unit-proj) %*% R
+  V=proj %*% R
+  usr=max(abs(eigen(U)$values))
+  vsr=max(abs(eigen(V)$values))
+  cat ("i = ", i, ", usr = ", usr, ", vsr = ", vsr, "\n")
+}
