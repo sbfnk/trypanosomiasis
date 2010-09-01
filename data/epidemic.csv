@@ -1,0 +1,39 @@
+N,pos_tbng,pos_tbg,mortality,rec_rate
+"Human",30624,0,110,0.69,0.019
+"Sheep",267,82,18,0.091,0
+"Goat",264,52,8,0.061,0
+"Pig",307,27,1,1,2
+"Dog",37,13,0,0.091,0
+"White-eyelid mangabey",5,0,1,0.037,0
+"Crested mangabey",2,0,0,0.053,0
+"Cloaked mangabey",2,1,0,0.050,0
+"De Brazza’s monkey",1,0,0,0.045,0
+"G. white-nosed monkey",80,4,4,0.044,0
+"Mandrill",5,0,0,0.037,0
+"Mona monkey",21,1,0,0.045,0
+"Moustached monkey",73,3,0,0.045,0
+"Dwarf guenon",55,5,0,0.036,0
+"Bosman potto",6,2,0,0.038,0
+"Golden potto",3,1,0,0.091,0
+"Water chevrotain",1,0,0,0.083,0
+"Royal antelope",5,0,0,0.17,0
+"Blackstriped duiker",16,3,1,0.091,0   
+"Yellow-backed duiker",3,0,0,0.083,0
+"Blue duiker"  ,200,7,4,0.14,0
+"Ogilby’s duiker",1,0,0,0.14,0
+"Peter’ s duiker",3,0,0,0.091,0
+"Sitatunga",5,1,0,0.087,0
+"Brush-tailed porcupine",100,11,2,0.067,0
+"Greater cane rat",7,0,0,0.2,0
+"Giant forest squirrel",1,0,0,0.1,0
+"Red-legged sun squirrel",4,1,0,0.1,0
+"Giant rat" ,125,2,3,0.22,0
+"Dark mangoose",6,0,0,0.22,0
+"Small-spotted genet",8,0,1,0.13,0
+"African civet",2,0,0,0.083,0
+"Two-spotted palm civet",29,1,2,0.063,0
+"Long-tailed pangolin",32,2,0,0.077,0
+"Tree pangolin",17,1,0,0.077,0
+"Crocodile",3,0,0,0.022,0
+"Monitor lizard",6,0,0,0.067,0
+"Tree dassie",5,0,0,0.1,0
