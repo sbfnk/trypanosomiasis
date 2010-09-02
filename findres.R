@@ -25,7 +25,9 @@ findres <- function(NGM, projection, depth = 1, start = 1)
       for (i in c(start:(ncol(NGM)-depth+1))) {
         proj <- projection
         proj[i,i] = 1
-        res <- findres(NGM, proj, depth - 1, i + 1)
+        if (findres(NGM, proj, depth - 1, i + 1)) {
+          res <- TRUE
+        }
       }
     }
     res
