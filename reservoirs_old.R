@@ -5,9 +5,12 @@
 # Invoke % Rscript reservoirs.R 
 
 library('getopt');
+library('BB');
 
 source('mffoi.R');
 source('findres.R');
+source('foifm.R');
+source('likelihood.R');
 
 opt = getopt(c(
   'mixing', 'm', 1, "character",
@@ -28,6 +31,8 @@ N <- data$N
 mu <- data$mortality
 gamma <- data$rec_rate
 
+ndata <- nrow(data)
+
 if (opt$mixing == "random") {
   lambda <- M/(N-M)*(mu+gamma)
   if (!is.null(opt$density)) {
@@ -38,7 +43,7 @@ if (opt$mixing == "random") {
   beta <- b %o% b
 } else {
   mixing <- read.csv(file=opt$mixing, head=FALSE, sep=",")
-  if (max(mixing) == nrow(data)) {
+  if (max(mixing) == ndata) {
     # number of parameters equal to number of data rows -> estimate beta
     lambda <- M/(N-M)*(mu+gamma)
     if (!is.null(opt$density)) {
@@ -48,9 +53,57 @@ if (opt$mixing == "random") {
     }
   } else {
     # number of parameters smaller than number of data rows -> estimate lambda
-    # this is more complicated -- will have to do some kind of sophisticated
-    # random walk
-    #lambda <- foifm(mixing, 
+
+    stepsize <- 0.1
+    b <- rep(1, max(mixing))
+    l <- -Inf
+
+    for (i in 1:1000) {
+      # propose update
+      saveb <- b
+      savel <- l
+
+      mult <- FALSE
+      
+      r <- sample(max(mixing)*10*2, 1)
+      r <- r - max(mixing)*10
+      if (r > 0) {
+        mult <- TRUE
+      } else {
+        r <- -r
+      }
+      factor <- r %% 10 + 1
+      el <- r %/% 10 + 1
+
+      cat ("el=", el, "\n")
+      if (mult) {
+        b[el] <- b[el] * factor
+      } else {
+        b[el] <- b[el] / factor
+      }
+      
+      ##   el <- el - max(mixing)
+      ##   b[el] = b[el] - stepsize
+      ## } else {
+      ##   b[el] = b[el] + stepsize
+      ## }
+
+      lambda <- foifm(mixing, b, gamma, mu)
+      lambda <- (lambda + abs(lambda)) / 2
+      l <- likelihood(lambda, mu, gamma, M, N)
+
+      accept <- min(c(1, exp(-(savel-l))))
+      cat ("accept=",accept,"savel=",savel,"l=",l,"\n")
+      if (runif(1) < accept) {
+        # accept
+        savel <- l
+        saveb <- b
+      } else {
+        l <- savel
+        b <- saveb
+      }
+      cat(saveb,"\n")
+    }
   }
 }
 
@@ -66,14 +119,14 @@ cat ("R0 = ", R0, "\n")
 found <- FALSE
 depth <- 1
 while (!found) {
-  found <- findres(R, matrix(0,38,38), depth)
+  found <- findres(R, matrix(0,ndata,ndata), depth)
   depth <- depth + 1
 }
 
 
-unit=diag(1,38,38)
-for (i in c(1:38)) {
-  proj=matrix(0,38,38)
+unit=diag(1,ndata,ndata)
+for (i in c(1:ndata)) {
+  proj=matrix(0,ndata,ndata)
   proj[i,i]=1
    U=proj %*% R
    Q=(unit-proj) %*% R
