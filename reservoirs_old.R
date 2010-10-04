@@ -95,14 +95,6 @@ if (opt$mixing == "random") {
 
       prev <- pfm(mixing, b, gamma, mu, !is.null(opt$density), N)
       cat ("prev=",prev,"\n")
-      beta <- matrix(NA, nrow(mixing), ncol(mixing))
-      for (i in 1:nrow(mixing)) {
-        for (j in 1:nrow(mixing)) {
-          beta[i,j]=b[mixing[i,j]]
-        }
-      }
-#      lambda <- beta %*% (prev*N)
-      lambda <- beta %*% (prev)
       l <- ilikelihood(prev, mu, gamma, M, N)
 
 #      cat ("savel=", savel, ", l=", l, ", savel-l=", savel-l, "\n")
