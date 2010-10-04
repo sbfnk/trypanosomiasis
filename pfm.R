@@ -21,6 +21,8 @@ pfm <- function(mixing, b, gamma, mu, density = FALSE, N = NA)
     prev0 <- rep(0.5,nrow(mixing))
 
     ans <- dfsane(par = prev0, fn = solvfun, control = list(trace = FALSE))
-
+    ## cat("residual=", ans$residual, ", fn.reduction=", ans$fn.reduction,
+    ## ", feval=", ans$feval, ", iter=", ans$iter, ", convergence=",
+    ## ans$convergence, "\n") 
     ans$par
   }
