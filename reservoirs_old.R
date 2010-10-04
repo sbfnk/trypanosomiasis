@@ -11,6 +11,7 @@ source('mffoi.R');
 source('findres.R');
 source('foifm.R');
 source('pfm.R');
+source('prand.R');
 source('likelihood.R');
 source('ilikelihood.R');
 
@@ -38,13 +39,51 @@ ndata <- nrow(data)
 cat ("Target prev=", M/N, "\n")
 
 if (opt$mixing == "random") {
-  lambda <- M/(N-M)*(mu+gamma )
-  if (!is.null(opt$density)) {
-    b <- lambda/sqrt(sum(N*lambda*lambda/(lambda+mu+gamma)))
-  } else {
-    b <- lambda/sqrt(sum(lambda*lambda/(lambda+mu+gamma)))
+
+  a <- rep(1, length(N))
+  
+  l <- -Inf
+  
+  for (i in 1:1000) {
+    # propose update
+    savea <- a
+    savel <- l
+    
+    mult <- FALSE
+    
+    r <- sample(length(a)*9*2-2, 1)
+    r <- r - length(a)*9
+    if (r > 0) {
+      mult <- TRUE
+    } else {
+      r <- -r
+    }
+    factor <- r %% 9 + 2
+    el <- r %/% 9 + 1
+    
+    if (mult) {
+      a[el] <- a[el] * factor
+    } else {
+      a[el] <- a[el] / factor
+    }
+      
+    prev <- prand(a, gamma, mu, !is.null(opt$density), N)
+    cat ("prev=",prev,"\n")
+    l <- ilikelihood(prev, mu, gamma, M, N)
+
+    accept <- min(c(1, exp(-(savel-l))))
+    cat ("accept=",accept,"savel=",savel,"l=",l,"\n")
+    if (runif(1) < accept) {
+        # accept
+        savel <- l
+        savea <- a
+      } else {
+        l <- savel
+        a <- savea
+      }
+      cat("a=", savea,"\n")
+    }
   }
-  beta <- b %o% b
 } else {
   mixing <- read.csv(file=opt$mixing, head=FALSE, sep=",")
   if (max(mixing) == ndata) {
