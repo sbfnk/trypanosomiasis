@@ -10,7 +10,9 @@ library('BB');
 source('mffoi.R');
 source('findres.R');
 source('foifm.R');
+source('pfm.R');
 source('likelihood.R');
+source('ilikelihood.R');
 
 opt = getopt(c(
   'mixing', 'm', 1, "character",
@@ -34,7 +36,7 @@ gamma <- data$rec_rate
 ndata <- nrow(data)
 
 if (opt$mixing == "random") {
-  lambda <- M/(N-M)*(mu+gamma)
+  lambda <- M/(N-M)*(mu+gamma )
   if (!is.null(opt$density)) {
     b <- lambda/sqrt(sum(N*lambda*lambda/(lambda+mu+gamma)))
   } else {
@@ -88,9 +90,8 @@ if (opt$mixing == "random") {
       ##   b[el] = b[el] + stepsize
       ## }
 
-      lambda <- foifm(mixing, b, gamma, mu)
-      lambda <- (lambda + abs(lambda)) / 2
-      l <- likelihood(lambda, mu, gamma, M, N)
+      prev <- pfm(mixing, b, gamma, mu, !is.null(opt$density), N)
+      l <- ilikelihood(prev, mu, gamma, M, N)
 
       accept <- min(c(1, exp(-(savel-l))))
       cat ("accept=",accept,"savel=",savel,"l=",l,"\n")
@@ -105,33 +106,4 @@ if (opt$mixing == "random") {
       cat(saveb,"\n")
     }
   }
-}
-
-if (!is.null(opt$density)) {
-  beta <- t(beta * N)
-}
-
-R <- beta %*% diag(1/(mu+lambda))
-R0 <- max(Re(eigen(R)$values))
-
-cat ("R0 = ", R0, "\n")
-
-found <- FALSE
-depth <- 1
-while (!found) {
-  found <- findres(R, matrix(0,ndata,ndata), depth)
-  depth <- depth + 1
-}
-
-
-unit=diag(1,ndata,ndata)
-for (i in c(1:ndata)) {
-  proj=matrix(0,ndata,ndata)
-  proj[i,i]=1
-   U=proj %*% R
-   Q=(unit-proj) %*% R
-   u_sr=max(abs(eigen(U)$values))
-   q_sr=max(abs(eigen(Q)$values))
-   cat ("i = ", sprintf("%2d", i), ", u_sr = ", sprintf("%.2f", u_sr),
-        ", q_sr = ", sprintf("%.2f", q_sr), "\n")
 }
