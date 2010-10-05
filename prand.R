@@ -1,11 +1,11 @@
-prand <- function(a, gamma, mu, density = FALSE, N = NA)
+prand <- function(mixing=NA, pars, gamma, mu, density = FALSE, N = NA)
   {
-    beta <- matrix(NA, length(a), length(a))
+    beta <- matrix(NA, length(pars), length(pars))
 
     solvfun <- function(prev) {
-      for (i in 1:length(a)) {
-        for (j in 1:length(a)) {
-          beta[i,j]=a[i]*a[j]
+      for (i in 1:length(pars)) {
+        for (j in 1:length(pars)) {
+          beta[i,j]=pars[i]*pars[j]
         }
       }
       if (density) {
@@ -18,7 +18,7 @@ prand <- function(a, gamma, mu, density = FALSE, N = NA)
       as.vector(r)
     }
 
-    prev0 <- rep(0.5,length(a))
+    prev0 <- rep(0.5,length(pars))
 
     ans <- dfsane(par = prev0, fn = solvfun, control = list(trace = FALSE))
     ans$par

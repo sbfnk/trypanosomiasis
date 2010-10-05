@@ -1,11 +1,11 @@
-pfm <- function(mixing, b, gamma, mu, density = FALSE, N = NA)
+pfm <- function(mixing, pars, gamma, mu, density = FALSE, N = NA)
   {
     beta <- matrix(NA, nrow(mixing), ncol(mixing))
 
     solvfun <- function(prev) {
       for (i in 1:nrow(mixing)) {
         for (j in 1:nrow(mixing)) {
-          beta[i,j]=b[mixing[i,j]]
+          beta[i,j]=pars[mixing[i,j]]
         }
       }
       if (density) {

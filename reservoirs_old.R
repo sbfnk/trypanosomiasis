@@ -39,116 +39,64 @@ ndata <- nrow(data)
 cat ("Target prev=", M/N, "\n")
 
 if (opt$mixing == "random") {
-
-  a <- rep(1, length(N))
-  
-  l <- -Inf
-  
-  for (i in 1:1000) {
-    # propose update
-    savea <- a
-    savel <- l
-    
-    mult <- FALSE
-    
-    r <- sample(length(a)*9*2-2, 1)
-    r <- r - length(a)*9
-    if (r > 0) {
-      mult <- TRUE
-    } else {
-      r <- -r
-    }
-    factor <- r %% 9 + 2
-    el <- r %/% 9 + 1
-    
-    if (mult) {
-      a[el] <- a[el] * factor
-    } else {
-      a[el] <- a[el] / factor
-    }
-      
-    prev <- prand(a, gamma, mu, !is.null(opt$density), N)
-    cat ("prev=",prev,"\n")
-    l <- ilikelihood(prev, mu, gamma, M, N)
-
-    accept <- min(c(1, exp(-(savel-l))))
-    cat ("accept=",accept,"savel=",savel,"l=",l,"\n")
-    if (runif(1) < accept) {
-        # accept
-        savel <- l
-        savea <- a
-      } else {
-        l <- savel
-        a <- savea
-      }
-      cat("a=", savea,"\n")
-    }
-  }
+  mixing <- NA
+  b <- rep(1, length(N))
+  fn <- prand
 } else {
   mixing <- read.csv(file=opt$mixing, head=FALSE, sep=",")
-  if (max(mixing) == ndata) {
-    # number of parameters equal to number of data rows -> estimate beta
-    lambda <- M/(N-M)*(mu+gamma)
-    if (!is.null(opt$density)) {
-      beta <- mffoi(lambda, mixing, gamma, mu, TRUE, N)
-    } else {
-      beta <- mffoi(lambda, mixing, gamma, mu)
-    }
+  b <- rep(1, max(mixing))
+  fn <- pfm
+}
+  
+l <- -Inf
+  
+for (i in 1:1000) {
+  # propose update
+  saveb <- b
+  savel <- l
+  
+  mult <- FALSE
+  
+  r <- sample(length(b)*9*2-2, 1)
+  r <- r - length(b)*9
+  if (r > 0) {
+    mult <- TRUE
   } else {
-    # number of parameters smaller than number of data rows -> estimate lambda
-
-    stepsize <- 0.1
-    b <- rep(1, max(mixing))
-    l <- -Inf
-
-    for (i in 1:1000) {
-      # propose update
-      saveb <- b
-      savel <- l
-
-      mult <- FALSE
-      
-      r <- sample(max(mixing)*9*2-2, 1)
-      r <- r - max(mixing)*9
-      if (r > 0) {
-        mult <- TRUE
-      } else {
-        r <- -r
-      }
-      factor <- r %% 9 + 2
-      el <- r %/% 9 + 1
-
-      if (mult) {
-        b[el] <- b[el] * factor
-      } else {
-        b[el] <- b[el] / factor
-      }
+    r <- -r
+  }
+  factor <- r %% 9 + 2
+  el <- r %/% 9 + 1
+  
+  if (mult) {
+    b[el] <- b[el] * factor
+  } else {
+    b[el] <- b[el] / factor
+  }
       
 #      cat ("el=", el, ", factor=", factor, ", mult=", mult, "\n")
 #      cat(b, "\n")
-      ##   el <- el - max(mixing)
-      ##   b[el] = b[el] - stepsize
-      ## } else {
-      ##   b[el] = b[el] + stepsize
-      ## }
+#   el <- el - length(b)
+#   b[el] = b[el] - stepsize
+# } else {
+#   b[el] = b[el] + stepsize
+# }
 
-      prev <- pfm(mixing, b, gamma, mu, !is.null(opt$density), N)
-      cat ("prev=",prev,"\n")
-      l <- ilikelihood(prev, mu, gamma, M, N)
+  prev <- fn(mixing=mixing, pars=b, gamma=gamma, mu=mu,
+            density=!is.null(opt$density), N=N)
+  cat ("prev=",prev,"\n")
+  l <- ilikelihood(prev, mu, gamma, M, N)
 
-#      cat ("savel=", savel, ", l=", l, ", savel-l=", savel-l, "\n")
-      accept <- min(c(1, exp(-(savel-l))))
-      cat ("accept=",accept,"savel=",savel,"l=",l,"\n")
-      if (runif(1) < accept) {
-        # accept
-#        cat ("accepted\n")
-        savel <- l
-        saveb <- b
-      } else {
-        l <- savel
-        b <- saveb
-      }
-      cat("b=", saveb,"\n")
-    }
+  cat ("savel=", savel, ", l=", l, ", savel-l=", savel-l, "\n")
+  accept <- min(c(1, exp(-(savel-l))))
+  cat ("accept=",accept,"savel=",savel,"l=",l,"\n")
+  if (is.numeric(accept) && runif(1) < accept) {
+    # accept
+    #        cat ("accepted\n")
+    savel <- l
+    saveb <- b
+  } else {
+    l <- savel
+    b <- saveb
   }
+  cat("b=", saveb,"\n")
 }
