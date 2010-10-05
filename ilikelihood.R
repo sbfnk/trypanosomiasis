@@ -1,5 +1,5 @@
 ilikelihood <- function(prev, mu, gamma, M, N)
   {
-    sum(M*log(prev) +
-        (N-M)*log(1-prev))
+    sum(M[prev>0]*log(prev[prev>0]) +
+        (N[prev>0]-M[prev>0])*log(1-prev[prev>0]))
   }
