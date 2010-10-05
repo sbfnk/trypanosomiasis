@@ -63,31 +63,23 @@ for (i in 1:iter) {
   savel <- l
   
   mult <- FALSE
-  
-  r <- sample(length(b)*9*2-2, 1)
-  r <- r - length(b)*9
-  if (r > 0) {
-    mult <- TRUE
-  } else {
-    r <- -r
-  }
-  factor <- r %% 9 + 2
-  el <- r %/% 9 + 1
-  
-  if (mult) {
-    b[el] <- b[el] * factor
-  } else {
-    b[el] <- b[el] / factor
+
+  nr <- sample(length(b), 1)
+  el <- sample(length(b), nr)
+  r <- sample(9*2, nr, replace = TRUE)
+  for (j in 1:nr) {
+    if (r[j] > 9) {
+      mult <- TRUE
+      r[j] <- r[j] - 9
+    }
+    
+    if (mult) {
+      b[el[j]] <- b[el[j]] * r[j]
+    } else {
+      b[el[j]] <- b[el[j]] / r[j]
+    }
   }
       
-#      cat ("el=", el, ", factor=", factor, ", mult=", mult, "\n")
-#      cat(b, "\n")
-#   el <- el - length(b)
-#   b[el] = b[el] - stepsize
-# } else {
-#   b[el] = b[el] + stepsize
-# }
-
   prev <- fn(mixing=mixing, pars=b, gamma=gamma, mu=mu,
             density=!is.null(opt$density), N=N)
   cat ("prev=",prev,"\n")
