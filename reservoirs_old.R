@@ -18,7 +18,8 @@ source('ilikelihood.R');
 opt = getopt(c(
   'mixing', 'm', 1, "character",
   'data', 'd', 1, "character",
-  'density', 'y', 0, "logical"
+  'density', 'y', 0, "logical",
+  'iterations', 'i', 1, "integer"
 ));
 
 # read data
@@ -47,10 +48,16 @@ if (opt$mixing == "random") {
   b <- rep(1, max(mixing))
   fn <- pfm
 }
+
+if (is.null(opt$iterations)) {
+  iter <- 1000
+} else {
+  iter <- opt$iterations
+}
   
 l <- -Inf
   
-for (i in 1:1000) {
+for (i in 1:iter) {
   # propose update
   saveb <- b
   savel <- l
@@ -89,7 +96,7 @@ for (i in 1:1000) {
   cat ("savel=", savel, ", l=", l, ", savel-l=", savel-l, "\n")
   accept <- min(c(1, exp(-(savel-l))))
   cat ("accept=",accept,"savel=",savel,"l=",l,"\n")
-  if (is.numeric(accept) && runif(1) < accept) {
+  if (!is.nan(accept) && runif(1) < accept) {
     # accept
     #        cat ("accepted\n")
     savel <- l
