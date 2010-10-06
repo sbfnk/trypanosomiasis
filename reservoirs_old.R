@@ -11,7 +11,7 @@ source('mffoi.R');
 source('findres.R');
 source('foifm.R');
 source('pfm.R');
-source('prand.R');
+source('mixing.R');
 source('likelihood.R');
 source('ilikelihood.R');
 
@@ -40,13 +40,11 @@ ndata <- nrow(data)
 cat ("Target prev=", M/N, "\n")
 
 if (opt$mixing == "random") {
-  mixing <- NA
+  mixing_matrix <- NA
   b <- rep(1, length(N))
-  fn <- prand
 } else {
-  mixing <- read.csv(file=opt$mixing, head=FALSE, sep=",")
-  b <- rep(1, max(mixing))
-  fn <- pfm
+  mixing_matrix <- read.csv(file=opt$mixing, head=FALSE, sep=",")
+  b <- rep(1, max(mixing_matrix))
 }
 
 if (is.null(opt$iterations)) {
@@ -80,8 +78,8 @@ for (i in 1:iter) {
     }
   }
       
-  prev <- fn(mixing=mixing, pars=b, gamma=gamma, mu=mu,
-            density=!is.null(opt$density), N=N)
+  prev <- pfm(pars=b, gamma=gamma, mu=mu, mixing_structure=mixing_matrix
+              density=!is.null(opt$density), N=N)
   cat ("prev=",prev,"\n")
   l <- ilikelihood(prev, mu, gamma, M, N)
 

@@ -1,13 +1,8 @@
-pfm <- function(mixing, pars, gamma, mu, density = FALSE, N = NA)
+pfm <- function(pars, gamma, mu, mixing_structure = NA, density = FALSE, N = NA)
   {
-    beta <- matrix(NA, nrow(mixing), ncol(mixing))
+    beta <- mixing(pars, mixing_structure)
 
     solvfun <- function(prev) {
-      for (i in 1:nrow(mixing)) {
-        for (j in 1:nrow(mixing)) {
-          beta[i,j]=pars[mixing[i,j]]
-        }
-      }
       if (density) {
         lambda <- beta %*% (prev*N)
       } else {
@@ -18,11 +13,9 @@ pfm <- function(mixing, pars, gamma, mu, density = FALSE, N = NA)
       as.vector(r)
     }
 
-    prev0 <- rep(0.5,nrow(mixing))
+    prev0 <- rep(0.5,nrow(beta))
 
     ans <- dfsane(par = prev0, fn = solvfun, control = list(trace = FALSE))
-    ## cat("residual=", ans$residual, ", fn.reduction=", ans$fn.reduction,
-    ## ", feval=", ans$feval, ", iter=", ans$iter, ", convergence=",
-    ## ans$convergence, "\n") 
+
     ans$par
   }
