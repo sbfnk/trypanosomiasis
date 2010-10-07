@@ -6,6 +6,7 @@
 
 library('getopt');
 library('BB');
+library('mnormt');
 
 source('mffoi.R');
 source('findres.R');
@@ -63,7 +64,9 @@ for (i in 1:iter) {
   mult <- FALSE
 
 #  nr <- sample(length(b), 1)
-  nr <- 1
+#  nr <- 1
+  nr <- ceiling(abs(rmnorm(1, 0, 2)))
+
   el <- sample(length(b), nr)
   r <- sample(9*2, nr, replace = TRUE)
   for (j in 1:nr) {
