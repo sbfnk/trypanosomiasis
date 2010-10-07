@@ -62,7 +62,8 @@ for (i in 1:iter) {
   
   mult <- FALSE
 
-  nr <- sample(length(b), 1)
+#  nr <- sample(length(b), 1)
+  nr <- 1
   el <- sample(length(b), nr)
   r <- sample(9*2, nr, replace = TRUE)
   for (j in 1:nr) {
@@ -78,22 +79,23 @@ for (i in 1:iter) {
     }
   }
       
-  prev <- pfm(pars=b, gamma=gamma, mu=mu, mixing_structure=mixing_matrix
+  prev <- pfm(pars=b, gamma=gamma, mu=mu, mixing_structure=mixing_matrix, 
               density=!is.null(opt$density), N=N)
-  cat ("prev=",prev,"\n")
+  cat ("i=", i, ", testb=", b, "\n")
+  cat ("i=", i, ", prev=",prev, "\n")
   l <- ilikelihood(prev, mu, gamma, M, N)
 
-  cat ("savel=", savel, ", l=", l, ", savel-l=", savel-l, "\n")
+  cat ("i=", i, ", savel=", savel, ", l=", l, ", savel-l=", savel-l, "\n")
   accept <- min(c(1, exp(-(savel-l))))
-  cat ("accept=",accept,"savel=",savel,"l=",l,"\n")
+  cat ("i=", i, ", accept=",accept,"savel=",savel,"l=",l,"\n")
   if (!is.nan(accept) && runif(1) < accept) {
     # accept
-    #        cat ("accepted\n")
+    cat ("i=", i, ", accepted\n")
     savel <- l
     saveb <- b
   } else {
     l <- savel
     b <- saveb
   }
-  cat("b=", saveb,"\n")
+  cat("i=", i, ", b=", saveb,"\n")
 }
