@@ -1,5 +1,5 @@
 N,pos_tbng,pos_tbg,mortality,rec_rate
-"Human",30624,0,110,0.69,0.019
+"Human",30624,0,110,0.019,0.061
 "Sheep",267,82,18,0.091,0
 "Goat",264,52,8,0.061,0
 "Pig",307,27,1,1,2
@@ -7,7 +7,7 @@ N,pos_tbng,pos_tbg,mortality,rec_rate
 "White-eyelid mangabey",5,0,1,0.037,0
 "Crested mangabey",2,0,0,0.053,0
 "Cloaked mangabey",2,1,0,0.050,0
-"De Brazza’s monkey",1,0,0,0.045,0
+"De Brazza's monkey",1,0,0,0.045,0
 "G. white-nosed monkey",80,4,4,0.044,0
 "Mandrill",5,0,0,0.037,0
 "Mona monkey",21,1,0,0.045,0
@@ -20,8 +20,8 @@ N,pos_tbng,pos_tbg,mortality,rec_rate
 "Blackstriped duiker",16,3,1,0.091,0   
 "Yellow-backed duiker",3,0,0,0.083,0
 "Blue duiker"  ,200,7,4,0.14,0
-"Ogilby’s duiker",1,0,0,0.14,0
-"Peter’ s duiker",3,0,0,0.091,0
+"Ogilby's duiker",1,0,0,0.14,0
+"Peter's duiker",3,0,0,0.091,0
 "Sitatunga",5,1,0,0.087,0
 "Brush-tailed porcupine",100,11,2,0.067,0
 "Greater cane rat",7,0,0,0.2,0
