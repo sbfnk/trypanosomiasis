@@ -1,6 +1,6 @@
 mixing <- function(pars, mixing_structure=NA)
   {
-    if (!is.null(mixing_structure)) {
+    if (is.na(mixing_structure)) {
       # random
       beta <- matrix(NA, length(pars), length(pars))
       
