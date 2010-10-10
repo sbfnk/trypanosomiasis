@@ -1,4 +1,4 @@
-findres <- function(NGM, projection, depth = 1, start = 1)
+findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 1, start = 1)
   {
     res <- FALSE
     if (depth == 1) {
