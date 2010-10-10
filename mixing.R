@@ -15,7 +15,11 @@ mixing <- function(pars, mixing_structure=NA)
 
       for (i in 1:nrow(mixing_structure)) {
         for (j in 1:nrow(mixing_structure)) {
-          beta[i,j]=pars[mixing_structure[i,j]]
+	  if (mixing_structure[i,j] > 0) {
+            beta[i,j]=pars[mixing_structure[i,j]]
+	  } else {
+            beta[i,j]=0
+	  }
         }
       }
     }
