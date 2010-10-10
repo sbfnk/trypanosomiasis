@@ -2,6 +2,7 @@ findres <- function(NGM, projection, depth = 1, start = 1)
   {
     res <- FALSE
     if (depth == 1) {
+      cat ("R0 = ", max(abs(eigen(NGM))), "\n")
       for (i in c(start:ncol(NGM))) {
         unit=diag(1,nrow(NGM),ncol(NGM))
         proj <- projection
