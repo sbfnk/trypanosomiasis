@@ -2,7 +2,7 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 1,
   {
     res <- FALSE
     if (depth == 1) {
-      cat ("R0 = ", max(abs(eigen(NGM))), "\n")
+      cat ("R0 = ", max(abs(eigen(NGM)$values)), "\n")
       for (i in c(start:ncol(NGM))) {
         unit=diag(1,nrow(NGM),ncol(NGM))
         proj <- projection
