@@ -68,19 +68,27 @@ for (i in 1:iter) {
   nr <- ceiling(abs(rmnorm(1, 0, 2)))
 
   el <- sample(length(b), nr)
-  r <- sample(9*2, nr, replace = TRUE)
+#  b[el] <- rmnorm(1, b[el], diag(b[el]/100, nrow=nr, ncol=nr))
+#  b[b<0] <- 0 
+#  r <- sample(9*4, nr, replace = TRUE)
   for (j in 1:nr) {
-    if (r[j] > 9) {
-      mult <- TRUE
-      r[j] <- r[j] - 9
+#    if (r[j] > 18) {
+#      r[j] <- r[j] - 18 
+#      if (r[j] > 9) {
+#        r[j] <- r[j] - 9
+#        b[el[j]] <- b[el[j]] * r[j]
+#      } else {
+#        b[el[j]] <- b[el[j]] / r[j]
+#      }
+#    } else {
+      nonzero <- TRUE
+      while (nonzero == TRUE) {
+        b[el[j]] <- rnorm(1, mean=b[el[j]], sd=b[el[j]]/10)
+#        cat(j, " ", b[el[j]], "\n")
+        if (b[el[j]]>0) { nonzero <- FALSE }
+      }
     }
-    
-    if (mult) {
-      b[el[j]] <- b[el[j]] * r[j]
-    } else {
-      b[el[j]] <- b[el[j]] / r[j]
-    }
-  }
+#  }
       
   prev <- pfm(pars=b, gamma=gamma, mu=mu, mixing_structure=mixing_matrix, 
               density=!is.null(opt$density), N=N)
@@ -89,9 +97,10 @@ for (i in 1:iter) {
   l <- ilikelihood(prev, mu, gamma, M, N)
 
   cat ("i=", i, ", savel=", savel, ", l=", l, ", savel-l=", savel-l, "\n")
-  accept <- min(c(1, exp(-(savel-l))))
-  cat ("i=", i, ", accept=",accept,"savel=",savel,"l=",l,"\n")
-  if (!is.nan(accept) && runif(1) < accept) {
+#  accept <- min(c(1, exp(-(savel-l))))
+#  cat ("i=", i, ", accept=",accept,"savel=",savel,"l=",l,"\n")
+#  if (!is.nan(accept) && runif(1) < accept) {
+   if (!is.nan(l) && l > savel) {
     # accept
     cat ("i=", i, ", accepted\n")
     savel <- l
