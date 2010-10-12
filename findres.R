@@ -49,7 +49,7 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 0,
           search_result <- findres(NGM, proj, depth - 1, i + 1)
           R0 <- search_result$R0
           if (search_result$res) {
-            species_list <- c(species_list, as.vector(search_result$combos))
+            species_list <- c(species_list, t(search_result$combos))
             u <- c(u, search_result$u)
             q <- c(q, search_result$q)
             res <- TRUE
