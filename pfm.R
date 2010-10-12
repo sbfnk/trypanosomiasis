@@ -9,7 +9,7 @@ pfm <- function(pars, gamma, mu, mixing_structure = NA, density = FALSE, N = NA)
         lambda <- beta %*% prev
       }
       
-      r <- 1/(1+(gamma+mu)/lambda) - prev
+      r <- lambda * (1-prev) - (gamma+mu)*prev
       as.vector(r)
     }
 
