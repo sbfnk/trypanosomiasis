@@ -57,7 +57,7 @@ if (!is.null(opt$ignorezeroes)) {
 
 if (opt$mixing == "random") {
   mixing_matrix <- NA
-  b <- rep(1, length(N))
+  b <- rep(0.1, length(N))
 } else {
   mixing_matrix <- as.matrix(read.csv(file=opt$mixing, head=FALSE, sep=","))
   if (!is.null(opt$ignorezeroes)) {
