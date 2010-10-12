@@ -19,7 +19,7 @@ N,pos_tbng,pos_tbg,mortality,rec_rate
 "Royal antelope",5,0,0,0.17,0
 "Blackstriped duiker",16,3,1,0.091,0   
 "Yellow-backed duiker",3,0,0,0.083,0
-"Blue duiker"  ,200,7,4,0.14,0
+"Blue duiker",200,7,4,0.14,0
 "Ogilby's duiker",1,0,0,0.14,0
 "Peter's duiker",3,0,0,0.091,0
 "Sitatunga",5,1,0,0.087,0
@@ -27,7 +27,7 @@ N,pos_tbng,pos_tbg,mortality,rec_rate
 "Greater cane rat",7,0,0,0.2,0
 "Giant forest squirrel",1,0,0,0.1,0
 "Red-legged sun squirrel",4,1,0,0.1,0
-"Giant rat" ,125,2,3,0.22,0
+"Giant rat",125,2,3,0.22,0
 "Dark mangoose",6,0,0,0.22,0
 "Small-spotted genet",8,0,1,0.13,0
 "African civet",2,0,0,0.083,0
