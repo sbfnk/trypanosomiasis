@@ -15,7 +15,8 @@ pfm <- function(pars, gamma, mu, mixing_structure = NA, density = FALSE, N = NA)
 
     prev0 <- rep(0.5,nrow(beta))
 
-    ans <- dfsane(par = prev0, fn = solvfun, control = list(trace = FALSE))
+#    ans <- dfsane(par = prev0, fn = solvfun, control = list(trace = FALSE))
+    ans <- BBsolve(par = prev0, fn = solvfun)
 
     ans$par
   }
