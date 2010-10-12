@@ -1,8 +1,11 @@
 findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 1, start = 1)
   {
     res <- FALSE
+    species_list <- c()
+    u <- c()
+    q <- c()
     if (depth == 1) {
-      cat ("R0 = ", max(abs(eigen(NGM)$values)), "\n")
+      R0 <- max(abs(eigen(NGM)$values))
       for (i in c(start:ncol(NGM))) {
         unit=diag(1,nrow(NGM),ncol(NGM))
         proj <- projection
@@ -26,6 +29,9 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 1,
             }
           }
           cat ("Maintenance: ", species, "\n")
+          species_list <- c(species_list, species)
+          u <- c(u, u_sr)
+          q <- c(q, q_sr)
           res <- TRUE
         }
       }
@@ -33,10 +39,20 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 1,
       for (i in c(start:(ncol(NGM)-depth+1))) {
         proj <- projection
         proj[i,i] = 1
-        if (findres(NGM, proj, depth - 1, i + 1)) {
+        search_result <- findres(NGM, proj, depth - 1, i + 1)
+        R0 <- search_result$R0
+        if (search_result$res) {
+          species_list <- c(species_list, as.vector(search_result$combos))
+          u <- c(u, search_result$u)
+          q <- c(q, search_result$q)
           res <- TRUE
         }
       }
     }
-    res
+    if (length(species_list) > 0) {
+      combos <- matrix(species_list, ncol=depth, byrow=T)
+    } else {
+      combos <- NA
+    }
+    return(list(res = res, combos = combos, u = u, q = q, R0 = R0))
   }
