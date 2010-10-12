@@ -6,10 +6,11 @@ plot_prevs <- function(pars, gamma, mu, M, mixing_structure = NA,
   source('pfm.R')
   source('mixing.R')
   
+  prev <- pfm(b, gamma=gamma, mu=mu, mixing_structure=mixing_structure,
+           density=density, N=N)*N
+  maxdata <- max(c(prev, M))
   par(mar = c(12, 3, 1, 1), las=2)
-  plot(pfm(b, gamma=gamma, mu=mu, mixing_structure=mixing_structure,
-           density=density, N=N)*N,
-       col="red", pch=19, xlab="", ylab="# infected",axes=FALSE, ylim=c(0,120))
+  plot(prev, col="red", pch=19, xlab="", ylab="# infected",axes=FALSE, ylim=c(0,maxdata*1.1))
   par(new=T)
   plot(M, col="blue", axes=F, pch="+", ylab="", xlab="")
   axis(1,labels=labels,at=1:38,lwd.ticks=0)
