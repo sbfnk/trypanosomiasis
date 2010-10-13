@@ -9,7 +9,11 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 0,
       d <- 0
       while(foundres$res == F) {
         d <- d+1
+        cat ("Depth: ", d, "\n")
         foundres <- findres(NGM, depth=d)
+        if (d==1) {
+          cat("R0 =", foundres$R0, "\n")
+        }
       }
     } else {
       if (depth == 1) {
