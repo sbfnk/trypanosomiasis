@@ -57,7 +57,11 @@ if (!is.null(opt$ignorezeroes)) {
 
 if (opt$mixing == "random") {
   mixing_matrix <- NA
-  b <- rep(0.1, length(N))
+  mixing_els <- c(1:length(M))
+  if (!is.null(opt$ignorezeroes)) {
+    mixing_els <- mixing_els[M>0]
+  }
+  b <- rep(0.1,length(N))
 } else {
   mixing_matrix <- as.matrix(read.csv(file=opt$mixing, head=FALSE, sep=","))
   if (!is.null(opt$ignorezeroes)) {
@@ -65,11 +69,10 @@ if (opt$mixing == "random") {
   }
   mixing_els <- unique(as.vector(mixing_matrix))
   mixing_els <- mixing_els[mixing_els != 0]
-  cat ("mixing els ", mixing_els, "\n")
-  b <- rep(0, max(mixing_matrix))
-  b[mixing_els] <- 0.1
+  b <- rep(0.1, length(mixing_els))
 }
 
+cat ("mixing els ", mixing_els, "\n")
 cat ("Species: ", rownames(data)[M>0], "\n")
 
 if (!is.null(opt$ignorezeroes)) {
@@ -95,7 +98,9 @@ for (i in 1:iter) {
 
   nr <- ceiling(abs(rmnorm(1, 0, 2)))
 
-  el <- sample(x=mixing_els, size=nr)
+  if (nr > length(b)) { nr = length(b) }
+
+  el <- sample(x=length(b), size=nr)
   for (j in 1:nr) {
     nonzero <- TRUE
     while (nonzero == TRUE) {
