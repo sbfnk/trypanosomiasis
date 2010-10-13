@@ -1,9 +1,5 @@
-components <- function(NGM)
+components <- function(NGM, humans=c(1), domestic=c(2:5), wild = c(6:38))
   {
-    humans <- c(1)
-    domestic <- c(2:5)
-    wild <- c(6:38)
-
     proj_labels <- c("humans only", "domestic only", "wild only",
                      "humans and domestic", "domestic and wild",
                      "humans and wild", "all")
