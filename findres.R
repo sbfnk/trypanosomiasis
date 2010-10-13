@@ -1,4 +1,4 @@
-findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 0, start = 1)
+findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 0, start = 1, top = T)
   {
     res <- FALSE
     species_list <- c()
@@ -50,7 +50,7 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 0,
         for (i in c(start:(ncol(NGM)-depth+1))) {
           proj <- projection
           proj[i,i] = 1
-          search_result <- findres(NGM, proj, depth - 1, i + 1)
+          search_result <- findres(NGM, proj, depth - 1, i + 1, top = F)
           R0 <- search_result$R0
           if (search_result$res) {
             species_list <- c(species_list, t(search_result$combos))
@@ -60,10 +60,10 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 0,
           }
         }
       }
-      if (length(species_list) > 0) {
-        combos <- matrix(species_list, ncol=depth, byrow=T)
+      if (top) {
+        combos <- matrix(species_list, ncol = depth, byrow = T)
       } else {
-        combos <- NA
+        combos <- species_list
       }
       foundres <- list(res = res, combos = combos, u = u, q = q, R0 = R0)
     }
