@@ -64,16 +64,19 @@ if (opt$mixing == "random") {
     mixing_matrix <- mixing_matrix[M>0,][,M>0]
   }
   mixing_els <- unique(as.vector(mixing_matrix))
+  mixing_els <- mixing_els[mixing_els != 0]
+  cat ("mixing els ", mixing_els, "\n")
   b <- rep(0, max(mixing_matrix))
-  b[mixing_els] <- 1
+  b[mixing_els] <- 0.1
 }
+
+cat ("Species: ", rownames(data)[M>0], "\n")
 
 if (!is.null(opt$ignorezeroes)) {
   M <- M[M>0]
 }
 
 cat ("Target prev=", M/N, "\n")
-cat ("Species: ", rownames(data)[M>0], "\n")
 
 if (is.null(opt$iterations)) {
   iter <- 1000
@@ -92,12 +95,15 @@ for (i in 1:iter) {
 
   nr <- ceiling(abs(rmnorm(1, 0, 2)))
 
-  el <- sample(length(b), nr)
+  el <- sample(x=mixing_els, size=nr)
   for (j in 1:nr) {
     nonzero <- TRUE
     while (nonzero == TRUE) {
-      b[el[j]] <- rnorm(1, mean=b[el[j]], sd=b[el[j]]/10)
-      if (b[el[j]]>0) { nonzero <- FALSE }
+      test <- rnorm(1, mean=b[el[j]], sd=b[el[j]]/10)
+      if (test>0) { 
+        nonzero <- FALSE
+        b[el[j]] <- test 
+      }
     }
   }
   
