@@ -23,7 +23,8 @@ opt = getopt(c(
   'iterations', 'i', 1, "integer",
   'ignorezeroes', 'z', 0, "logical",
   'gambiense', 'g', 0, "logical",
-  'nongambiense', 'n', 0, "logical"
+  'nongambiense', 'n', 0, "logical",
+  'convergence', 'c', 1, "integer"
 ));
 
 # read data
@@ -57,7 +58,11 @@ if (!is.null(opt$ignorezeroes)) {
 
 if (opt$mixing == "random") {
   mixing_matrix <- NA
-  b <- rep(0.1, length(N))
+  mixing_els <- 1:length(M)
+  if (!is.null(opt$ignorezeroes)) {
+    mixing_els <- mixing_els[M>0]
+  }
+  b <- rep(0, length(M))
 } else {
   mixing_matrix <- as.matrix(read.csv(file=opt$mixing, head=FALSE, sep=","))
   if (!is.null(opt$ignorezeroes)) {
@@ -67,9 +72,9 @@ if (opt$mixing == "random") {
   mixing_els <- mixing_els[mixing_els != 0]
   cat ("mixing els ", mixing_els, "\n")
   b <- rep(0, max(mixing_matrix))
-  b[mixing_els] <- 0.1
 }
 
+b[mixing_els] <- 0.1
 cat ("Species: ", rownames(data)[M>0], "\n")
 
 if (!is.null(opt$ignorezeroes)) {
@@ -85,11 +90,29 @@ if (is.null(opt$iterations)) {
 }
   
 l <- -Inf
-  
-for (i in 1:iter) {
+
+## cat ("gamma=", gamma, "\n")
+## cat ("mu=", mu, "\n")
+## cat ("N=", N, "\n")
+## cat ("mixing_structure=", mixing_matrix, "\n")
+
+maxl <- -Inf
+maxb <- b
+convcount <- 0
+
+if (!is.null(opt$convergence)) {
+  iter <- Inf
+}
+
+i <- 0
+
+while (i < iter && (is.null(opt$convergence) || convcount < opt$convergence)) {
+  i <- i + 1
   # propose update
   saveb <- b
   savel <- l
+
+  convcount <- convcount + 1
   
   mult <- FALSE
 
@@ -113,15 +136,31 @@ for (i in 1:iter) {
   cat ("i=", i, ", prev=",prev, "\n")
   l <- ilikelihood(prev, mu, gamma, M, N)
 
-  cat ("i=", i, ", savel=", savel, ", l=", l, ", savel-l=", savel-l, "\n")
-   if (!is.nan(l) && l > savel) {
+  cat ("i=", i, ", savel=", savel, ", l=", l, ", savel-l=", savel-l, ", maxl=",
+       maxl, "\n")
+  accept <- min(c(1, exp(-(savel-l))))
+  if (!is.nan(accept) && runif(1) < accept) {
     # accept
     cat ("i=", i, ", accepted\n")
     savel <- l
     saveb <- b
+    if (l > maxl) {
+      maxl <- l
+      maxb <- b
+      cat ("i=", i, ", reset_convcount=", convcount, "\n")
+      convcount <- 0
+    }
   } else {
+    cat ("i=", i, ", convcount=", convcount, "\n")
     l <- savel
     b <- saveb
   }
-  cat("i=", i, ", b=", saveb,"\n")
+  cat("i=", i, ", b=", b,"\n")
+  cat("i=", i, ", maxb=", maxb,"\n")
+  if (!is.null(opt$convergence) && convcount == opt$convergence) {
+    cat ("Converged\n")
+    cat("i=", i, ", maxl=", maxl,"\n")
+    cat("i=", i, ", b=", maxb,"\n")
+    break
+  }
 }
