@@ -151,10 +151,10 @@ while (i < iter && (is.null(opt$convergence) || convcount < opt$convergence)) {
       convcount <- 0
     }
   } else {
-    cat ("i=", i, ", convcount=", convcount, "\n")
     l <- savel
     b <- saveb
   }
+  cat ("i=", i, ", convcount=", convcount, "\n")
   cat("i=", i, ", b=", b,"\n")
   cat("i=", i, ", maxb=", maxb,"\n")
   if (!is.null(opt$convergence) && convcount == opt$convergence) {
