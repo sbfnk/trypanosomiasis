@@ -2,11 +2,15 @@ mixing <- function(pars, mixing_structure=NA)
   {
     if (is.na(mixing_structure)) {
       # random
-      beta <- matrix(NA, length(pars), length(pars))
       
-      for (i in 1:length(pars)) {
-        for (j in 1:length(pars)) {
-          beta[i,j]=pars[i]*pars[j]
+      beta <- matrix(NA, length(pars), length(pars))
+      beta <- beta[pars>0,][,pars>0]
+
+      b <- pars[pars > 0]
+      
+      for (i in 1:nrow(beta)) {
+        for (j in 1:ncol(beta)) {
+          beta[i,j]=b[i]*b[j]
         }
       }
     } else {
