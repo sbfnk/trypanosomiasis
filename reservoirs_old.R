@@ -147,7 +147,7 @@ while (i < iter && (is.null(opt$convergence) || convcount < opt$convergence)) {
     if (l > maxl) {
       maxl <- l
       maxb <- b
-      cat ("i=", i, ", reset_convcount=", convcount, "\n")
+      cat ("i=", i, ", reset_convcount=", convcount, ", maxl=", maxl, "\n")
       convcount <- 0
     }
   } else {
