@@ -26,6 +26,9 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 0,
           Q <- (unit-proj) %*% NGM
           u_sr <- max(abs(eigen(U)$values))
           q_sr <- max(abs(eigen(Q)$values))
+          if (top) {
+            cat("i =", i, ", u_sr =", u_sr, ", q_sr =", q_sr, "\n")
+          }
           pvec <- c()
           for (j in 1:nrow(proj))  {
             if (proj[j,j] == 1) {
@@ -60,7 +63,7 @@ findres <- function(NGM, projection = matrix(0,nrow(NGM), ncol(NGM)), depth = 0,
           }
         }
       }
-      if (top) {
+      if (top && (length(species_list) > 0)) {
         combos <- matrix(species_list, ncol = depth, byrow = T)
       } else {
         combos <- species_list
