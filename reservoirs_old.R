@@ -70,7 +70,7 @@ if (opt$mixing == "random") {
   }
   mixing_els <- unique(as.vector(mixing_matrix))
   mixing_els <- mixing_els[mixing_els != 0]
-  cat ("mixing els ", mixing_els, "\n")
+#  cat ("mixing els ", mixing_els, "\n")
   b <- rep(0, max(mixing_matrix))
 }
 
@@ -132,16 +132,16 @@ while (i < iter && (is.null(opt$convergence) || convcount < opt$convergence)) {
   
   prev <- pfm(pars=b, gamma=gamma, mu=mu, mixing_structure=mixing_matrix, 
               density=!is.null(opt$density), N=N)
-  cat ("i=", i, ", testb=", b, "\n")
-  cat ("i=", i, ", prev=",prev, "\n")
+#  cat ("i=", i, ", testb=", b, "\n")
+#  cat ("i=", i, ", prev=",prev, "\n")
   l <- ilikelihood(prev, mu, gamma, M, N)
 
-  cat ("i=", i, ", savel=", savel, ", l=", l, ", savel-l=", savel-l, ", maxl=",
-       maxl, "\n")
+#  cat ("i=", i, ", savel=", savel, ", l=", l, ", savel-l=", savel-l, ", maxl=",
+#       maxl, "\n")
   accept <- min(c(1, exp(-(savel-l))))
   if (!is.nan(accept) && runif(1) < accept) {
     # accept
-    cat ("i=", i, ", accepted\n")
+#    cat ("i=", i, ", accepted\n")
     savel <- l
     saveb <- b
     if (l > maxl) {
@@ -154,9 +154,9 @@ while (i < iter && (is.null(opt$convergence) || convcount < opt$convergence)) {
     l <- savel
     b <- saveb
   }
-  cat ("i=", i, ", convcount=", convcount, "\n")
-  cat("i=", i, ", b=", b,"\n")
-  cat("i=", i, ", maxb=", maxb,"\n")
+#  cat ("i=", i, ", convcount=", convcount, "\n")
+#  cat("i=", i, ", b=", b,"\n")
+#  cat("i=", i, ", maxb=", maxb,"\n")
   if (!is.null(opt$convergence) && convcount == opt$convergence) {
     cat ("Converged\n")
     cat("i=", i, ", maxl=", maxl,"\n")
