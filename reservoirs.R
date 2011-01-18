@@ -56,8 +56,6 @@ if (is.null(opt$gambiense)) {
 
 rN <- data$N
 vN <- vector$N
-rsize <- data$size
-vsize <- vector$size
 rprev <- rM/rN
 vprev <- vM/vN
 rmu <- data$mortality
@@ -70,7 +68,7 @@ rtheta <- data$theta
 rabundance <- data$abundance
 vdensity <- vector$density
 
-biting_rate <- params$biting_rate
+biting_rate <- vector$biting_rate
 if (!is.null(opt$area_convert) {
   area_convert <- params$area_convert
 }
@@ -93,7 +91,7 @@ if (!is.null(opt$ignorezeroes)) {
 }
 
 beta <- betaffoiv(rlambda, vlambda, theta, biting_rate, rabundance, vdensity,
-                  area_convert)
+                  area_convert, vprev)
 
 NGM <- matrix(0,length(theta), length(theta))
   NGM[1,2:length(theta)] <- beta / (mu + gamma)
