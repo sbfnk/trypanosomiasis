@@ -1,5 +1,6 @@
 betaffoiv <- function(rlambda, vlambda, theta = NULL, b = NULL,
-                     rabundance = NULL, vdensity = NULL, area_convert = NULL)
+                     rabundance = NULL, vdensity = NULL, area_convert = NULL,
+                      vprev = NULL)
   {
     foi <- function(beta) {
       factor <- beta
