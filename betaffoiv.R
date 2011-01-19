@@ -1,26 +1,7 @@
-betaffoiv <- function(rlambda, vlambda, theta = NULL, b = NULL,
-                     rabundance = NULL, vdensity = NULL, area_convert = NULL,
-                      vprev = NULL)
+betaffoiv <- function(rlambda, vlambda, factor = 1)
   {
     foi <- function(beta) {
-      factor <- beta
-      if (!is.null(theta)) {
-        factor <- factor * lambda
-      }
-      if (!is.null(b)) {
-        factor <- factor * b
-      }
-      if (!is.null(rabundance)) {
-        factor <- factor / b
-      }
-      if (!is.null(vdensity)) {
-        factor <- factor * vdensity
-      }
-      if (!is.null(area_convert)) {
-        factor <- factor * area_convert
-      }
-      r <- beta * (t(beta) %*% (prev*N)) /
-        (mu_vector + (t(beta) %*% (prev*N)))
+      r <- 
       as.vector(r)
     }
 

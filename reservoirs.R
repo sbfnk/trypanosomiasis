@@ -64,7 +64,7 @@ rgamma <- data$rec_rate
 vgamma <- vector$rec_rate
 rlambda <- rprev/(1-rprev)*(rmu + rgamma)
 vlambda <- vprev/(1-vprev)*(vmu + vgamma)
-rtheta <- data$theta
+theta <- data$theta
 rabundance <- data$abundance
 vdensity <- vector$density
 
@@ -90,10 +90,17 @@ if (!is.null(opt$ignorezeroes)) {
   vM <- vM[vM>0]
 }
 
-beta <- betaffoiv(rlambda, vlambda, theta, biting_rate, rabundance, vdensity,
-                  area_convert, vprev)
+beta <- betaffoiv(rlambda, vlambda, joinfactors(theta, biting_rate, rabundance,
+                  vdensity, area_convert))
 
-NGM <- matrix(0,length(theta), length(theta))
+NGM <- matrix(0,length(rgamma)+length(vgamma), length(rgamma)+length(vgamma))
+
+NGM[1:length(vgamma), (length(vgamma)+1):(length(dgamma)+1)])
+for (i in 1:length(vgamma)) {
+  for (j in 1:length(vgamma)) {
+  }    
+}
+    
   NGM[1,2:length(theta)] <- beta / (mu + gamma)
   NGM[2:length(theta), 1] <- sum(beta/N)
 }
