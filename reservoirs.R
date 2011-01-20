@@ -79,7 +79,7 @@ if (!is.null(opt$ignorezeroes)) {
   vgamma <- vgamma[vM>0]
 }
 
-cat ("Species: ", as.vector(data$name[rM>0]), "\n")
+cat ("\n")
 cat ("Vectors: ", as.vector(vector$name[vM>0]), "\n")
 
 if (!is.null(opt$ignorezeroes)) {
@@ -88,15 +88,27 @@ if (!is.null(opt$ignorezeroes)) {
 }
 
 factor <- joinfactors(theta, biting_rate, area_convert)
-beta <- betaffoiv(rlambda, vdensity, rabundance, factor, vprev, rprev, vmu)
+res <- betaffoiv(rlambda, vdensity, rabundance, factor, vprev, rprev, vmu)
+beta <- res$par
 
 NGM <- matrix(0,length(rgamma)+length(vgamma), length(rgamma)+length(vgamma))
 
 NGM[1:length(vgamma),(length(vgamma)+1):(length(vgamma)+length(rgamma))] <-
-  1/vmu %*% t(beta) * facto * vdensity/rabundance
+  1/vmu %*% t(beta) * factor * vdensity/rabundance
 for (i in 1:length(vgamma)) {
   NGM[(length(vgamma)+1):(length(vgamma)+length(rgamma)), i] <-
     beta/(rgamma+rmu)
 }
 
-NGM
+# one vector case
+
+R0 <- sqrt(sum(NGM[2:(length(rgamma)+1), 1] * NGM[1, 2:(length(rgamma)+1)]))
+
+cat ("\nR0: ", R0, "\n")
+cat ("\nVector prevalence: ", sum(beta * factor * rprev) /
+     sum(vmu + beta * factor * rprev), "\n\n")
+cat ("\nbeta: ", beta, "\n\n")
+
+for (i in 1:length(rgamma)) {
+  cat (as.vector(data$name[i]), ": ", NGM[i+1, 1]*NGM[1, i+1], "\n");
+}
