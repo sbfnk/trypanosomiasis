@@ -79,14 +79,12 @@ if (!is.null(opt$ignorezeroes)) {
   vgamma <- vgamma[vM>0]
 }
 
-cat ("\n")
-cat ("Vectors: ", as.vector(vector$name[vM>0]), "\n")
-
 if (!is.null(opt$ignorezeroes)) {
   rM <- rM[rM>0]
   vM <- vM[vM>0]
 }
 
+for (i in 1:1000) {
 factor <- joinfactors(theta, biting_rate, area_convert)
 res <- betaffoiv(rlambda, vdensity, rabundance, factor, vprev, rprev, vmu)
 beta <- res$par
@@ -103,12 +101,4 @@ for (i in 1:length(vgamma)) {
 # one vector case
 
 R0 <- sqrt(sum(NGM[2:(length(rgamma)+1), 1] * NGM[1, 2:(length(rgamma)+1)]))
-
-cat ("\nR0: ", R0, "\n")
-cat ("\nVector prevalence: ", sum(beta * factor * rprev) /
-     sum(vmu + beta * factor * rprev), "\n\n")
-cat ("\nbeta: ", beta, "\n\n")
-
-for (i in 1:length(rgamma)) {
-  cat (as.vector(data$name[i]), ": ", NGM[i+1, 1]*NGM[1, i+1], "\n");
 }
