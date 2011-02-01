@@ -21,6 +21,7 @@ int main(int argc, char* argv[])
   bool gambiense = false;
   bool nonGambiense = false;
   bool vectorPrevalence = false;
+  bool bitingPreference = false;
 
   unsigned int verbose = 0;
 
@@ -48,6 +49,8 @@ int main(int argc, char* argv[])
      "factor to convert area to prevalence")
     ("vector-prevalence,r", 
      "consider vector prevalence")
+    ("biting-preference,b", 
+     "consider biting preference")
     ;
 
   po::variables_map vm;
@@ -107,6 +110,10 @@ int main(int argc, char* argv[])
 
   if (vm.count("vector-prevalence")) {
     vectorPrevalence = true;
+  }
+
+  if (vm.count("biting-preference")) {
+    bitingPreference = true;
   }
 
   std::vector<host> hosts;
@@ -198,7 +205,8 @@ int main(int argc, char* argv[])
   
   // ********************* estimate betas *********************
 
-  betafunc_params p (hosts, vectors, params, vectorPrevalence);
+  betafunc_params p (hosts, vectors, params, vectorPrevalence,
+                     bitingPreference, gambiense, nonGambiense);
 
   std::vector<double> beta;
 

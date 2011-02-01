@@ -123,6 +123,7 @@ struct betafunc_params
                   std::vector<vector> const &vectors,
                   param const &params,
                   bool uvp = false,
+                  bool bp = false,
                   bool tbg = true,
                   bool tbng = false) :
     nSpecies(hosts.size()),
@@ -141,13 +142,23 @@ struct betafunc_params
     }
 
     hAbundance = new double [nSpecies];
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      hAbundance[i] = hosts[i].abundance;
-    }
-    
     theta = new double [nSpecies];
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      theta[i] = hosts[i].theta;
+    
+    if (bp) {
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        hAbundance[i] = hosts[i].theta * hosts[0].abundance / hosts[0].theta; 
+      }
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        theta[i] = 1 / (double)(hosts.size());
+      }
+    } else {
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        hAbundance[i] = hosts[i].abundance;
+      }
+      
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        theta[i] = hosts[i].theta;
+      }
     }
 
     vDensity = new double [nVectorSpecies];
@@ -162,7 +173,7 @@ struct betafunc_params
     if (useVectorPrevalence) {
       vPrevalence = new double [nVectorSpecies];
       for (size_t i = 0; i < vectors.size(); ++i) {
-        vPrevalence[i] = vectors[i].M / static_cast<double>(vectors[i].N);
+        vPrevalence[i] = vectors[i].M / (double)(vectors[i].N);
       }
     } else {
       vMu = new double [nVectorSpecies];
