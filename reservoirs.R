@@ -84,7 +84,6 @@ if (!is.null(opt$ignorezeroes)) {
   vM <- vM[vM>0]
 }
 
-for (i in 1:1000) {
 factor <- joinfactors(theta, biting_rate, area_convert)
 res <- betaffoiv(rlambda, vdensity, rabundance, factor, vprev, rprev, vmu)
 beta <- res$par
@@ -101,4 +100,7 @@ for (i in 1:length(vgamma)) {
 # one vector case
 
 R0 <- sqrt(sum(NGM[2:(length(rgamma)+1), 1] * NGM[1, 2:(length(rgamma)+1)]))
+cat ("R0=", R0, "\n");
+for (i in 1:length(rgamma)) {
+  cat (i, ": ", sqrt(NGM[i+1, 1]*NGM[1, i+1]), "\n")
 }
