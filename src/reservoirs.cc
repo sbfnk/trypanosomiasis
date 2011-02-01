@@ -204,10 +204,27 @@ int main(int argc, char* argv[])
 
   betaffoiv(&p, beta, hosts.size());
 
+  double r0 = 0;
+
+  double domestic = 0;
+  double wildLife = 0;
+  double animal = 0;
+  
   std::cout << "\nNGM contributions: \n";
   for (size_t i = 0; i < hosts.size(); ++i) {
-    double K = beta[i] * beta[i] / (hosts[i].gamma + hosts[i].mu) *
-      params.areaConvert * vectors[0].density / hosts[i].abundance;
+    double K = pow(beta[i] * hosts[i].theta * vectors[0].bitingRate, 2) * 
+      params.areaConvert * vectors[0].density / hosts[i].abundance /
+      ((hosts[i].gamma + hosts[i].mu) * vectors[0].mu);
+    r0 += K;
+    if (i == 0) {
+    } else if (i < 4) {
+      domestic += K;
+      animal += K;
+    } else {
+      wildLife += K;
+      animal += K;
+    }
+      
     double contrib = sqrt(K);
     // std::cout << "beta[" << i << "]=" << beta[i] << ", hosts[" << i
     //           << "].gamma=" << hosts[i].gamma << ", hosts[" << i << "].mu="
@@ -216,7 +233,13 @@ int main(int argc, char* argv[])
     //           << vectors[0].density << ", hosts[" << i << "].abundance="
     //           << hosts[i].abundance << std::endl;
     std::cout << hosts[i].name << ": " << contrib << std::endl;
+
   }
+  std::cout << "\nR0: " << sqrt(r0) << std::endl;
+
+  std::cout << "\nDomestic cycle: " << sqrt(domestic) << std::endl;
+  std::cout << "Wildlife cycle: " << sqrt(wildLife) << std::endl;
+  std::cout << "Domestic+wildlife: " << sqrt(animal) << std::endl;
 }
    
 //------------------------------------------------------------

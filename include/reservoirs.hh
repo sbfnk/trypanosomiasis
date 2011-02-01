@@ -315,21 +315,78 @@ int betafunc_fdf(const gsl_vector * x, void * p, gsl_vector* f, gsl_matrix * J)
   return GSL_SUCCESS;
 }
 
-void betaffoiv(void *betafunc_params, std::vector<double> &beta,
+void betaffoiv(void *p, std::vector<double> &beta,
                size_t nSpecies)
 {
+  // betafunc_params* params = ((struct betafunc_params*) p);
+  // std::cout << "rlambda:";
+  // for (size_t i = 0; i < nSpecies; ++i) {
+  //   std::cout << " " << params->hLambda[i];
+  // }
+  // std::cout << std::endl;
+
+  // std::cout << "vdensity:";
+  // for (size_t i = 0; i < params->nVectorSpecies; ++i) {
+  //   std::cout << " " << params->vDensity[i];
+  // }
+  // std::cout << std::endl;
+
+  // std::cout << "rabundance:";
+  // for (size_t i = 0; i < nSpecies; ++i) {
+  //   std::cout << " " << params->hAbundance[i];
+  // }
+  // std::cout << std::endl;
+  
+  // std::cout << "theta:";
+  // for (size_t i = 0; i < nSpecies; ++i) {
+  //   std::cout << " " << params->theta[i];
+  // }
+  // std::cout << std::endl;
+  
+  // std::cout << "biting_rate:";
+  // for (size_t i = 0; i < params->nVectorSpecies; ++i) {
+  //   std::cout << " " << params->bitingRate[i];
+  // }
+  // std::cout << std::endl;
+
+  // std::cout << "area_convert:";
+  // std::cout << " " << params->area_convert;
+  // std::cout << std::endl;
+
+  // std::cout << "vprev:";
+  // if (params->useVectorPrevalence) {
+  //   for (size_t i = 0; i < params->nVectorSpecies; ++i) {
+  //     std::cout << " " << params->vPrevalence[i];
+  //   }
+  // }
+  // std::cout << std::endl;
+  
+  // std::cout << "rprev:";
+  // for (size_t i = 0; i < nSpecies; ++i) {
+  //   std::cout << " " << params->hPrevalence[i];
+  // }
+  // std::cout << std::endl;
+  
+  // std::cout << "vmu:";
+  // if (!params->useVectorPrevalence) {
+  //   for (size_t i = 0; i < params->nVectorSpecies; ++i) {
+  //     std::cout << " " << params->vMu[i];
+  //   }
+  // }
+  // std::cout << std::endl;
+  
   // const gsl_multiroot_fdfsolver_type * T =
   //   gsl_multiroot_fdfsolver_hybridsj;
   // gsl_multiroot_fdfsolver * s =
   //   gsl_multiroot_fdfsolver_alloc (T, nSpecies);
   // gsl_multiroot_function_fdf f = {&betafunc_f, &betafunc_df, &betafunc_fdf,
-  //                                 nSpecies, betafunc_params};
+  //                                 nSpecies, p};
 
   const gsl_multiroot_fsolver_type * T =
     gsl_multiroot_fsolver_hybrids;
   gsl_multiroot_fsolver * s =
     gsl_multiroot_fsolver_alloc (T, nSpecies);
-  gsl_multiroot_function f = {&betafunc_f, nSpecies, betafunc_params};
+  gsl_multiroot_function f = {&betafunc_f, nSpecies, p};
 
   gsl_vector* x_init = gsl_vector_alloc(nSpecies);
   for (size_t i = 0; i < nSpecies; ++i) {
@@ -340,14 +397,14 @@ void betaffoiv(void *betafunc_params, std::vector<double> &beta,
   gsl_multiroot_fsolver_set(s, &f, x_init);
 
   size_t iter = 0;
-  print_state (iter, s, nSpecies);
+  // print_state (iter, s, nSpecies);
 
   int status;
   do {
     iter++;
     // status = gsl_multiroot_fdfsolver_iterate (s);
     status = gsl_multiroot_fsolver_iterate (s);
-    print_state (iter, s, nSpecies);
+    // print_state (iter, s, nSpecies);
 
     if (status)
       break;
@@ -355,7 +412,7 @@ void betaffoiv(void *betafunc_params, std::vector<double> &beta,
     status = gsl_multiroot_test_residual (s->f, 1e-7);
   } while (status == GSL_CONTINUE && iter < 1000);
 
-  printf ("status = %s\n", gsl_strerror (status));
+  // printf ("status = %s\n", gsl_strerror (status));
 
   beta.resize(nSpecies);
 
