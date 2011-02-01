@@ -208,7 +208,7 @@ int main(int argc, char* argv[])
   for (size_t i = 0; i < hosts.size(); ++i) {
     double K = beta[i] * beta[i] / (hosts[i].gamma + hosts[i].mu) *
       params.areaConvert * vectors[0].density / hosts[i].abundance;
-    double contrib = sqrt(K*K);
+    double contrib = sqrt(K);
     // std::cout << "beta[" << i << "]=" << beta[i] << ", hosts[" << i
     //           << "].gamma=" << hosts[i].gamma << ", hosts[" << i << "].mu="
     //           << hosts[i].mu << ", params.areaConvert="
