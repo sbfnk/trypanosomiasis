@@ -67,7 +67,7 @@ biting_rate <- vector$biting_rate
 if (!is.null(opt$area_convert)) {
   area_convert <- params$area_convert
 } else {
-  area_convert <- NULL
+  area_convert <- 1
 }
 
 if (!is.null(opt$ignorezeroes)) {
@@ -84,17 +84,17 @@ if (!is.null(opt$ignorezeroes)) {
   vM <- vM[vM>0]
 }
 
-factor <- joinfactors(theta, biting_rate, area_convert)
-res <- betaffoiv(rlambda, vdensity, rabundance, factor, vprev, rprev, vmu)
+res <- betaffoiv(rlambda, vdensity, rabundance, theta,
+                 biting_rate, area_convert, vprev, rprev, vmu)
 beta <- res$par
 
 NGM <- matrix(0,length(rgamma)+length(vgamma), length(rgamma)+length(vgamma))
 
 NGM[1:length(vgamma),(length(vgamma)+1):(length(vgamma)+length(rgamma))] <-
-  1/vmu %*% t(beta) * factor * vdensity/rabundance
+  1/vmu * t(beta) * theta * biting_rate * area_convert * vdensity/rabundance 
 for (i in 1:length(vgamma)) {
   NGM[(length(vgamma)+1):(length(vgamma)+length(rgamma)), i] <-
-    beta/(rgamma+rmu)
+    beta * theta * biting_rate /(rgamma+rmu)
 }
 
 # one vector case

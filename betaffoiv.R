@@ -1,12 +1,24 @@
-betaffoiv <- function(rlambda, vdensity, rabundance, factor = 1,
+betaffoiv <- function(rlambda, vdensity, rabundance, theta,
+                      biting_rate, area_convert,
                       vprev = NULL, rprev = NULL, vmu = NULL)
   {
+    ## cat ("rlambda: ", rlambda, "\n")
+    ## cat ("vdensity: ", vdensity, "\n")
+    ## cat ("rabundance: ", rabundance, "\n")
+    ## cat ("theta: ", theta, "\n")
+    ## cat ("biting_rate: ", biting_rate, "\n")
+    ## cat ("area_convert: ", area_convert, "\n")
+    ## cat ("vprev: ", vprev, "\n")
+    ## cat ("rprev: ", rprev, "\n")
+    ## cat ("vmu: ", vmu, "\n")
+
     foi <- function(beta) {
-      r <- beta * factor
+      r <- beta
       if (is.null(vprev)) {
         # nonlinear equation
-        r <- r * vdensity / rabundance * sum(beta * factor * rprev) /
-          sum(vmu + beta * factor * rprev)
+        r <- r * area_convert * vdensity / rabundance *
+          biting_rate*sum(beta * theta * rprev) /
+          (vmu + biting_rate * sum(beta * theta * rprev))
       } else {
         # linear equation
         r <- r * vdensity / rabundance * vprev

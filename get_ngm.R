@@ -14,19 +14,19 @@ get_ngm <- function(data, vector, params, ignorezeroes = TRUE, gambiense = TRUE,
 
   rM <- rep(0, length(rN))
   vM <- rep(0, length(vN))
-  if (!is.null(gambiense)) {
+  if (gambiense) {
     rM <- rM + data$pos_tbg
     vM <- vM + vector$pos_tbg
   }
 
-  if (!is.null(nongambiense)) {
+  if (nongambiense) {
     rM <- rM + data$pos_tbng
     vM <- vM + vector$pos_tbng
   }
 
   rprev <- rM/rN
 
-  if (!is.null(vector_prevalence)) {
+  if (vector_prevalence) {
     vprev <- vM/vN
   } else {
     vprev <- NULL
@@ -44,28 +44,25 @@ get_ngm <- function(data, vector, params, ignorezeroes = TRUE, gambiense = TRUE,
 
   biting_rate <- vector$biting_rate
 
-  if (!is.null(convert_area)) {
+  if (convert_area) {
     area_convert <- params$area_convert
   } else {
-    area_convert <- NULL
+    area_convert <- 1
   }
 
-  if (!is.null(ignorezeroes)) {
+  if (ignorezeroes) {
     rN <- rN[rM>0]
     rmu <- rmu[rM>0]
     rgamma <- rgamma[rM>0]
     vN <- vN[vM>0]
     vmu <- vmu[vM>0]
     vgamma <- vgamma[vM>0]
-  }
-
-  if (!is.null(ignorezeroes)) {
     rM <- rM[rM>0]
     vM <- vM[vM>0]
   }
 
-  factor <- joinfactors(theta, biting_rate, area_convert)
-  res <- betaffoiv(rlambda, vdensity, rabundance, factor, vprev, rprev, vmu)
+  res <- betaffoiv(rlambda, vdensity, rabundance, theta,
+                   biting_rate, area_convert, vprev, rprev, vmu)
   beta <- res$par
 
   NGM <- matrix(0,length(rgamma)+length(vgamma), length(rgamma)+length(vgamma))
