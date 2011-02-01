@@ -1,10 +1,10 @@
 #------ GNU g++ -----------------------------------------------------
 
 CC         = g++
-CPPFLAGS     = -Wall -g -O3 -Iinclude
+CPPFLAGS     = -Wall -I${CODEDIR} -Iinclude -g # -O3
 
 LINKER      = g++
-LDFLAGS   = 
+LDFLAGS     = -lboost_program_options -llapack -llevmar -lgsl -g
 
 #--------------------------------------------------------------------
 
@@ -13,17 +13,17 @@ DEPENDFLAGS = -m
 
 #--------------------------------------------------------------------
 
-SOURCES     = tryps.cc 
+SOURCES     = reservoirs.cc
 OBJECTS     = $(patsubst %.cc,out/%.o,${SOURCES})
 
-EXEC        = tryps
+EXEC        = reservoirs
 #--------------------------------------------------------------------
 
 all:  bin/$(EXEC)
 
 bin/$(EXEC): $(OBJECTS) 
 	@echo ... linking:
-	$(LINKER) $(LDFLAGS) $(OPTFLAGS) $(CPPFLAGS) $(OBJECTS) -o $@
+	$(LINKER) $(OBJECTS) $(LDFLAGS) $(OPTFLAGS) $(CPPFLAGS) -o $@
 	@echo
 
 out/%.o : src/%.cc include/%.hh
@@ -32,7 +32,13 @@ out/%.o : src/%.cc include/%.hh
 	@echo
 
 depend:
-	$(MAKEDEPEND) $(DEPENDFLAGS) $(SOURCES)
+	$(MAKEDEPEND) $(DEPENDFLAGS) src/*.cc
+
+htmldoc:
+	doxygen
+
+pdfdoc: htmldoc
+	$(MAKE) -C doc/latex pdf
 
 clean:
 	@echo ... cleaning $(OBJECTS) $(EXEC)
@@ -40,11 +46,9 @@ clean:
 	@echo ... done
 
 cleaner:
-	@echo '... cleaning also *~, *.x and gmon.out
-	@rm -f bin/* out/* *~ *.x gmon.out $(EXEC)
+	@echo '... cleaning also *~'
+	@rm -f bin/* out/* *~ .#*
 	@echo ... done
 
 #-------------------------------------------------------------------
 # DO NOT DELETE
-
-tryps.o: tryps.hh
