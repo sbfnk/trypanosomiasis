@@ -14,15 +14,15 @@ namespace po = boost::program_options;
 int main(int argc, char* argv[])
 {
 
-  std::string dataFile();
-  std::string vectorFile();
-  std::string paramsFile();
+  std::string dataFile;
+  std::string vectorFile;
+  std::string paramsFile;
 
   bool gambiense = false;
   bool nonGambiense = false;
   bool vectorPrevalence = false;
 
-  param params;
+  unsigned int verbose = 0;
 
   po::options_description main_options
     ("Usage: reservoirs [options]... \n\nOptions");
@@ -42,8 +42,7 @@ int main(int argc, char* argv[])
     ("params-file,p", po::value<std::string>()->
      default_value("params/params.csv"),
      "params file")
-    ("species,s", po::value<std::string>()->
-     default_value("g")
+    ("species,s", po::value<std::string>()->default_value("g"),
      "trypanosome species to consider (g=gambiense, n=nongambiense)")
     ("area-convert,a", 
      "factor to convert area to prevalence")
@@ -54,8 +53,8 @@ int main(int argc, char* argv[])
   po::variables_map vm;
     
   try {
-    po::store(po::command_line_parser(argc, argv).options(main_options).
-              positional(file_option).run(), vm); 
+    po::store(po::command_line_parser(argc, argv).options(main_options).run(),
+              vm);
   }
   catch (std::exception& e) {
     std::cerr << "Error parsing command line parameters: " << e.what()
@@ -63,6 +62,11 @@ int main(int argc, char* argv[])
     return 1;
   }
   po::notify(vm);
+
+  if (vm.count("help")) {
+    std::cout << main_options << std::endl;
+    return 0;
+  }
 
   if (vm.count("verbose")) {
     verbose = 1;
@@ -123,6 +127,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  std::string line;
   while (std::getline(in,line))  {
     std::vector<std::string> lineVector;
     Tokenizer tok(line, sep);
@@ -140,7 +145,7 @@ int main(int argc, char* argv[])
 
   // ********************** read vector file ********************
   
-  in = std::ifstream(vectorFile.c_str());
+  in.open(vectorFile.c_str());
   firstLine = true;
   
   if (!in.is_open()) {
@@ -165,10 +170,9 @@ int main(int argc, char* argv[])
 
   // ********************** read params file ********************
   
-  in = std::ifstream(vectorFile.c_str());
+  in.open(paramsFile.c_str());
   firstLine = true;
   
-  std::ifstream in(vectorFile.c_str());
   if (!in.is_open()) {
     std::cerr << "Could not open " << vectorFile << std::endl;
     return 1;
@@ -194,18 +198,24 @@ int main(int argc, char* argv[])
   
   // ********************* estimate betas *********************
 
-  betafunc_params p(hosts, vectors, params, vectorPrevalence);
+  betafunc_params p (hosts, vectors, params, vectorPrevalence);
 
   std::vector<double> beta;
 
-  betaffoiv(p, beta);
+  betaffoiv(&p, beta, hosts.size());
 
   std::cout << "\nNGM contributions: \n";
   for (size_t i = 0; i < hosts.size(); ++i) {
     double K = beta[i] * beta[i] / (hosts[i].gamma + hosts[i].mu) *
-      area_convert * vector[0].density / hosts[i].abundance;
+      params.areaConvert * vectors[0].density / hosts[i].abundance;
     double contrib = sqrt(K*K);
-    std::cout << hosts[i].name << ": " << K << std::endl;
+    // std::cout << "beta[" << i << "]=" << beta[i] << ", hosts[" << i
+    //           << "].gamma=" << hosts[i].gamma << ", hosts[" << i << "].mu="
+    //           << hosts[i].mu << ", params.areaConvert="
+    //           << params.areaConvert << ", vectors[0]="
+    //           << vectors[0].density << ", hosts[" << i << "].abundance="
+    //           << hosts[i].abundance << std::endl;
+    std::cout << hosts[i].name << ": " << contrib << std::endl;
   }
 }
    
