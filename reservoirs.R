@@ -64,6 +64,7 @@ rabundance <- data$abundance
 vdensity <- vector$density
 
 biting_rate <- vector$biting_rate
+
 if (!is.null(opt$area_convert)) {
   area_convert <- params$area_convert
 } else {
@@ -77,9 +78,7 @@ if (!is.null(opt$ignorezeroes)) {
   vN <- vN[vM>0]
   vmu <- vmu[vM>0]
   vgamma <- vgamma[vM>0]
-}
 
-if (!is.null(opt$ignorezeroes)) {
   rM <- rM[rM>0]
   vM <- vM[vM>0]
 }
@@ -100,6 +99,7 @@ for (i in 1:length(vgamma)) {
 # one vector case
 
 R0 <- sqrt(sum(NGM[2:(length(rgamma)+1), 1] * NGM[1, 2:(length(rgamma)+1)]))
+
 cat ("R0=", R0, "\n");
 for (i in 1:length(rgamma)) {
   cat (i, ": ", sqrt(NGM[i+1, 1]*NGM[1, i+1]), "\n")
