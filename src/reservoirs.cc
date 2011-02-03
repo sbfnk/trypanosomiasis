@@ -394,6 +394,11 @@ int main(int argc, char* argv[])
         (new boost::math::beta_distribution<>
          (hosts[j].M+1, hosts[j].N-hosts[j].M+1));
     }
+    for (size_t j = 0; j < vectors.size(); ++j) {
+      distributions.push_back
+        (new boost::math::beta_distribution<>
+         (vectors[j].M+1, vectors[j].N-vectors[j].M+1));
+    }
 
     unsigned int seed;
     struct timeval tv;
@@ -410,9 +415,17 @@ int main(int argc, char* argv[])
         p.hPrevalence[j] = quantile(*distributions[j], randGen());
         out << " " << p.hPrevalence[j];
       }
+      if (p.useVectorPrevalence) {
+        for (size_t j = 0; j < vectors.size(); ++j) {
+          p.vPrevalence[j] = quantile(*distributions[j+hosts.size()],
+                                      randGen());
+          out << " " << p.vPrevalence[j];
+        }
+      }
+        
 
       betaffoiv(&p, beta);
-      for (size_t j = 0; j < hosts.size(); ++j) {
+      for (size_t j = 0; j < beta.size(); ++j) {
         out << " " << beta[j];
       }
       out << std::endl;
