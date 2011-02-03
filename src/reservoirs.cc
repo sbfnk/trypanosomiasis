@@ -28,6 +28,7 @@ int main(int argc, char* argv[])
   bool nonGambiense = false;
   bool vectorPrevalence = false;
   bool bitingPreference = false;
+  bool jacobian = false;
 
   size_t samples = 0;
 
@@ -65,6 +66,8 @@ int main(int argc, char* argv[])
      "consider biting preference")
     ("samples,m", po::value<size_t>()->default_value(0),
      "number of samples")
+    ("jacobian,j", 
+     "use jacobian")
     ;
 
   po::variables_map vm;
@@ -140,6 +143,10 @@ int main(int argc, char* argv[])
 
   if (vm.count("biting-preference")) {
     bitingPreference = true;
+  }
+
+  if (vm.count("jacobian")) {
+    jacobian = true;
   }
 
   std::vector<host> hosts;
@@ -347,7 +354,7 @@ int main(int argc, char* argv[])
   
   if (samples == 0) {
 
-    betaffoiv(&p, beta);
+    betaffoiv(&p, beta, jacobian, verbose);
 
     double r0 = 0;
 

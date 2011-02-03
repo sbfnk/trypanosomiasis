@@ -155,7 +155,19 @@ struct betafunc_params
   bool useVectorPrevalence;
 };
 
-// void print_state (size_t iter, gsl_multiroot_fdfsolver * s, size_t n)
+void print_state (size_t iter, gsl_multiroot_fdfsolver * s, size_t n)
+{
+  printf ("iter = %3u x =", iter);
+  for (size_t i = 0; i < n; ++i) {
+    printf(" %.3f", gsl_vector_get(s->x, i));
+  }
+  printf("  f(x) =");
+  for (size_t i = 0; i < n; ++i) {
+    printf(" %.3e", gsl_vector_get(s->f, i));
+  }
+  printf("\n");
+}
+
 void print_state (size_t iter, gsl_multiroot_fsolver * s, size_t n)
 {
   printf ("iter = %3u x =", iter);
@@ -237,33 +249,43 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
       }
     }
   } else {
+
+    double hostSum = 0;
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      hostSum += gsl_vector_get(x, i) * params->hosts[i].theta *
+        params->hPrevalence[i];
+    }
+
     for (size_t i = 0; i < params->hosts.size(); ++i) {
       for (size_t j = 0; j < params->hosts.size(); ++j) {
 
         double sum = 0;
 
-        for (size_t l = 0; l < params->hosts.size(); ++l) {
-          sum += gsl_vector_get(x, l) *
-            params->hosts[l].theta * params->hPrevalence[l];
-        }
-        
-        double enumerator;
-        double denominator;
-        
-        double y = 0;
-        
         for (size_t k = 0; k < params->vectors.size(); ++k) {
-          
-          enumerator = - params->params.areaConvert * params->vectors[k].bitingRate *
-            params->hosts[i].abundance * gsl_vector_get(x, i) * params->hosts[i].theta;
+
           if (i == j) {
-            enumerator -= params->hosts[i].abundance * params->params.areaConvert *
-              (params->vectors[k].mu + sum) * sum;
+            sum += params->vectors[k].bitingRate * params->vectors[k].density
+              * (params->vectors[k].mu * params->vectors[k].bitingRate * 
+                 (gsl_vector_get(x, i) * params->hosts[i].theta *
+                params->hPrevalence[i] + hostSum) + pow(hostSum, 2)) /
+              pow(params->vectors[k].mu + params->vectors[k].bitingRate *
+                  hostSum, 2);
+          } else {
+            sum += params->vectors[k].bitingRate * params->vectors[k].density *
+              params->vectors[k].mu * params->vectors[k].bitingRate / 
+              pow(params->vectors[k].mu + params->vectors[k].bitingRate *
+                  hostSum, 2);
           }
-          denominator = 1 / ((params->vectors[k].mu + sum) * (params->vectors[k].mu + sum));
-          
-          y += enumerator /denominator;
         }
+        
+        double y = -sum * params->hosts[i].theta * params->params.areaConvert /
+          params->hosts[i].abundance;
+
+        if (i != j) {
+          y *= gsl_vector_get(x,i) * params->hosts[j].theta *
+            params->hPrevalence[j];
+        } 
+                      
         gsl_matrix_set(J, i, j, y);
       }
     }
@@ -280,7 +302,8 @@ int betafunc_fdf(const gsl_vector * x, void * p, gsl_vector* f, gsl_matrix * J)
   return GSL_SUCCESS;
 }
 
-void betaffoiv(void *p, std::vector<double> &beta)
+void betaffoiv(void *p, std::vector<double> &beta,
+               bool jac = false, unsigned int verbose = 0)
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
@@ -354,17 +377,17 @@ void betaffoiv(void *p, std::vector<double> &beta)
   // }
   // std::cout << std::endl;
   
-  // const gsl_multiroot_fdfsolver_type * T =
-  //   gsl_multiroot_fdfsolver_hybridsj;
-  // gsl_multiroot_fdfsolver * s =
-  //   gsl_multiroot_fdfsolver_alloc (T, params->hosts.size());
-  // gsl_multiroot_function_fdf f = {&betafunc_f, &betafunc_df, &betafunc_fdf,
-  //                                 params->hosts.size(), p};
-
   size_t nvars = params->hosts.size() +
     (params->useVectorPrevalence ? params->vectors.size() : 0);
 
   std::cout << "nvars: " << nvars << std::endl;
+
+  const gsl_multiroot_fdfsolver_type * Tdf =
+    gsl_multiroot_fdfsolver_hybridsj;
+  gsl_multiroot_fdfsolver * sdf =
+    gsl_multiroot_fdfsolver_alloc (Tdf, nvars);
+  gsl_multiroot_function_fdf fdf = {&betafunc_f, &betafunc_df, &betafunc_fdf,
+                                    nvars, p};
 
   const gsl_multiroot_fsolver_type * T =
     gsl_multiroot_fsolver_hybrids;
@@ -377,39 +400,69 @@ void betaffoiv(void *p, std::vector<double> &beta)
     gsl_vector_set(x_init, i, 1);
   }
   
-  // gsl_multiroot_fdfsolver_set(s, &f, x_init);
+  gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
   gsl_multiroot_fsolver_set(s, &f, x_init);
 
   size_t iter = 0;
-  print_state (iter, s, nvars);
+  if (verbose > 0) {
+    if (jac) {
+      print_state (iter, sdf, nvars);
+    } else {
+      print_state (iter, s, nvars);
+    }
+  }
 
   int status;
   do {
     iter++;
-    // status = gsl_multiroot_fdfsolver_iterate (s);
-    status = gsl_multiroot_fsolver_iterate (s);
-    print_state (iter, s, nvars);
+    if (jac) {
+      status = gsl_multiroot_fdfsolver_iterate (sdf);
+    } else {
+      status = gsl_multiroot_fsolver_iterate (s);
+    }
+
+    if (verbose > 0) {
+      if (jac) {
+        print_state (iter, sdf, nvars);
+      } else {
+        print_state (iter, s, nvars);
+      }
+    }
 
     if (status)
       break;
 
-    status = gsl_multiroot_test_residual (s->f, 1e-7);
+    if (jac) {
+      status = gsl_multiroot_test_residual (sdf->f, 1e-7);
+    } else {
+      status = gsl_multiroot_test_residual (s->f, 1e-7);
+    }
   } while (status == GSL_CONTINUE && iter < 1000);
 
-  printf ("status = %s\n", gsl_strerror (status));
+  if (verbose > 0) {
+    printf ("status = %s\n", gsl_strerror (status));
+  }
 
   beta.resize(nvars);
+  gsl_vector* sol;
+
+  if (jac) {
+    sol = sdf->x;
+  } else {
+    sol = s->x;
+  }
 
   for (size_t i = 0; i < params->hosts.size(); ++i) {
-    beta[i] = gsl_vector_get(s->x, i);
+    beta[i] = gsl_vector_get(sol, i);
   }
-  if (params->useVectorPrevalence) {       
+  if (params->useVectorPrevalence) {
     for (size_t i = 0; i < params->vectors.size(); ++i) {
-      beta[i+params->hosts.size()] = gsl_vector_get(s->x, i+params->hosts.size());
+      beta[i+params->hosts.size()] =
+        gsl_vector_get(sol, i+params->hosts.size());
     }
   }
 
-  // gsl_multiroot_fdfsolver_free (s);
+  gsl_multiroot_fdfsolver_free (sdf);
   gsl_multiroot_fsolver_free (s);
   gsl_vector_free (x_init);
 }
