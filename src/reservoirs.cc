@@ -408,12 +408,12 @@ int main(int argc, char* argv[])
       out << i;
       for (size_t j = 0; j < hosts.size(); ++j) {
         p.hPrevalence[j] = quantile(*distributions[j], randGen());
-        out << "," << p.hPrevalence[j];
+        out << " " << p.hPrevalence[j];
       }
 
       betaffoiv(&p, beta);
       for (size_t j = 0; j < hosts.size(); ++j) {
-        out << "," << beta[j];
+        out << " " << beta[j];
       }
       out << std::endl;
     }
