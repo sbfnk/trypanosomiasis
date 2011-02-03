@@ -232,22 +232,45 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
   betafunc_params* params = ((struct betafunc_params*) p);
 
   if (params->useVectorPrevalence) {
+    double hostSum = 0;
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      hostSum += gsl_vector_get(x, i) * params->hosts[i].theta *
+        params->hPrevalence[i];
+    }
+    
     double vectorSum = 0;
     for (size_t i = 0; i < params->vectors.size(); ++i) {
-      vectorSum += params->vectors[i].density * params->vPrevalence[i];
+      vectorSum += params->vectors[i].density * params->vPrevalence[i] *
+        params->vectors[i].bitingRate;
     }
     
     for (size_t i = 0; i < params->hosts.size(); ++i) {
       for (size_t j = 0; j < params->hosts.size(); ++j) {
         if (i == j) {
-          double y = - params->params.areaConvert * vectorSum /
-            params->hosts[i].abundance;
+          double y = - params->hosts[i].theta * params->params.areaConvert *
+            vectorSum / params->hosts[i].abundance;
           gsl_matrix_set(J, i, j, y);
         } else {
           gsl_matrix_set(J, i, j, 0);
         }
       }
+      for (size_t j = 0; j < params->vectors.size(); ++j) {
+        gsl_matrix_set(J, i, params->hosts.size()+j, 0);
+      }
     }
+    for (size_t i = 0; i < params->vectors.size(); ++i) {
+      for (size_t j = 0; j < params->hosts.size(); ++j) {
+        double y = -params->vectors[i].bitingRate *
+          gsl_vector_get(x, params->hosts.size()+i) *
+          params->hosts[j].theta * params->hPrevalence[j];
+        gsl_matrix_set(J, params->hosts.size()+i, j, y);
+      }
+      for (size_t j = 0; j < params->vectors.size(); ++j) {
+        double y = -params->vectors[i].bitingRate * hostSum;
+        gsl_matrix_set(J, params->hosts.size()+i, params->hosts.size()+j, y);
+      }
+    }
+      
   } else {
 
     double hostSum = 0;
