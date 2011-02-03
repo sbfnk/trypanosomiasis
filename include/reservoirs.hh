@@ -403,8 +403,6 @@ void betaffoiv(void *p, std::vector<double> &beta,
   size_t nvars = params->hosts.size() +
     (params->useVectorPrevalence ? params->vectors.size() : 0);
 
-  std::cout << "nvars: " << nvars << std::endl;
-
   const gsl_multiroot_fdfsolver_type * Tdf =
     gsl_multiroot_fdfsolver_hybridsj;
   gsl_multiroot_fdfsolver * sdf =
