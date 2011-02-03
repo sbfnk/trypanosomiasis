@@ -39,6 +39,8 @@ int main(int argc, char* argv[])
   main_options.add_options()
     ("help,h",
      "produce help message")
+    ("longhelp,H",
+     "produce long help message")
     ("verbose,v",
      "produce verbose output")
     ("very-verbose,V",
@@ -55,7 +57,7 @@ int main(int argc, char* argv[])
      "output file")
     ("species,s", po::value<std::string>()->default_value("g"),
      "trypanosome species to consider (g=gambiense, n=nongambiense)")
-    ("area-convert,a", 
+    ("convert-area,c", 
      "factor to convert area to prevalence")
     ("vector-prevalence,r", 
      "consider vector prevalence")
@@ -68,8 +70,8 @@ int main(int argc, char* argv[])
   po::variables_map vm;
     
   try {
-    po::store(po::command_line_parser(argc, argv).options(main_options).run(),
-              vm);
+    po::store(po::command_line_parser(argc, argv).options(main_options).
+              allow_unregistered().run(), vm);
   }
   catch (std::exception& e) {
     std::cerr << "Error parsing command line parameters: " << e.what()
@@ -174,6 +176,24 @@ int main(int argc, char* argv[])
   }
   in.close();
 
+  po::options_description host_options
+    ("\nHost options");
+
+  for (size_t i = 0; i < hosts.size(); ++i) {
+    host_options.add_options()
+      ((hosts[i].name+"-M").c_str(), po::value<size_t>());
+    host_options.add_options()
+      ((hosts[i].name+"-N").c_str(), po::value<size_t>());
+    host_options.add_options()
+      ((hosts[i].name+"-mu").c_str(), po::value<double>());
+    host_options.add_options()
+      ((hosts[i].name+"-gamma").c_str(), po::value<double>());
+    host_options.add_options()
+      ((hosts[i].name+"-theta").c_str(), po::value<double>());
+    host_options.add_options()
+      ((hosts[i].name+"-abundance").c_str(), po::value<double>());
+  }
+
   // ********************** read vector file ********************
   
   in.open(vectorFile.c_str());
@@ -199,6 +219,24 @@ int main(int argc, char* argv[])
   }
   in.close();
 
+  po::options_description vector_options
+    ("\nVector options");
+  
+  for (size_t i = 0; i < vectors.size(); ++i) {
+    vector_options.add_options()
+      ((vectors[i].name+"-M").c_str(), po::value<size_t>());
+    vector_options.add_options()
+      ((vectors[i].name+"-N").c_str(), po::value<size_t>());
+    vector_options.add_options()
+      ((vectors[i].name+"-mu").c_str(), po::value<double>());
+    vector_options.add_options()
+      ((vectors[i].name+"-gamma").c_str(), po::value<double>());
+    vector_options.add_options()
+      ((vectors[i].name+"-biting-rate").c_str(), po::value<double>());
+    vector_options.add_options()
+      ((vectors[i].name+"-density").c_str(), po::value<double>());
+  }
+
   // ********************** read params file ********************
   
   in.open(paramsFile.c_str());
@@ -223,19 +261,93 @@ int main(int argc, char* argv[])
   }
   in.close();
 
-  if (!vm.count("area-convert")) {
+  po::options_description param_options
+    ("\nParameter options");
+
+  param_options.add_options()
+    ("area-convert", po::value<double>());
+
+  if (!vm.count("convert-area")) {
     params.areaConvert = 1.;
+  }
+
+  if (vm.count("longhelp")) {
+    std::cout << main_options << host_options << vector_options
+              << param_options;
+  }
+
+  // ************** read additional parameters ****************
+
+  po::options_description long_options;
+  long_options.add(main_options).
+    add(host_options).add(vector_options).
+    add(param_options);
+  
+  try {
+    po::store(po::command_line_parser(argc, argv).
+              options(long_options).run(), vm);
+  }
+  catch (std::exception& e) {
+    std::cerr << "Error parsing command line parameters: " << e.what()
+              << std::endl;
+    return 1;
+  }
+  po::notify(vm);
+
+  for (size_t i = 0; i < hosts.size(); ++i) {
+    if (vm.count((hosts[i].name+"-M").c_str())) {
+      hosts[i].M = vm[(hosts[i].name+"-M").c_str()].as<size_t>();
+    }
+    if (vm.count((hosts[i].name+"-N").c_str())) {
+      hosts[i].N = vm[(hosts[i].name+"-N").c_str()].as<size_t>(); 
+    }
+    if (vm.count((hosts[i].name+"-mu").c_str())) {
+      hosts[i].mu = vm[(hosts[i].name+"-mu").c_str()].as<double>(); 
+    }
+    if (vm.count((hosts[i].name+"-gamma").c_str())) {
+      hosts[i].gamma = vm[(hosts[i].name+"-gamma").c_str()].as<double>(); 
+    }
+    if (vm.count((hosts[i].name+"-theta").c_str())) {
+      hosts[i].theta = vm[(hosts[i].name+"-theta").c_str()].as<double>(); 
+    }
+    if (vm.count((hosts[i].name+"-abundance").c_str())) {
+      hosts[i].abundance = vm[(hosts[i].name+"-abundance").c_str()].as<double>();
+    }
+  }
+  for (size_t i = 0; i < vectors.size(); ++i) {
+    if (vm.count((vectors[i].name+"-M").c_str())) {
+      vectors[i].M = vm[(vectors[i].name+"-M").c_str()].as<size_t>(); 
+    }
+    if (vm.count((vectors[i].name+"-N").c_str())) {
+      vectors[i].N = vm[(vectors[i].name+"-N").c_str()].as<size_t>(); 
+    }
+    if (vm.count((vectors[i].name+"-mu").c_str())) {
+      vectors[i].mu = vm[(vectors[i].name+"-mu").c_str()].as<double>(); 
+    }
+    if (vm.count((vectors[i].name+"-gamma").c_str())) {
+      vectors[i].gamma = vm[(vectors[i].name+"-gamma").c_str()].as<double>(); 
+    }
+    if (vm.count((vectors[i].name+"-biting-rate").c_str())) {
+      vectors[i].bitingRate = vm[(vectors[i].name+"-biting-rate").c_str()].as<double>();
+    }
+    if (vm.count((vectors[i].name+"-density").c_str())) {
+      vectors[i].density = vm[(vectors[i].name+"-density").c_str()].as<double>(); 
+    }
+  }
+  
+  if (vm.count("area-convert")) {
+    params.areaConvert = vm["area-convert"].as<double>();
   }
   
   // ********************* estimate betas *********************
 
   betafunc_params p (hosts, vectors, params, vectorPrevalence,
-                     bitingPreference, gambiense, nonGambiense);
+                     bitingPreference);
   std::vector<double> beta;
   
   if (samples == 0) {
 
-    betaffoiv(&p, beta, hosts.size());
+    betaffoiv(&p, beta);
 
     double r0 = 0;
 
@@ -299,7 +411,7 @@ int main(int argc, char* argv[])
         out << "," << p.hPrevalence[j];
       }
 
-      betaffoiv(&p, beta, hosts.size());
+      betaffoiv(&p, beta);
       for (size_t j = 0; j < hosts.size(); ++j) {
         out << "," << beta[j];
       }

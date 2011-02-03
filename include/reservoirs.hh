@@ -123,94 +123,25 @@ struct betafunc_params
                   std::vector<vector> const &vectors,
                   param const &params,
                   bool uvp = false,
-                  bool bp = false,
-                  bool tbg = true,
-                  bool tbng = false) :
-    nSpecies(hosts.size()),
-    nVectorSpecies(vectors.size()),
-    area_convert(params.areaConvert),
+                  bool bp = false) :
+    hosts(hosts),
+    vectors(vectors),
+    params(params),
+    hLambda(std::vector<double>(hosts.size())),
+    hPrevalence(std::vector<double>(hosts.size())),
+    vPrevalence(std::vector<double>(vectors.size())),
     useVectorPrevalence(uvp)
-  {
-    hPrevalence = new double [nSpecies];
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      hPrevalence[i] = hosts[i].M / static_cast<double>(hosts[i].N);
-    }
-    hLambda = new double [nSpecies];
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      hLambda[i] = hPrevalence[i] / (1-hPrevalence[i]) *
-        (hosts[i].gamma + hosts[i].mu);
-    }
+  {}
 
-    hAbundance = new double [nSpecies];
-    theta = new double [nSpecies];
-    
-    if (bp) {
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        hAbundance[i] = hosts[i].theta * hosts[0].abundance / hosts[0].theta; 
-      }
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        theta[i] = 1 / (double)(hosts.size());
-      }
-    } else {
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        hAbundance[i] = hosts[i].abundance;
-      }
-      
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        theta[i] = hosts[i].theta;
-      }
-    }
-
-    vDensity = new double [nVectorSpecies];
-    for (size_t i = 0; i < vectors.size(); ++i) {
-      vDensity[i] = vectors[i].density;
-    }
-    bitingRate = new double [nVectorSpecies];
-    for (size_t i = 0; i < vectors.size(); ++i) {
-      bitingRate[i] = vectors[i].bitingRate;
-    }
-
-    if (useVectorPrevalence) {
-      vPrevalence = new double [nVectorSpecies];
-      for (size_t i = 0; i < vectors.size(); ++i) {
-        vPrevalence[i] = vectors[i].M / (double)(vectors[i].N);
-      }
-    } else {
-      vMu = new double [nVectorSpecies];
-      for (size_t i = 0; i < vectors.size(); ++i) {
-        vMu[i] = vectors[i].mu;
-      }
-    }
-  }
-
-  ~betafunc_params() {
-    delete [] hLambda;
-    delete [] vDensity;
-    delete [] hAbundance;
-    delete [] theta;
-    delete [] hPrevalence;
-    delete [] bitingRate;
-    if (useVectorPrevalence) {
-      delete [] vPrevalence;
-    } else {
-      delete [] vMu;
-    }
-  }
+  std::vector<host> const &hosts;
+  std::vector<vector> const &vectors;
+  param const& params;
   
-  size_t nSpecies;
-  size_t nVectorSpecies;
-
-  double* hLambda;
-  double* vDensity;
-  double* hAbundance;
-  double* theta;
-  double* hPrevalence;
-  double* bitingRate;
-  double area_convert;
+  std::vector<double> hLambda;
+  std::vector<double> hPrevalence;
+  std::vector<double> vPrevalence;
 
   bool useVectorPrevalence;
-  double* vPrevalence;
-  double* vMu;
 };
 
 // void print_state (size_t iter, gsl_multiroot_fdfsolver * s, size_t n)
@@ -231,31 +162,28 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
-  double* vPrevalence;
-  if (params->useVectorPrevalence) {
-    vPrevalence = params->vPrevalence;
-  } else {
-    vPrevalence = new double [params->nVectorSpecies];
-    for (size_t i = 0; i < params->nVectorSpecies; ++i) {
+  if (!params->useVectorPrevalence) {
+    for (size_t i = 0; i < params->vectors.size(); ++i) {
       double sum = 0;
-      for (size_t j = 0; j < params->nSpecies; ++j) {
-        sum += gsl_vector_get(x, j) * params->theta[j] *
+      for (size_t j = 0; j < params->hosts.size(); ++j) {
+        sum += gsl_vector_get(x, j) * params->hosts[j].theta *
           params->hPrevalence[j];
       }
-      vPrevalence[i] = params->bitingRate[i] * sum /
-        (params->vMu[i] + params->bitingRate[i] * sum);
+      params->vPrevalence[i] = params->vectors[i].bitingRate * sum /
+        (params->vectors[i].mu + params->vectors[i].bitingRate * sum);
     }
   }
 
   double vectorSum = 0;
-  for (size_t i = 0; i < params->nVectorSpecies; ++i) {
-    vectorSum += params->vDensity[i] * vPrevalence[i];
+  for (size_t i = 0; i < params->vectors.size(); ++i) {
+    vectorSum += params->vectors[i].bitingRate * params->vectors[i].density *
+      params->vPrevalence[i]; 
   }
 
-  for (size_t i = 0; i < params->nSpecies; ++i) {
+  for (size_t i = 0; i < params->hosts.size(); ++i) {
     double beta = gsl_vector_get(x, i);
-    double y = params->hLambda[i] - beta * params->area_convert * vectorSum /
-      params->hAbundance[i];
+    double y = params->hLambda[i] - beta * params->hosts[i].theta *
+      params->params.areaConvert * vectorSum / params->hosts[i].abundance;
     gsl_vector_set(f, i, y);
   }
 
@@ -268,14 +196,15 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
 
   if (params->useVectorPrevalence) {
     double vectorSum = 0;
-    for (size_t i = 0; i < params->nVectorSpecies; ++i) {
-      vectorSum += params->vDensity[i] * params->vPrevalence[i];
+    for (size_t i = 0; i < params->vectors.size(); ++i) {
+      vectorSum += params->vectors[i].density * params->vPrevalence[i];
     }
     
-    for (size_t i = 0; i < params->nSpecies; ++i) {
-      for (size_t j = 0; j < params->nSpecies; ++j) {
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      for (size_t j = 0; j < params->hosts.size(); ++j) {
         if (i == j) {
-          double y = - params->area_convert * vectorSum / params->hAbundance[i];
+          double y = - params->params.areaConvert * vectorSum /
+            params->hosts[i].abundance;
           gsl_matrix_set(J, i, j, y);
         } else {
           gsl_matrix_set(J, i, j, 0);
@@ -283,14 +212,14 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
       }
     }
   } else {
-    for (size_t i = 0; i < params->nSpecies; ++i) {
-      for (size_t j = 0; j < params->nSpecies; ++j) {
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      for (size_t j = 0; j < params->hosts.size(); ++j) {
 
         double sum = 0;
 
-        for (size_t l = 0; l < params->nSpecies; ++l) {
+        for (size_t l = 0; l < params->hosts.size(); ++l) {
           sum += gsl_vector_get(x, l) *
-            params->theta[l] * params->hPrevalence[l];
+            params->hosts[l].theta * params->hPrevalence[l];
         }
         
         double enumerator;
@@ -298,15 +227,15 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
         
         double y = 0;
         
-        for (size_t k = 0; k < params->nVectorSpecies; ++k) {
+        for (size_t k = 0; k < params->vectors.size(); ++k) {
           
-          enumerator = - params->area_convert * params->bitingRate[k] *
-            params->hAbundance[i] * gsl_vector_get(x, i) * params->theta[i];
+          enumerator = - params->params.areaConvert * params->vectors[k].bitingRate *
+            params->hosts[i].abundance * gsl_vector_get(x, i) * params->hosts[i].theta;
           if (i == j) {
-            enumerator -= params->hAbundance[i] * params->area_convert *
-              (params->vMu[k] + sum) * sum;
+            enumerator -= params->hosts[i].abundance * params->params.areaConvert *
+              (params->vectors[k].mu + sum) * sum;
           }
-          denominator = 1 / ((params->vMu[k] + sum) * (params->vMu[k] + sum));
+          denominator = 1 / ((params->vectors[k].mu + sum) * (params->vectors[k].mu + sum));
           
           y += enumerator /denominator;
         }
@@ -326,62 +255,74 @@ int betafunc_fdf(const gsl_vector * x, void * p, gsl_vector* f, gsl_matrix * J)
   return GSL_SUCCESS;
 }
 
-void betaffoiv(void *p, std::vector<double> &beta,
-               size_t nSpecies)
+void betaffoiv(void *p, std::vector<double> &beta)
 {
-  // betafunc_params* params = ((struct betafunc_params*) p);
+  betafunc_params* params = ((struct betafunc_params*) p);
+
+  for (size_t i = 0; i < params->hosts.size(); ++i) {
+    params->hPrevalence[i] = params->hosts[i].M /
+      static_cast<double>(params->hosts[i].N);
+    params->hLambda[i] = params->hPrevalence[i] /
+      (1-params->hPrevalence[i]) *
+      (params->hosts[i].gamma + params->hosts[i].mu);
+  }
+  
+  for (size_t i = 0; i < params->vectors.size(); ++i) {
+    params->vPrevalence[i] = params->vectors[i].M /
+      static_cast<double>(params->vectors[i].N);
+  }
   // std::cout << "rlambda:";
-  // for (size_t i = 0; i < nSpecies; ++i) {
+  // for (size_t i = 0; i < params->hosts.size(); ++i) {
   //   std::cout << " " << params->hLambda[i];
   // }
   // std::cout << std::endl;
 
   // std::cout << "vdensity:";
-  // for (size_t i = 0; i < params->nVectorSpecies; ++i) {
-  //   std::cout << " " << params->vDensity[i];
+  // for (size_t i = 0; i < params->vectors.size(); ++i) {
+  //   std::cout << " " << params->vectors[i].density;
   // }
   // std::cout << std::endl;
 
   // std::cout << "rabundance:";
-  // for (size_t i = 0; i < nSpecies; ++i) {
-  //   std::cout << " " << params->hAbundance[i];
+  // for (size_t i = 0; i < params->hosts.size(); ++i) {
+  //   std::cout << " " << params->hosts[i].abundance;
   // }
   // std::cout << std::endl;
   
   // std::cout << "theta:";
-  // for (size_t i = 0; i < nSpecies; ++i) {
-  //   std::cout << " " << params->theta[i];
+  // for (size_t i = 0; i < params->hosts.size(); ++i) {
+  //   std::cout << " " << params->hosts[i].theta;
   // }
   // std::cout << std::endl;
   
   // std::cout << "biting_rate:";
-  // for (size_t i = 0; i < params->nVectorSpecies; ++i) {
-  //   std::cout << " " << params->bitingRate[i];
+  // for (size_t i = 0; i < params->vectors.size(); ++i) {
+  //   std::cout << " " << params->vectors[i].bitingRate;
   // }
   // std::cout << std::endl;
 
   // std::cout << "area_convert:";
-  // std::cout << " " << params->area_convert;
+  // std::cout << " " << params->params.areaConvert;
   // std::cout << std::endl;
 
   // std::cout << "vprev:";
   // if (params->useVectorPrevalence) {
-  //   for (size_t i = 0; i < params->nVectorSpecies; ++i) {
+  //   for (size_t i = 0; i < params->vectors.size(); ++i) {
   //     std::cout << " " << params->vPrevalence[i];
   //   }
   // }
   // std::cout << std::endl;
   
   // std::cout << "rprev:";
-  // for (size_t i = 0; i < nSpecies; ++i) {
+  // for (size_t i = 0; i < params->hosts.size(); ++i) {
   //   std::cout << " " << params->hPrevalence[i];
   // }
   // std::cout << std::endl;
   
   // std::cout << "vmu:";
   // if (!params->useVectorPrevalence) {
-  //   for (size_t i = 0; i < params->nVectorSpecies; ++i) {
-  //     std::cout << " " << params->vMu[i];
+  //   for (size_t i = 0; i < params->vectors.size(); ++i) {
+  //     std::cout << " " << params->vectors[i].mu;
   //   }
   // }
   // std::cout << std::endl;
@@ -389,33 +330,33 @@ void betaffoiv(void *p, std::vector<double> &beta,
   // const gsl_multiroot_fdfsolver_type * T =
   //   gsl_multiroot_fdfsolver_hybridsj;
   // gsl_multiroot_fdfsolver * s =
-  //   gsl_multiroot_fdfsolver_alloc (T, nSpecies);
+  //   gsl_multiroot_fdfsolver_alloc (T, params->hosts.size());
   // gsl_multiroot_function_fdf f = {&betafunc_f, &betafunc_df, &betafunc_fdf,
-  //                                 nSpecies, p};
+  //                                 params->hosts.size(), p};
 
   const gsl_multiroot_fsolver_type * T =
     gsl_multiroot_fsolver_hybrids;
   gsl_multiroot_fsolver * s =
-    gsl_multiroot_fsolver_alloc (T, nSpecies);
-  gsl_multiroot_function f = {&betafunc_f, nSpecies, p};
+    gsl_multiroot_fsolver_alloc (T, params->hosts.size());
+  gsl_multiroot_function f = {&betafunc_f, params->hosts.size(), p};
 
-  gsl_vector* x_init = gsl_vector_alloc(nSpecies);
-  for (size_t i = 0; i < nSpecies; ++i) {
+  gsl_vector* x_init = gsl_vector_alloc(params->hosts.size());
+  for (size_t i = 0; i < params->hosts.size(); ++i) {
     gsl_vector_set(x_init, i, 1);
   }
   
-  // gsl_multiroot_fdfsolver_set(s, &f, x);
+  // gsl_multiroot_fdfsolver_set(s, &f, x_init);
   gsl_multiroot_fsolver_set(s, &f, x_init);
 
   size_t iter = 0;
-  // print_state (iter, s, nSpecies);
+  // print_state (iter, s, params->hosts.size());
 
   int status;
   do {
     iter++;
     // status = gsl_multiroot_fdfsolver_iterate (s);
     status = gsl_multiroot_fsolver_iterate (s);
-    // print_state (iter, s, nSpecies);
+    // print_state (iter, s, params->hosts.size());
 
     if (status)
       break;
@@ -425,9 +366,9 @@ void betaffoiv(void *p, std::vector<double> &beta,
 
   // printf ("status = %s\n", gsl_strerror (status));
 
-  beta.resize(nSpecies);
+  beta.resize(params->hosts.size());
 
-  for (size_t i = 0; i < nSpecies; ++i) {
+  for (size_t i = 0; i < params->hosts.size(); ++i) {
     beta[i] = gsl_vector_get(s->x, i);
   }
   
