@@ -131,7 +131,16 @@ struct betafunc_params
     hPrevalence(std::vector<double>(hosts.size())),
     vPrevalence(std::vector<double>(vectors.size())),
     useVectorPrevalence(uvp)
-  {}
+  {
+    for (size_t i = 0; i <hosts.size(); ++i) {
+      hPrevalence[i] = hosts[i].M /
+        static_cast<double>(hosts[i].N);
+    }
+    for (size_t i = 0; i < vectors.size(); ++i) {
+      vPrevalence[i] = vectors[i].M /
+        static_cast<double>(vectors[i].N);
+    }
+  }
 
   std::vector<host> const &hosts;
   std::vector<vector> const &vectors;
@@ -259,18 +268,12 @@ void betaffoiv(void *p, std::vector<double> &beta)
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
-  for (size_t i = 0; i < params->hosts.size(); ++i) {
-    params->hPrevalence[i] = params->hosts[i].M /
-      static_cast<double>(params->hosts[i].N);
+  for (size_t i = 0; i < params->vectors.size(); ++i) {
     params->hLambda[i] = params->hPrevalence[i] /
       (1-params->hPrevalence[i]) *
       (params->hosts[i].gamma + params->hosts[i].mu);
   }
   
-  for (size_t i = 0; i < params->vectors.size(); ++i) {
-    params->vPrevalence[i] = params->vectors[i].M /
-      static_cast<double>(params->vectors[i].N);
-  }
   // std::cout << "rlambda:";
   // for (size_t i = 0; i < params->hosts.size(); ++i) {
   //   std::cout << " " << params->hLambda[i];
