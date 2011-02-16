@@ -431,9 +431,19 @@ int main(int argc, char* argv[])
       }
         
 
-      betaffoiv(&p, beta);
-      for (size_t j = 0; j < beta.size(); ++j) {
-        out << " " << beta[j];
+      //betaffoiv(&p, beta);
+
+      std::vector<double> contribs (hosts.size());
+      double contrib_sum = .0;
+      for (size_t j = 0; j < hosts.size(); ++j) {
+        double c = pow(p.hPrevalence[j], 2) / (1-p.hPrevalence[j]) *
+          hosts[j].abundance * (hosts[j].mu + hosts[j].gamma);
+        contribs.push_back(c/((1-p.vPrevalence[0])*(1-p.hPrevalence[j])));
+        contrib_sum += j;
+      }
+      for (size_t j = 0; j < contribs.size(); ++j) {
+        contribs[j] = contribs[j]/contrib_sum;
+        out << " " << contribs[j];
       }
       out << std::endl;
     }
