@@ -46,7 +46,7 @@ if (!is.null(opt$area_convert)) {
 res_data <- matrix(scan(opt$file), byrow=TRUE, ncol=2*offset-1)
 
 pdf(paste("human_data.pdf"))
-human_data <- sqrt(res_data[,offset+1]*res_data[,offset+1]*theta[1]*biting_rate*area_convert*vdensity/rabundance[1]/vmu*theta[1]*biting_rate/(rgamma[1]+rmu[1]))
+human_data <- sqrt(res_data[,offset+1])
 hist(main="Human", breaks=100, freq=F, x=human_data, xlab="R0", ylab="Likelihood")
 lines(density(human_data), col="red")
 CIrand <- quantile(x=human_data, probs=c(0.025, 0.975))
@@ -57,7 +57,7 @@ dev.off()
 
 pdf(paste("species_data.pdf"))
 for (i in 1:12)  {
-  species_data<- sqrt(res_data[,i+offset]*res_data[,i+offset]*theta[i]*biting_rate*area_convert*vdensity/rabundance[i]/vmu*theta[i]*biting_rate/(rgamma[i]+rmu[i]))
+  species_data<- sqrt(res_data[,i+offset])
   hist(main=data$name[i], breaks=100, freq=F, x=species_data, xlab="R0", ylab="Likelihood")
   lines(density(species_data), col="red")
   CIrand <- quantile(x=species_data, probs=c(0.025, 0.975))
@@ -71,7 +71,7 @@ pdf(paste("domestic.pdf"))
 species_data <- rep(0, 1000000)
 for (i in 2:4) {
   species_data <- species_data +
-    res_data[,i+offset]*res_data[,i+offset]*theta[i]*biting_rate*area_convert*vdensity/rabundance[i]/vmu*theta[i]*biting_rate/(rgamma[i]+rmu[i])
+    res_data[,i+offset]
 }
 species_data <- sqrt(species_data)
 hist(main="Domestic cycle", breaks=100, freq=F, x=species_data, xlab="R0", ylab="Likelihood")
@@ -86,7 +86,7 @@ pdf(paste("wildlife.pdf"))
 species_data <- rep(0, 1000000)
 for (i in 5:12) {
   species_data <- species_data +
-    res_data[,i+offset]*res_data[,i+offset]*theta[i]*biting_rate*area_convert*vdensity/rabundance[i]/vmu*theta[i]*biting_rate/(rgamma[i]+rmu[i])
+    res_data[,i+offset]
 }
 species_data <- sqrt(species_data)
 hist(main="Wildlife cycle", breaks=100, freq=F, x=species_data, xlab="R0", ylab="Likelihood")
@@ -101,7 +101,7 @@ pdf(paste("dom_wild.pdf"))
 species_data <- rep(0, 1000000)
 for (i in 2:12) {
   species_data <- species_data +
-    res_data[,i+offset]*res_data[,i+offset]*theta[i]*biting_rate*area_convert*vdensity/rabundance[i]/vmu*theta[i]*biting_rate/(rgamma[i]+rmu[i])
+    res_data[,i+offset]
 }
 species_data <- sqrt(species_data)
 hist(main="Domestic+Wildlife", breaks=100, freq=F, x=species_data, xlab="R0", ylab="Likelihood")
@@ -121,7 +121,7 @@ pdf(paste("r0.pdf"))
 species_data <- rep(0, 1000000)
 for (i in 1:12) {
   species_data <- species_data +
-    res_data[,i+offset]*res_data[,i+offset]*theta[i]*biting_rate*area_convert*vdensity/rabundance[i]/vmu*theta[i]*biting_rate/(rgamma[i]+rmu[i])
+    res_data[,i+offset]
 }
 species_data <- sqrt(species_data)
 hist(main="R0", breaks=100, freq=F, x=species_data, xlab="R0", ylab="Likelihood")
