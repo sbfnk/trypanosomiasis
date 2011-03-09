@@ -438,8 +438,8 @@ int main(int argc, char* argv[])
       for (size_t j = 0; j < hosts.size(); ++j) {
         double c = pow(p.hPrevalence[j], 2) / (1-p.hPrevalence[j]) *
           hosts[j].abundance * (hosts[j].mu + hosts[j].gamma);
-        contribs.push_back(c/((1-p.vPrevalence[0])*(1-p.hPrevalence[j])));
-        contrib_sum += j;
+        contribs[j] = c/((1-p.vPrevalence[0])*(1-p.hPrevalence[j]));
+        contrib_sum += c;
       }
       for (size_t j = 0; j < contribs.size(); ++j) {
         contribs[j] = contribs[j]/contrib_sum;
