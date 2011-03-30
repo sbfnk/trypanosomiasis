@@ -343,62 +343,64 @@ void betaffoiv(void *p, std::vector<double> &beta,
         (params->vectors[i].gamma + params->vectors[i].mu);
     }
   }
-  
-  // std::cout << "rlambda:";
-  // for (size_t i = 0; i < params->hosts.size(); ++i) {
-  //   std::cout << " " << params->hLambda[i];
-  // }
-  // std::cout << std::endl;
 
-  // std::cout << "vdensity:";
-  // for (size_t i = 0; i < params->vectors.size(); ++i) {
-  //   std::cout << " " << params->vectors[i].density;
-  // }
-  // std::cout << std::endl;
+  if (verbose) {
+    std::cout << "rlambda:";
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      std::cout << " " << params->hLambda[i];
+    }
+    std::cout << std::endl;
 
-  // std::cout << "rabundance:";
-  // for (size_t i = 0; i < params->hosts.size(); ++i) {
-  //   std::cout << " " << params->hosts[i].abundance;
-  // }
-  // std::cout << std::endl;
-  
-  // std::cout << "theta:";
-  // for (size_t i = 0; i < params->hosts.size(); ++i) {
-  //   std::cout << " " << params->hosts[i].theta;
-  // }
-  // std::cout << std::endl;
-  
-  // std::cout << "biting_rate:";
-  // for (size_t i = 0; i < params->vectors.size(); ++i) {
-  //   std::cout << " " << params->vectors[i].bitingRate;
-  // }
-  // std::cout << std::endl;
+    std::cout << "vdensity:";
+    for (size_t i = 0; i < params->vectors.size(); ++i) {
+      std::cout << " " << params->vectors[i].density;
+    }
+    std::cout << std::endl;
 
-  // std::cout << "area_convert:";
-  // std::cout << " " << params->params.areaConvert;
-  // std::cout << std::endl;
+    std::cout << "rabundance:";
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      std::cout << " " << params->hosts[i].abundance;
+    }
+    std::cout << std::endl;
+  
+    std::cout << "theta:";
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      std::cout << " " << params->hosts[i].theta;
+    }
+    std::cout << std::endl;
+  
+    std::cout << "biting_rate:";
+    for (size_t i = 0; i < params->vectors.size(); ++i) {
+      std::cout << " " << params->vectors[i].bitingRate;
+    }
+    std::cout << std::endl;
 
-  // std::cout << "vprev:";
-  // if (params->useVectorPrevalence) {
-  //   for (size_t i = 0; i < params->vectors.size(); ++i) {
-  //     std::cout << " " << params->vPrevalence[i];
-  //   }
-  // }
-  // std::cout << std::endl;
+    std::cout << "area_convert:";
+    std::cout << " " << params->params.areaConvert;
+    std::cout << std::endl;
+
+    std::cout << "vprev:";
+    if (params->useVectorPrevalence) {
+      for (size_t i = 0; i < params->vectors.size(); ++i) {
+        std::cout << " " << params->vPrevalence[i];
+      }
+    }
+    std::cout << std::endl;
   
-  // std::cout << "rprev:";
-  // for (size_t i = 0; i < params->hosts.size(); ++i) {
-  //   std::cout << " " << params->hPrevalence[i];
-  // }
-  // std::cout << std::endl;
+    std::cout << "rprev:";
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      std::cout << " " << params->hPrevalence[i];
+    }
+    std::cout << std::endl;
   
-  // std::cout << "vmu:";
-  // if (!params->useVectorPrevalence) {
-  //   for (size_t i = 0; i < params->vectors.size(); ++i) {
-  //     std::cout << " " << params->vectors[i].mu;
-  //   }
-  // }
-  // std::cout << std::endl;
+    std::cout << "vmu:";
+    if (!params->useVectorPrevalence) {
+      for (size_t i = 0; i < params->vectors.size(); ++i) {
+        std::cout << " " << params->vectors[i].mu;
+      }
+    }
+    std::cout << std::endl;
+  }
   
   size_t nvars = params->hosts.size() +
     (params->useVectorPrevalence ? params->vectors.size() : 0);
