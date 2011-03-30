@@ -29,6 +29,8 @@ int main(int argc, char* argv[])
   bool vectorPrevalence = false;
   bool bitingPreference = false;
   bool jacobian = false;
+  bool lhc = false;
+  bool calcBetas = false;
 
   size_t samples = 0;
 
@@ -151,6 +153,12 @@ int main(int argc, char* argv[])
 
   if (vm.count("jacobian")) {
     jacobian = true;
+  }
+  if (vm.count("lhc")) {
+    lhc = true;
+  }
+  if (vm.count("beta")) {
+    calcBetas = true;
   }
 
   std::vector<host> hosts;
@@ -352,13 +360,83 @@ int main(int argc, char* argv[])
   
   // ********************* estimate betas *********************
 
+  
+  std::vector <double> K;
+  
   betafunc_params p (hosts, vectors, params, vectorPrevalence,
                      bitingPreference);
-  std::vector<double> beta;
-  
+
   if (samples == 0) {
 
-    betaffoiv(&p, beta, jacobian, verbose);
+    if (calcBetas) {
+      std::vector<double> beta;
+      std::vector<double> alpha;
+      betaffoiv(&p, beta, jacobian, verbose);
+      if (vectorPrevalence) {
+        double alphaContribSum = 0;
+        for (size_t i = 0; i < hosts.size(); ++i) {
+          alphaContribSum += beta[i] * hosts[i].theta * vectors[0].bitingRate *
+            p.hPrevalence[i];
+        }
+        alpha.push_back(p.vPrevalence[0] / (1-p.vPrevalence[0]) *
+                        vectors[0].mu / alphaContribSum);
+      } else {
+        alpha.push_back(1);
+      }
+
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        if (verbose) {
+          std::cout << "beta[" << i << "]=" << beta[i] << ", ";
+        }
+        K.push_back
+          (alpha[0] *
+           pow(beta[i] * hosts[i].theta * vectors[0].bitingRate, 2) *
+           params.areaConvert * vectors[0].density /
+           hosts[i].abundance / ((hosts[i].gamma + hosts[i].mu) *
+                                 vectors[0].mu));
+      }
+      if (verbose) {
+        std::cout << std::endl;
+        if (!vectorPrevalence) {
+          for (size_t i = 0; i < vectors.size(); ++i) {
+            std::cout << "alpha[" << i << "]=" << beta[i + hosts.size()]
+                      << ", ";
+          }
+          std::cout << std::endl;
+        }
+      }
+    } else {
+      std::vector<double> hostContrib;
+      double hostContribSum = 0;
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        double newContrib =
+          pow(p.hPrevalence[i], 2) / (1 - p.hPrevalence[i]) *
+          hosts[i].abundance * (hosts[i].gamma + hosts[i].mu);
+        if (verbose) {
+          std::cout << "Host contrib " << i << ": " << newContrib << std::endl;
+        }
+        hostContrib.push_back(newContrib);
+        hostContribSum += newContrib;
+      }
+      if (!vectorPrevalence) {
+        double a = hostContribSum * params.areaConvert * vectors[0].density /
+          vectors[0].mu;
+        p.vPrevalence[0] = 0.5 * (sqrt(a*(4+a)) - a);
+        if (verbose) {
+          std::cout << "Determined vector prevalence "
+                    << p.vPrevalence[0] << std::endl;
+        }
+      } else {
+        if (verbose) {
+          std::cout << "Measured vector prevalence "
+                    << p.vPrevalence[0] << std::endl;
+        }
+      }
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        K.push_back(1/((1-p.vPrevalence[0])*(1-p.hPrevalence[i])) *
+                    hostContrib[i] / hostContribSum);
+      }
+    }
 
     double r0 = 0;
 
@@ -368,26 +446,23 @@ int main(int argc, char* argv[])
   
     std::cout << "\nNGM contributions: \n";
     for (size_t i = 0; i < hosts.size(); ++i) {
-      double K = pow(beta[i] * hosts[i].theta * vectors[0].bitingRate, 2) * 
-        params.areaConvert * vectors[0].density / hosts[i].abundance /
-        ((hosts[i].gamma + hosts[i].mu) * vectors[0].mu);
-      r0 += K;
+      r0 += K[i];
       if (i == 0) {
       } else if (i < 4) {
-        domestic += K;
-        animal += K;
+        domestic += K[i];
+        animal += K[i];
       } else {
-        wildLife += K;
-        animal += K;
+        wildLife += K[i];
+        animal += K[i];
       }
       
-      double contrib = sqrt(K);
+      double contrib = sqrt(K[i]);
       if (verbose) {
-        std::cout << "beta[" << i << "]=" << beta[i] << ", hosts[" << i
-                  << "].gamma=" << hosts[i].gamma << ", hosts[" << i << "].mu="
-                  << hosts[i].mu << ", params.areaConvert="
-                  << params.areaConvert << ", vectors[0]="
-                  << vectors[0].density << ", hosts[" << i << "].abundance="
+        std::cout << "hosts[" << i << "].gamma=" << hosts[i].gamma
+                  << ", hosts[" << i << "].mu=" << hosts[i].mu
+                  << ", params.areaConvert=" << params.areaConvert
+                  << ", vectors[0].density=" << vectors[0].density
+                  << ", hosts[" << i << "].abundance="
                   << hosts[i].abundance << std::endl;
       }
       std::cout << hosts[i].name << ": " << contrib << std::endl;

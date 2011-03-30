@@ -157,7 +157,7 @@ struct betafunc_params
 
 void print_state (size_t iter, gsl_multiroot_fdfsolver * s, size_t n)
 {
-  printf ("iter = %3u x =", iter);
+  printf ("iter = %3u x =", static_cast<unsigned int>(iter));
   for (size_t i = 0; i < n; ++i) {
     printf(" %.3f", gsl_vector_get(s->x, i));
   }
@@ -170,7 +170,7 @@ void print_state (size_t iter, gsl_multiroot_fdfsolver * s, size_t n)
 
 void print_state (size_t iter, gsl_multiroot_fsolver * s, size_t n)
 {
-  printf ("iter = %3u x =", iter);
+  printf ("iter = %3u x =", static_cast<unsigned int>(iter));
   for (size_t i = 0; i < n; ++i) {
     printf(" %.3f", gsl_vector_get(s->x, i));
   }
