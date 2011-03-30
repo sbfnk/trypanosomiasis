@@ -68,6 +68,10 @@ int main(int argc, char* argv[])
      "number of samples")
     ("jacobian,j", 
      "use jacobian")
+    ("lhc,l", 
+     "latin hypercube sampling")
+    ("beta,a", 
+     "calculate betas")
     ;
 
   po::variables_map vm;
@@ -378,12 +382,14 @@ int main(int argc, char* argv[])
       }
       
       double contrib = sqrt(K);
-      // std::cout << "beta[" << i << "]=" << beta[i] << ", hosts[" << i
-      //           << "].gamma=" << hosts[i].gamma << ", hosts[" << i << "].mu="
-      //           << hosts[i].mu << ", params.areaConvert="
-      //           << params.areaConvert << ", vectors[0]="
-      //           << vectors[0].density << ", hosts[" << i << "].abundance="
-      //           << hosts[i].abundance << std::endl;
+      if (verbose) {
+        std::cout << "beta[" << i << "]=" << beta[i] << ", hosts[" << i
+                  << "].gamma=" << hosts[i].gamma << ", hosts[" << i << "].mu="
+                  << hosts[i].mu << ", params.areaConvert="
+                  << params.areaConvert << ", vectors[0]="
+                  << vectors[0].density << ", hosts[" << i << "].abundance="
+                  << hosts[i].abundance << std::endl;
+      }
       std::cout << hosts[i].name << ": " << contrib << std::endl;
 
     }
