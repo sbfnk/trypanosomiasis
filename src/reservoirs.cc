@@ -13,6 +13,7 @@
 #include <boost/random/variate_generator.hpp>
 
 #include "reservoirs.hh"
+#include "ihs.hh"
 
 namespace po = boost::program_options;
 
@@ -474,6 +475,10 @@ int main(int argc, char* argv[])
     std::cout << "Wildlife cycle: " << sqrt(wildLife) << std::endl;
     std::cout << "Domestic+wildlife: " << sqrt(animal) << std::endl;
   } else {
+    // generate latin hypercube samples
+    
+
+    // generate beta distributions of prevalence
     std::ofstream out(outFile.c_str());
     std::vector<boost::math::beta_distribution<>*> distributions;
 
@@ -497,20 +502,29 @@ int main(int argc, char* argv[])
     boost::variate_generator<boost::mt19937, boost::uniform_real<> >
       randGen(gen, boost::uniform_real<> (0,1));
 
+    out << "n";
+    for (size_t j = 0; j < hosts.size(); ++j) {
+      out << ",\"" << hosts[j].name << "_prev\"";
+    }
+    for (size_t j = 0; j < vectors.size(); ++j) {
+      out << ",\"" << vectors[j].name << "_prev\"";
+    }
+    for (size_t j = 0; j < hosts.size(); ++j) {
+      out << ",\"" << hosts[j].name << "\"";
+    }
+    out << std::endl;
+
     for (size_t i = 0; i < samples; ++i) {
       out << i;
       for (size_t j = 0; j < hosts.size(); ++j) {
         p.hPrevalence[j] = quantile(*distributions[j], randGen());
-        out << " " << p.hPrevalence[j];
+        out << "," << p.hPrevalence[j];
       }
-      if (p.useVectorPrevalence) {
-        for (size_t j = 0; j < vectors.size(); ++j) {
-          p.vPrevalence[j] = quantile(*distributions[j+hosts.size()],
-                                      randGen());
-          out << " " << p.vPrevalence[j];
-        }
+      for (size_t j = 0; j < vectors.size(); ++j) {
+        p.vPrevalence[j] = quantile(*distributions[j+hosts.size()],
+                                    randGen());
+        out << "," << p.vPrevalence[j];
       }
-        
 
       //betaffoiv(&p, beta);
 
@@ -524,7 +538,7 @@ int main(int argc, char* argv[])
       }
       for (size_t j = 0; j < contribs.size(); ++j) {
         contribs[j] = contribs[j]/contrib_sum;
-        out << " " << contribs[j];
+        out << "," << contribs[j];
       }
       out << std::endl;
     }
