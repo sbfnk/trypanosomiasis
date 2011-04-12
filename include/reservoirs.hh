@@ -37,12 +37,30 @@ struct host {
       } else if (header[i] == "mortality") {
         std::istringstream s(data[i]);
         s >> mu;
+      } else if (header[i] == "mortality_low") {
+        std::istringstream s(data[i]);
+        s >> mu_limits.first;
+      } else if (header[i] == "mortality_high") {
+        std::istringstream s(data[i]);
+        s >> mu_limits.second;
       } else if (header[i] == "rec_rate") {
         std::istringstream s(data[i]);
         s >> gamma;
+      } else if (header[i] == "rec_rate_low") {
+        std::istringstream s(data[i]);
+        s >> gamma_limits.first;
+      } else if (header[i] == "rec_rate_high") {
+        std::istringstream s(data[i]);
+        s >> gamma_limits.second;
       } else if (header[i] == "abundance") {
         std::istringstream s(data[i]);
         s >> abundance;
+      } else if (header[i] == "abundance_low") {
+        std::istringstream s(data[i]);
+        s >> abundance_limits.first;
+      } else if (header[i] == "abundance_high") {
+        std::istringstream s(data[i]);
+        s >> abundance_limits.second;
       } else if (header[i] == "theta") {
         std::istringstream s(data[i]);
         s >> theta;
@@ -53,6 +71,7 @@ struct host {
   std::string name;
   size_t M, N;
   double mu, gamma, theta, abundance;
+  std::pair<double, double> mu_limits, gamma_limits, abundance_limits;
 };
 
 struct vector {

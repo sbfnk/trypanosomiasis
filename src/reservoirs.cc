@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
   bool vectorPrevalence = false;
   bool bitingPreference = false;
   bool jacobian = false;
-  bool lhc = false;
+  size_t lhsSamples = 0;
   bool calcBetas = false;
 
   size_t samples = 0;
@@ -71,8 +71,8 @@ int main(int argc, char* argv[])
      "number of samples")
     ("jacobian,j", 
      "use jacobian")
-    ("lhc,l", 
-     "latin hypercube sampling")
+    ("lhs,l", po::value<size_t>()->default_value(0),
+     "number of samples for latin hypercube sampling")
     ("beta,a", 
      "calculate betas")
     ;
@@ -155,8 +155,8 @@ int main(int argc, char* argv[])
   if (vm.count("jacobian")) {
     jacobian = true;
   }
-  if (vm.count("lhc")) {
-    lhc = true;
+  if (vm.count("lhs")) {
+    lhsSamples = vm["lhs"].as<size_t>();
   }
   if (vm.count("beta")) {
     calcBetas = true;
@@ -475,8 +475,9 @@ int main(int argc, char* argv[])
     std::cout << "Wildlife cycle: " << sqrt(wildLife) << std::endl;
     std::cout << "Domestic+wildlife: " << sqrt(animal) << std::endl;
   } else {
-    // generate latin hypercube samples
-    
+
+    int seed = get_seed();
+    int *x = 0;
 
     // generate beta distributions of prevalence
     std::ofstream out(outFile.c_str());
@@ -493,10 +494,11 @@ int main(int argc, char* argv[])
          (vectors[j].M+1, vectors[j].N-vectors[j].M+1));
     }
 
-    unsigned int seed;
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-    seed = tv.tv_sec + tv.tv_usec;
+    // seed = get_seed();
+    // unsigned int seed;
+    // struct timeval tv;
+    // gettimeofday(&tv, 0);
+    // seed = tv.tv_sec + tv.tv_usec;
     boost::mt19937 gen(seed);
     
     boost::variate_generator<boost::mt19937, boost::uniform_real<> >
@@ -505,6 +507,11 @@ int main(int argc, char* argv[])
     out << "n";
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j].name << "_prev\"";
+      if (lhsSamples > 0) {
+        out << ",\"" << hosts[j].name << "_abundance\"";
+        out << ",\"" << hosts[j].name << "_mu\"";
+        out << ",\"" << hosts[j].name << "_gamma\"";
+      }
     }
     for (size_t j = 0; j < vectors.size(); ++j) {
       out << ",\"" << vectors[j].name << "_prev\"";
@@ -515,18 +522,49 @@ int main(int argc, char* argv[])
     out << std::endl;
 
     for (size_t i = 0; i < samples; ++i) {
+
+      if (lhsSamples > 0) {
+        // std::cout << i << " " << lhsSamples << " " << i % lhsSamples << std::endl;
+        if (i % lhsSamples == 0) {
+          // generate latin hypercube samples
+          x = (int*) malloc (3 * hosts.size() * lhsSamples * sizeof(int));
+          ihs(3*hosts.size(), lhsSamples, 5, &seed, x);
+        }
+
+        for (size_t j = 0; j < hosts.size(); ++j) {
+          hosts[j].abundance = hosts[j].abundance_limits.first +
+            (hosts[j].abundance_limits.second -
+             hosts[j].abundance_limits.first) *
+            x[i % lhsSamples * hosts.size() * 3 + j] /
+            static_cast<double>(lhsSamples);
+          hosts[j].mu = hosts[j].mu_limits.first +
+            (hosts[j].mu_limits.second -
+             hosts[j].mu_limits.first) *
+            x[i % lhsSamples * hosts.size() * 3 + j + 1] /
+            static_cast<double>(lhsSamples);
+          hosts[j].gamma = hosts[j].gamma_limits.first +
+            (hosts[j].gamma_limits.second -
+             hosts[j].gamma_limits.first) *
+            x[i % lhsSamples * hosts.size() * 3 + j + 2] /
+            static_cast<double>(lhsSamples);
+        }
+      }
+      
       out << i;
       for (size_t j = 0; j < hosts.size(); ++j) {
         p.hPrevalence[j] = quantile(*distributions[j], randGen());
         out << "," << p.hPrevalence[j];
+        if (lhsSamples > 0) {
+          out << "," << hosts[j].abundance;
+          out << "," << hosts[j].mu;
+          out << "," << hosts[j].gamma;
+        }
       }
       for (size_t j = 0; j < vectors.size(); ++j) {
         p.vPrevalence[j] = quantile(*distributions[j+hosts.size()],
                                     randGen());
         out << "," << p.vPrevalence[j];
       }
-
-      //betaffoiv(&p, beta);
 
       std::vector<double> contribs (hosts.size());
       double contrib_sum = .0;
@@ -542,8 +580,9 @@ int main(int argc, char* argv[])
       }
       out << std::endl;
     }
-    
+
     out.close();
+    if (x) free(x);
   }
 }
    
