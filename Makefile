@@ -13,7 +13,7 @@ DEPENDFLAGS = -m
 
 #--------------------------------------------------------------------
 
-SOURCES     = reservoirs.cc
+SOURCES     = reservoirs.cc ihs.cc
 OBJECTS     = $(patsubst %.cc,out/%.o,${SOURCES})
 
 EXEC        = reservoirs
