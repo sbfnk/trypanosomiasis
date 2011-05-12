@@ -11,6 +11,7 @@
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_real.hpp>
 #include <boost/random/variate_generator.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "reservoirs.hh"
 #include "ihs.hh"
@@ -20,23 +21,28 @@ namespace po = boost::program_options;
 int main(int argc, char* argv[])
 {
 
-  std::string dataFile;
-  std::string vectorFile;
-  std::string paramsFile;
-  std::string outFile;
+  std::string dataFile; // name of the file holding host parameters
+  std::string vectorFile; // name of the file holding vector parameters
+  std::string outFile; // output file
 
-  bool gambiense = false;
-  bool nonGambiense = false;
-  bool vectorPrevalence = false;
-  bool bitingPreference = false;
-  bool jacobian = false;
-  size_t lhsSamples = 0;
-  bool calcBetas = false;
+  bool gambiense = false; // include gambiense data?
+  bool nonGambiense = false; // include nongambiense data?
+  bool jacobian = false; // use jacobian?
+  size_t lhsSamples = 0; // number of samples to be used in linear hypercube
+                         // sampling 
+  bool calcBetas = true; // calculate the betas (or use analytical formula in
+                          // simple model?)
 
-  size_t samples = 0;
+  size_t samples = 0; // number of samples to be used from negative binomial
+                      // distribution around measured prevalence
 
-  unsigned int verbose = 0;
+  double xi; // xi (assortativity)
 
+  unsigned int verbose = 0; // be verbose
+
+  std::vector<std::vector<size_t> > groups; // composition of groups
+
+  // main options
   po::options_description main_options
     ("Usage: reservoirs [options]... \n\nOptions");
 
@@ -54,29 +60,23 @@ int main(int argc, char* argv[])
     ("vector-file,e", po::value<std::string>()->
      default_value("data/bipindi_vector.csv"),
      "vector file")
-    ("params-file,p", po::value<std::string>()->
-     default_value("params/params.csv"),
-     "params file")
     ("output-file,o", po::value<std::string>()->default_value("reservoirs.dat"),
      "output file")
     ("species,s", po::value<std::string>()->default_value("g"),
      "trypanosome species to consider (g=gambiense, n=nongambiense)")
-    ("convert-area,c", 
-     "factor to convert area to prevalence")
-    ("vector-prevalence,r", 
-     "consider vector prevalence")
-    ("biting-preference,b", 
-     "consider biting preference")
-    ("samples,m", po::value<size_t>()->default_value(0),
+    ("xi,x", po::value<double>()->default_value(.0),
+     "assortativity parameter xi")
+    ("lhs,l", po::value<size_t>()->default_value(0),
+     "number of samples for latin hypercube sampling")
+    ("samples,n", po::value<size_t>()->default_value(0),
      "number of samples")
     ("jacobian,j", 
      "use jacobian")
-    ("lhs,l", po::value<size_t>()->default_value(0),
-     "number of samples for latin hypercube sampling")
-    ("beta,a", 
-     "calculate betas")
+    ("simple,i", 
+     "use simple model")
     ;
 
+  // read options
   po::variables_map vm;
     
   try {
@@ -90,11 +90,13 @@ int main(int argc, char* argv[])
   }
   po::notify(vm);
 
+  // help option
   if (vm.count("help")) {
     std::cout << main_options << std::endl;
     return 0;
   }
 
+  // verbose option
   if (vm.count("verbose")) {
     verbose = 1;
   }
@@ -102,6 +104,7 @@ int main(int argc, char* argv[])
     verbose = 2;
   }
   
+  // host data file, necessary option
   if (vm.count("data-file")) {
     dataFile = vm["data-file"].as<std::string>();
   } else {
@@ -109,6 +112,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
+  // vector data file, necessary option
   if (vm.count("vector-file")) {
     vectorFile = vm["vector-file"].as<std::string>();
   } else {
@@ -116,15 +120,9 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  if (vm.count("params-file")) {
-    paramsFile = vm["params-file"].as<std::string>();
-  } else {
-    std::cerr << "Error: must specify params file" << std::endl;
-    return 1;
-  }
-
   samples = vm["samples"].as<size_t>();
 
+  // vector data file, necessary option if more than one sample is generated
   if (vm.count("output-file")) {
     outFile = vm["output-file"].as<std::string>();
   } else {
@@ -135,6 +133,7 @@ int main(int argc, char* argv[])
     }
   }
 
+  // one of the two trypanosome species must be specified
   gambiense = (vm["species"].as<std::string>().find_first_of("g") !=
                std::string::npos);
   nonGambiense = (vm["species"].as<std::string>().find_first_of("n") !=
@@ -144,28 +143,24 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  if (vm.count("vector-prevalence")) {
-    vectorPrevalence = true;
-  }
-
-  if (vm.count("biting-preference")) {
-    bitingPreference = true;
-  }
-
   if (vm.count("jacobian")) {
     jacobian = true;
   }
+
   if (vm.count("lhs")) {
     lhsSamples = vm["lhs"].as<size_t>();
   }
-  if (vm.count("beta")) {
-    calcBetas = true;
+
+  if (vm.count("simple")) {
+    calcBetas = false;
   }
 
-  std::vector<host> hosts;
-  std::vector<vector> vectors;
-  param params;
+  xi = vm["xi"].as<double>();
 
+  std::vector<host> hosts; // vector of hosts
+  std::vector<vector> vectors; // vector of vectors
+
+  // tokenizer for reading csv file
   typedef boost::tokenizer<boost::escaped_list_separator<char> > Tokenizer;
   boost::escaped_list_separator<char> sep('\\', ',', '\"');
 
@@ -257,51 +252,11 @@ int main(int argc, char* argv[])
       ((vectors[i].name+"-density").c_str(), po::value<double>());
   }
 
-  // ********************** read params file ********************
-  
-  in.open(paramsFile.c_str());
-  firstLine = true;
-  
-  if (!in.is_open()) {
-    std::cerr << "Could not open " << vectorFile << std::endl;
-    return 1;
-  }
-
-  while (std::getline(in,line))  {
-    std::vector<std::string> lineVector;
-    Tokenizer tok(line, sep);
-    lineVector.assign(tok.begin(), tok.end());
-
-    if (firstLine) {
-      headings = lineVector;
-      firstLine = false;
-    } else {
-      params = param(lineVector, headings);
-    }
-  }
-  in.close();
-
-  po::options_description param_options
-    ("\nParameter options");
-
-  param_options.add_options()
-    ("area-convert", po::value<double>());
-
-  if (!vm.count("convert-area")) {
-    params.areaConvert = 1.;
-  }
-
-  if (vm.count("longhelp")) {
-    std::cout << main_options << host_options << vector_options
-              << param_options;
-  }
-
   // ************** read additional parameters ****************
 
   po::options_description long_options;
   long_options.add(main_options).
-    add(host_options).add(vector_options).
-    add(param_options);
+    add(host_options).add(vector_options);
   
   try {
     po::store(po::command_line_parser(argc, argv).
@@ -354,57 +309,102 @@ int main(int argc, char* argv[])
       vectors[i].density = vm[(vectors[i].name+"-density").c_str()].as<double>(); 
     }
   }
-  
-  if (vm.count("area-convert")) {
-    params.areaConvert = vm["area-convert"].as<double>();
+
+  // ************** read group composition options ****************
+
+  po::options_description group_options
+    ("\nGroup options");
+
+  group_options.add_options()
+    ("groups,g", po::value<std::string>(),
+     "groups (semicolon-separated list of comma-separated hosts")
+    ;
+  long_options.add(group_options);
+  try {
+    po::store(po::command_line_parser(argc, argv).
+              options(long_options).run(), vm);
+  }
+  catch (std::exception& e) {
+    std::cerr << "Error parsing command line parameters: " << e.what()
+              << std::endl;
+    return 1;
+  }
+  po::notify(vm);
+    
+  if (vm.count("groups")) {
+    std::string groupString = vm["groups"].as<std::string>();
+    std::vector<std::string> result;
+    boost::algorithm::split(result, groupString, boost::is_any_of(";"));
+    for (std::vector<std::string>::iterator it = result.begin();
+         it != result.end(); it++) {
+      std::vector<std::string> subres;
+      boost::algorithm::split(subres, *it, boost::is_any_of(","));
+      std::vector<size_t> group;
+      for (std::vector<std::string>::iterator it2 = subres.begin();
+           it2 != subres.end(); it2++) {
+        size_t s;
+        std::istringstream myStream(*it2);
+        myStream >> s;
+        group.push_back(s);
+      }
+      groups.push_back(group);
+    }
+  } else {
+    // groups.push_back(std::vector<size_t>());
+    // for (size_t i = 0; i < hosts.size(); ++i) {
+    //   groups[0].push_back(i);
+    // }
+    for (size_t i = 0; i < hosts.size(); ++i) {
+      groups.push_back(std::vector<size_t>(1,i));
+    }
+  }
+
+  for (size_t i = 1; i < groups.size(); ++i) {
+    vector newVector(vectors[0]);
+    vectors.push_back(newVector);
   }
   
   // ********************* estimate betas *********************
-
   
   std::vector <double> K;
   
-  betafunc_params p (hosts, vectors, params, vectorPrevalence,
-                     bitingPreference);
+  betafunc_params p (hosts, vectors, groups, xi);
 
   if (samples == 0) {
 
     if (calcBetas) {
-      std::vector<double> beta;
-      std::vector<double> alpha;
-      betaffoiv(&p, beta, jacobian, verbose);
-      if (vectorPrevalence) {
-        double alphaContribSum = 0;
-        for (size_t i = 0; i < hosts.size(); ++i) {
-          alphaContribSum += beta[i] * hosts[i].theta * vectors[0].bitingRate *
-            p.hPrevalence[i];
-        }
-        alpha.push_back(p.vPrevalence[0] / (1-p.vPrevalence[0]) *
-                        vectors[0].mu / alphaContribSum);
-      } else {
-        alpha.push_back(1);
-      }
+      // variables
+      std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
+      // find betas, p^v_is and alpha
+      betaffoiv(&p, vars, jacobian, verbose);
+      // double alphaContribSum = 0;
+      // for (size_t i = 0; i < hosts.size(); ++i) {
+      //   alphaContribSum += beta[i] * hosts[i].theta * vectors[0].bitingRate *
+      //     p.hPrevalence[i];
+      // }
+      // alpha.push_back(p.vPrevalence[0] / (1-p.vPrevalence[0]) *
+      //                 vectors[0].mu / alphaContribSum);
+      
       for (size_t i = 0; i < hosts.size(); ++i) {
         if (verbose) {
-          std::cout << "beta[" << i << "]=" << beta[i] << ", ";
+          std::cout << "beta^*[" << i << "]=" << vars[i] << ", "
+                    << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
+                    << std::endl;
         }
         K.push_back
-          (alpha[0] *
-           pow(beta[i] * hosts[i].theta * vectors[0].bitingRate, 2) *
-           params.areaConvert * vectors[0].density /
+          (vars[2*hosts.size()] *
+           pow(vars[i] * hosts[i].theta * vectors[0].bitingRate, 2) *
+           vectors[0].density /
            hosts[i].abundance / ((hosts[i].gamma + hosts[i].mu) *
                                  vectors[0].mu));
       }
       if (verbose) {
-        std::cout << std::endl;
-        if (!vectorPrevalence) {
-          for (size_t i = 0; i < vectors.size(); ++i) {
-            std::cout << "alpha[" << i << "]=" << beta[i + hosts.size()]
-                      << ", ";
-          }
-          std::cout << std::endl;
+        for (size_t i = 0; i < vectors.size(); ++i) {
+          std::cout << "alpha[" << i << "]=" << vars[i + 2*hosts.size()]
+                    << ", ";
         }
+        std::cout << std::endl;
       }
     } else {
       std::vector<double> hostContrib;
@@ -419,22 +419,12 @@ int main(int argc, char* argv[])
         hostContrib.push_back(newContrib);
         hostContribSum += newContrib;
       }
-      if (!vectorPrevalence) {
-        double a = hostContribSum * params.areaConvert * vectors[0].density /
-          vectors[0].mu;
-        p.vPrevalence[0] = 0.5 * (sqrt(a*(4+a)) - a);
-        if (verbose) {
-          std::cout << "Determined vector prevalence "
-                    << p.vPrevalence[0] << std::endl;
-        }
-      } else {
-        if (verbose) {
-          std::cout << "Measured vector prevalence "
-                    << p.vPrevalence[0] << std::endl;
-        }
+      if (verbose) {
+        std::cout << "Measured vector prevalence: " 
+                  << vectors[0].M/vectors[0].N << std::endl;
       }
       for (size_t i = 0; i < hosts.size(); ++i) {
-        K.push_back(1/((1-p.vPrevalence[0])*(1-p.hPrevalence[i])) *
+        K.push_back(1/((1-p.vectors[0].M/vectors[0].N)*(1-p.hPrevalence[i])) *
                     hostContrib[i] / hostContribSum);
       }
     }
@@ -461,7 +451,6 @@ int main(int argc, char* argv[])
       if (verbose) {
         std::cout << "hosts[" << i << "].gamma=" << hosts[i].gamma
                   << ", hosts[" << i << "].mu=" << hosts[i].mu
-                  << ", params.areaConvert=" << params.areaConvert
                   << ", vectors[0].density=" << vectors[0].density
                   << ", hosts[" << i << "].abundance="
                   << hosts[i].abundance << std::endl;
@@ -560,18 +549,19 @@ int main(int argc, char* argv[])
           out << "," << hosts[j].gamma;
         }
       }
-      for (size_t j = 0; j < vectors.size(); ++j) {
-        p.vPrevalence[j] = quantile(*distributions[j+hosts.size()],
-                                    randGen());
-        out << "," << p.vPrevalence[j];
-      }
+      // to be corrected for more vectors
+      // for (size_t j = 0; j < vectors.size(); ++j) {
+      p.vPrevalence = quantile(*distributions[hosts.size()],
+                                  randGen());
+      out << "," << p.vPrevalence;
+      // }
 
       std::vector<double> contribs (hosts.size());
       double contrib_sum = .0;
       for (size_t j = 0; j < hosts.size(); ++j) {
         double c = pow(p.hPrevalence[j], 2) / (1-p.hPrevalence[j]) *
           hosts[j].abundance * (hosts[j].mu + hosts[j].gamma);
-        contribs[j] = c/((1-p.vPrevalence[0])*(1-p.hPrevalence[j]));
+        contribs[j] = c/((1-p.vPrevalence)*(1-p.hPrevalence[j]));
         contrib_sum += c;
       }
       for (size_t j = 0; j < contribs.size(); ++j) {
