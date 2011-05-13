@@ -181,18 +181,18 @@ struct betafunc_params
 };
 
 // print current state of the fdfsolver
-// void print_state (size_t iter, gsl_multiroot_fdfsolver * s, size_t n)
-// {
-//   printf ("iter = %3u x =", static_cast<unsigned int>(iter));
-//   for (size_t i = 0; i < n; ++i) {
-//     printf(" %.3f", gsl_vector_get(s->x, i));
-//   }
-//   printf("  f(x) =");
-//   for (size_t i = 0; i < n; ++i) {
-//     printf(" %.3e", gsl_vector_get(s->f, i));
-//   }
-//   printf("\n");
-// }
+void print_state (size_t iter, gsl_multiroot_fdfsolver * s, size_t n)
+{
+  printf ("iter = %3u x =", static_cast<unsigned int>(iter));
+  for (size_t i = 0; i < n; ++i) {
+    printf(" %.3f", gsl_vector_get(s->x, i));
+  }
+  printf("  f(x) =");
+  for (size_t i = 0; i < n; ++i) {
+    printf(" %.3e", gsl_vector_get(s->f, i));
+  }
+  printf("\n");
+}
 
 // print current state of the fsolver
 void print_state (size_t iter, gsl_multiroot_fsolver * s, size_t n)
@@ -251,101 +251,80 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
 // function to find root of (derivative)
 int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
 {
-  // betafunc_params* params = ((struct betafunc_params*) p);
+  betafunc_params* params = ((struct betafunc_params*) p);
 
-  //   double hostSum = 0;
-  //   for (size_t i = 0; i < params->hosts.size(); ++i) {
-  //     hostSum += gsl_vector_get(x, i) * params->hosts[i].theta *
-  //       params->hPrevalence[i];
-  //   }
-    
-  //   double vectorSum = 0;
-  //   for (size_t i = 0; i < params->vectors.size(); ++i) {
-  //     vectorSum += params->vectors[i].density * params->vPrevalence[i] *
-  //       params->vectors[i].bitingRate;
-  //   }
-    
-  //   for (size_t i = 0; i < params->hosts.size(); ++i) {
-  //     for (size_t j = 0; j < params->hosts.size(); ++j) {
-  //       if (i == j) {
-  //         double y = - params->hosts[i].theta * params->params.areaConvert *
-  //           vectorSum / params->hosts[i].abundance;
-  //         gsl_matrix_set(J, i, j, y);
-  //       } else {
-  //         gsl_matrix_set(J, i, j, 0);
-  //       }
-  //     }
-  //     for (size_t j = 0; j < params->vectors.size(); ++j) {
-  //       gsl_matrix_set(J, i, params->hosts.size()+j, 0);
-  //     }
-  //   }
-  //   for (size_t i = 0; i < params->vectors.size(); ++i) {
-  //     for (size_t j = 0; j < params->hosts.size(); ++j) {
-  //       double y = -params->vectors[i].bitingRate *
-  //         gsl_vector_get(x, params->hosts.size()+i) *
-  //         params->hosts[j].theta * params->hPrevalence[j];
-  //       gsl_matrix_set(J, params->hosts.size()+i, j, y);
-  //     }
-  //     for (size_t j = 0; j < params->vectors.size(); ++j) {
-  //       double y = -params->vectors[i].bitingRate * hostSum;
-  //       gsl_matrix_set(J, params->hosts.size()+i, params->hosts.size()+j, y);
-  //     }
-  //   }
+  double pv[params->groups.size()];
+  double beta[params->hosts.size()];
+  double alpha = gsl_vector_get(x, params->hosts.size() +
+                                params->groups.size());
+  
+  for (size_t i = 0; i < params->hosts.size() + params->groups.size() + 1;
+       ++i) {
+    for (size_t j = 0; j < params->hosts.size() + params->groups.size() + 1;
+         ++j) {
+      gsl_matrix_set(J, i, j, 0);
+    }
+  }
+  for (size_t i = 0; i < params->hosts.size(); ++i) {
+    beta[i] = gsl_vector_get(x, i);
+  }
+  for (size_t j = 0; j < params->groups.size(); ++j) {
+    pv[j] = gsl_vector_get(x, j+params->hosts.size());
+  }
+
+  for (size_t j = 0; j < params->groups.size(); ++j) {
+
+    double dgjda = .0;
+
+    for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
+      size_t i = params->groups[j].members[k];
+
+      double dfidbi = params->hosts[i].theta / params->hosts[i].abundance *
+        pv[j];
+      gsl_matrix_set(J, i, i, dfidbi);
       
-  // } else {
+      double dfidpj = beta[i] * params->hosts[i].theta /
+        params->hosts[i].abundance;
+      gsl_matrix_set(J, i, j + params->hosts.size(), dfidpj);
 
-  //   double hostSum = 0;
-  //   for (size_t i = 0; i < params->hosts.size(); ++i) {
-  //     hostSum += gsl_vector_get(x, i) * params->hosts[i].theta *
-  //       params->hPrevalence[i];
-  //   }
+      double dgjdbi = -alpha * params->hosts[i].theta *
+        params->hPrevalence[i] / params->groups[j].theta;
+      gsl_matrix_set(J, j + params->hosts.size(), i, dgjdbi);
 
-  //   for (size_t i = 0; i < params->hosts.size(); ++i) {
-  //     for (size_t j = 0; j < params->hosts.size(); ++j) {
+      double dgjdpj = -(params->vectors[0].mu + params->xi) /
+        pow(1-pv[j], 2);
+      gsl_matrix_set(J, j + params->hosts.size(), j + params->hosts.size(),
+                     dgjdpj);
+      
+      dgjda -= beta[i] * params->hosts[i].theta * params->hPrevalence[i];
+    }
+    dgjda /= params->groups[j].theta;
+    gsl_matrix_set(J, j + params->hosts.size(), params->hosts.size() +
+                   params->groups.size(), dgjda);
 
-  //       double sum = 0;
+    double dhdpj = params->groups[j].theta;
+    gsl_matrix_set(J, params->hosts.size() + params->groups.size(),
+                   j + params->hosts.size(), dhdpj);
+  }      
 
-  //       for (size_t k = 0; k < params->vectors.size(); ++k) {
-
-  //         if (i == j) {
-  //           sum += params->vectors[k].bitingRate * params->vectors[k].density
-  //             * (params->vectors[k].mu * params->vectors[k].bitingRate * 
-  //                (gsl_vector_get(x, i) * params->hosts[i].theta *
-  //               params->hPrevalence[i] + hostSum) + pow(hostSum, 2)) /
-  //             pow(params->vectors[k].mu + params->vectors[k].bitingRate *
-  //                 hostSum, 2);
-  //         } else {
-  //           sum += params->vectors[k].bitingRate * params->vectors[k].density *
-  //             params->vectors[k].mu * params->vectors[k].bitingRate / 
-  //             pow(params->vectors[k].mu + params->vectors[k].bitingRate *
-  //                 hostSum, 2);
-  //         }
-  //       }
-        
-  //       double y = -sum * params->hosts[i].theta * params->params.areaConvert /
-  //         params->hosts[i].abundance;
-
-  //       if (i != j) {
-  //         y *= gsl_vector_get(x,i) * params->hosts[j].theta *
-  //           params->hPrevalence[j];
-  //       } 
-                      
-  //       gsl_matrix_set(J, i, j, y);
-  //     }
+  // for (size_t i = 0; i < params->hosts.size() + params->groups.size() + 1; ++i) {
+  //   for (size_t j = 0; j < params->hosts.size() + params->groups.size() + 1; ++j) {
+  //     std::cout << "J(" << i << "," << j << ") = " << gsl_matrix_get(J, i, j)
+  //               << std::endl;
   //   }
   // }
-
+  
   return GSL_SUCCESS;
 }
 
 // function to find root of (2nd derivative)
-// int betafunc_fdf(const gsl_vector * x, void * p, gsl_vector* f, gsl_matrix * J)
-// {
-//   // betafunc_f(x, p, f);
-//   // betafunc_df(x, p, J);
+int betafunc_fdf(const gsl_vector * x, void * p, gsl_vector* f, gsl_matrix * J)
+{
+  betafunc_f(x, p, f);
+  betafunc_df(x, p, J);
 
-//   return GSL_SUCCESS;
-// }
+  return GSL_SUCCESS;
+}
 
 // find beta (and alpha and p^v_i( from forces of infection
 int betaffoiv(void *p, std::vector<double> &vars,
@@ -396,12 +375,12 @@ int betaffoiv(void *p, std::vector<double> &vars,
   // adapt for more vectors
   size_t nvars = params->hosts.size() + params->groups.size() + 1;
 
-  // const gsl_multiroot_fdfsolver_type * Tdf =
-  //   gsl_multiroot_fdfsolver_hybridsj;
-  // gsl_multiroot_fdfsolver * sdf =
-  //   gsl_multiroot_fdfsolver_alloc (Tdf, nvars);
-  // gsl_multiroot_function_fdf fdf = {&betafunc_f, &betafunc_df, &betafunc_fdf,
-  //                                   nvars, p};
+  const gsl_multiroot_fdfsolver_type * Tdf =
+    gsl_multiroot_fdfsolver_hybridsj;
+  gsl_multiroot_fdfsolver * sdf =
+    gsl_multiroot_fdfsolver_alloc (Tdf, nvars);
+  gsl_multiroot_function_fdf fdf = {&betafunc_f, &betafunc_df, &betafunc_fdf,
+                                    nvars, p};
 
   const gsl_multiroot_fsolver_type * T =
     gsl_multiroot_fsolver_hybrids;
@@ -418,13 +397,13 @@ int betaffoiv(void *p, std::vector<double> &vars,
   }
   gsl_vector_set(x_init, params->hosts.size() + params->groups.size(), 1);
   
-  // gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
+  gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
   gsl_multiroot_fsolver_set(s, &f, x_init);
 
   size_t iter = 0;
   if (verbose > 0) {
     if (jac) {
-      // print_state (iter, sdf, nvars);
+      print_state (iter, sdf, nvars);
     } else {
       print_state (iter, s, nvars);
     }
@@ -434,15 +413,14 @@ int betaffoiv(void *p, std::vector<double> &vars,
   do {
     iter++;
     if (jac) {
-      // status = gsl_multiroot_fdfsolver_iterate (sdf);
+      status = gsl_multiroot_fdfsolver_iterate (sdf);
     } else {
       status = gsl_multiroot_fsolver_iterate (s);
-      // printf ("status = %s\n", gsl_strerror (status));
     }
 
     if (verbose > 0) {
       if (jac) {
-        // print_state (iter, sdf, nvars);
+        print_state (iter, sdf, nvars);
       } else {
         print_state (iter, s, nvars);
       }
@@ -452,10 +430,9 @@ int betaffoiv(void *p, std::vector<double> &vars,
       break;
 
     if (jac) {
-      // status = gsl_multiroot_test_residual (sdf->f, 1e-7);
+      status = gsl_multiroot_test_residual (sdf->f, 1e-7);
     } else {
       status = gsl_multiroot_test_residual (s->f, 1e-7);
-      // printf ("status = %s\n", gsl_strerror (status));
     }
   } while (status == GSL_CONTINUE); // && iter < 10000);
 
@@ -467,7 +444,7 @@ int betaffoiv(void *p, std::vector<double> &vars,
   gsl_vector* sol;
 
   if (jac) {
-    // sol = sdf->x;
+    sol = sdf->x;
   } else {
     sol = s->x;
   }
@@ -484,7 +461,7 @@ int betaffoiv(void *p, std::vector<double> &vars,
       gsl_vector_get(sol, i+params->hosts.size()+params->groups.size());
   }
 
-  // gsl_multiroot_fdfsolver_free (sdf);
+  gsl_multiroot_fdfsolver_free (sdf);
   gsl_multiroot_fsolver_free (s);
   gsl_vector_free (x_init);
 
