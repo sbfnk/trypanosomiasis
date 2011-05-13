@@ -385,7 +385,12 @@ int main(int argc, char* argv[])
       std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
       // find betas, p^v_is and alpha
-      betaffoiv(&p, vars, jacobian, verbose);
+      int status = betaffoiv(&p, vars, jacobian, verbose);
+
+      if (status != GSL_SUCCESS) {
+        std::cout << "ERROR: Could not find solution" << std::endl;
+        return 1;
+      }
 
       if (verbose) {
         for (size_t i = 0; i < hosts.size(); ++i) {
@@ -411,8 +416,8 @@ int main(int argc, char* argv[])
         for (size_t k = 0; k < groups[j].members.size(); ++k) {
           size_t i = groups[j].members[k];
           T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
-            vars[i] * hosts[i].theta / groups[j].theta;
-          T(i + groups.size(),j) = vars[i];
+            vars[i] * hosts[i].theta / hosts[i].abundance;
+          T(i + groups.size(),j) = vars[i] * hosts[i].theta / groups[j].theta;
         }
       }
       for (size_t i = 0; i < hosts.size(); ++i) {
@@ -435,18 +440,67 @@ int main(int argc, char* argv[])
       arma::cx_mat eigvec;
       
       arma::eig_gen(eigval, eigvec, K);
-      double R0 = 0;
-      for (size_t i = 0; i < hosts.size() + groups.size(); ++i) {
-        std::complex<double> ev = eigval(i);
-        if (ev.imag() == 0 && ev.real() > R0) {
-          R0 = ev.real();
-        }
-        if (verbose) {
-          std::cout << ev << std::endl;
+      arma::colvec colr0 = arma::real(eigval);
+      double R0 = arma::max(colr0);
+      if (verbose) {
+        for (size_t i = 0; i < hosts.size() + groups.size(); ++i) {
+          std::cout << eigval(i) << std::endl;
         }
       }
 
-      std::cout << "R0: " << R0 << std::endl;
+      arma::mat P(hosts.size() + groups.size(), hosts.size() + groups.size());
+      arma::mat KP(hosts.size() + groups.size(), hosts.size() + groups.size());
+      P.zeros();
+      for (size_t i = 0; i < groups.size(); ++i) {
+        P(i,i) = 1;
+      }
+      arma::mat tempP(hosts.size() + groups.size(),
+                      hosts.size() + groups.size());
+
+      std::cout << "\nNGM contributions:" << std::endl;
+      for (size_t i = groups.size(); i < groups.size() + hosts.size(); ++i) {
+        tempP = P;
+        tempP(i,i) = 1;
+        KP = tempP * K;
+        arma::eig_gen(eigval, eigvec, KP);
+        arma::colvec col = arma::real(eigval);
+        double contrib = arma::max(col);
+
+        std::cout << hosts[i-groups.size()].name << ": " << contrib << std::endl;
+      }
+
+      tempP = P;
+      for (size_t i = groups.size() + 1; i < groups.size() + 4; ++i) {
+        tempP(i,i) = 1;
+      }
+      KP = tempP * K;
+      arma::eig_gen(eigval, eigvec, KP);
+      arma::colvec coldomestic = arma::real(eigval);
+      double domestic = arma::max(coldomestic);
+      
+      tempP = P;
+      for (size_t i = groups.size() + 1; i < groups.size() + 12; ++i) {
+        tempP(i,i) = 1;
+      }
+      KP = tempP * K;
+      arma::eig_gen(eigval, eigvec, KP);
+      arma::colvec coldomwild = arma::real(eigval);
+      double domwild = arma::max(coldomwild);
+      
+      tempP = P;
+      for (size_t i = groups.size() + 4; i < groups.size() + 12; ++i) {
+        tempP(i,i) = 1;
+      }
+      KP = tempP * K;
+      arma::eig_gen(eigval, eigvec, KP);
+      arma::colvec colwild = arma::real(eigval);
+      double wild = arma::max(colwild);
+      
+      std::cout << "\nR0: " << R0 << std::endl;
+
+      std::cout << "\nDomestic cycle: " << domestic << std::endl;
+      std::cout << "Wildlife cycle: " << wild << std::endl;
+      std::cout << "Domestic+wildlife: " << domwild << std::endl;
 
       // eigenvalues
       // for (size_t j = 0; j < groups.size(); ++j) {
@@ -478,7 +532,7 @@ int main(int argc, char* argv[])
                   << vectors[0].M/vectors[0].N << std::endl;
       }
       for (size_t i = 0; i < hosts.size(); ++i) {
-        K.push_back(1/((1-p.vectors[0].M/vectors[0].N)*(1-p.hPrevalence[i])) *
+        K.push_back(1/((1-p.vPrevalence)*(1-p.hPrevalence[i])) *
                     hostContrib[i] / hostContribSum);
       }
 

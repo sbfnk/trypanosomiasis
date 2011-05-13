@@ -228,14 +228,16 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
   }
   for (size_t j = 0; j < params->groups.size(); ++j) {
     double yv = (pv[j] * params->vectors[j].mu + params->xi *
-                 (pv[j] - weightedVectorPrevSum)) /
+                 (pv[j] - params->vPrevalence)) /
       (1 - pv[j]);
     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
       size_t i = params->groups[j].members[k];
       double yh = params->hPrevalence[i] / (1 - params->hPrevalence[i]) *
         (params->hosts[i].mu + params->hosts[i].gamma) -
-        beta[i] * params->hosts[i].theta * pv[j] / params->groups[j].theta;
-      yv -= alpha * beta[i] * params->hPrevalence[i];
+        beta[i] * params->hosts[i].theta / params->hosts[i].abundance *
+        pv[j];
+      yv -= alpha * beta[i] * params->hosts[i].theta * params->hPrevalence[i] /
+        params->groups[j].theta;
       gsl_vector_set(f, i, yh);
     }
     gsl_vector_set(f, j + params->hosts.size(), yv);
@@ -346,8 +348,8 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
 // }
 
 // find beta (and alpha and p^v_i( from forces of infection
-void betaffoiv(void *p, std::vector<double> &vars,
-               bool jac = false, unsigned int verbose = 0)
+int betaffoiv(void *p, std::vector<double> &vars,
+              bool jac = false, unsigned int verbose = 0)
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
@@ -455,7 +457,7 @@ void betaffoiv(void *p, std::vector<double> &vars,
       status = gsl_multiroot_test_residual (s->f, 1e-7);
       // printf ("status = %s\n", gsl_strerror (status));
     }
-  } while (status == GSL_CONTINUE && iter < 10000);
+  } while (status == GSL_CONTINUE); // && iter < 10000);
 
   if (verbose > 0) {
     printf ("status = %s\n", gsl_strerror (status));
@@ -485,6 +487,8 @@ void betaffoiv(void *p, std::vector<double> &vars,
   // gsl_multiroot_fdfsolver_free (sdf);
   gsl_multiroot_fsolver_free (s);
   gsl_vector_free (x_init);
+
+  return status;
 }
 
 #endif
