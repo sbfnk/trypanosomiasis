@@ -1,8 +1,21 @@
+/*! \file reservoirs.cc
+  \brief Main program for reservoir analysis based on prevalence data
+
+  This takes prevalence data of some disease for a number of host species, as
+  well as data on abundance, vector biting preference, mortality and recovery
+  rates to estimate the relative contribution of each host species to the
+  next-generation matrix, and, consequently, to the basic reproductive number
+  R_0. This is done assuming the prevalences measured reflect an equilibrium of
+  the multi-host system. Some parts of the code are specific to analysing data
+  for African Trypanosomiasis, but this can be easily generalised.
+*/
+
 #include <iostream>
 #include <sstream>
 #include <fstream>
 #include <string>
 #include <algorithm>
+#include <armadillo>
 #include <math.h>
 #include <sys/time.h>
 #include <boost/program_options.hpp>
@@ -18,29 +31,30 @@
 
 namespace po = boost::program_options;
 
+/*! Main program. */
 int main(int argc, char* argv[])
 {
 
-  std::string dataFile; // name of the file holding host parameters
-  std::string vectorFile; // name of the file holding vector parameters
-  std::string outFile; // output file
+  std::string dataFile; //!< name of the file holding host parameters
+  std::string vectorFile; //!< name of the file holding vector parameters
+  std::string outFile; //!< output file
 
-  bool gambiense = false; // include gambiense data?
-  bool nonGambiense = false; // include nongambiense data?
-  bool jacobian = false; // use jacobian?
-  size_t lhsSamples = 0; // number of samples to be used in linear hypercube
-                         // sampling 
-  bool calcBetas = true; // calculate the betas (or use analytical formula in
-                          // simple model?)
+  bool gambiense = false; //!< include gambiense data?
+  bool nonGambiense = false; //!< include nongambiense data?
+  bool jacobian = false; //!< use jacobian?
+  size_t lhsSamples = 0; //!< number of samples to be used in linear hypercube
+                         //!< sampling 
+  bool calcBetas = true; //!< calculate the betas (or use analytical formula in
+                          //!< simple model?)
 
-  size_t samples = 0; // number of samples to be used from negative binomial
-                      // distribution around measured prevalence
+  size_t samples = 0; //!< number of samples to be used from negative binomial
+                      //!< distribution around measured prevalence
 
-  double xi; // xi (assortativity)
+  double xi; //!< xi (assortativity)
 
-  unsigned int verbose = 0; // be verbose
+  unsigned int verbose = 0; //!< be verbose
 
-  std::vector<std::vector<size_t> > groups; // composition of groups
+  std::vector<group> groups; //!< composition of groups
 
   // main options
   po::options_description main_options
@@ -64,6 +78,8 @@ int main(int argc, char* argv[])
      "output file")
     ("species,s", po::value<std::string>()->default_value("g"),
      "trypanosome species to consider (g=gambiense, n=nongambiense)")
+    ("groups,g", po::value<std::string>(),
+     "groups (semicolon-separated list of comma-separated hosts")
     ("xi,x", po::value<double>()->default_value(.0),
      "assortativity parameter xi")
     ("lhs,l", po::value<size_t>()->default_value(0),
@@ -74,6 +90,8 @@ int main(int argc, char* argv[])
      "use jacobian")
     ("simple,i", 
      "use simple model")
+    ("random,r", 
+     "assume random mixing")
     ;
 
   // read options
@@ -310,26 +328,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  // ************** read group composition options ****************
-
-  po::options_description group_options
-    ("\nGroup options");
-
-  group_options.add_options()
-    ("groups,g", po::value<std::string>(),
-     "groups (semicolon-separated list of comma-separated hosts")
-    ;
-  long_options.add(group_options);
-  try {
-    po::store(po::command_line_parser(argc, argv).
-              options(long_options).run(), vm);
-  }
-  catch (std::exception& e) {
-    std::cerr << "Error parsing command line parameters: " << e.what()
-              << std::endl;
-    return 1;
-  }
-  po::notify(vm);
+  // ************** read group composition option ****************
     
   if (vm.count("groups")) {
     std::string groupString = vm["groups"].as<std::string>();
@@ -339,26 +338,32 @@ int main(int argc, char* argv[])
          it != result.end(); it++) {
       std::vector<std::string> subres;
       boost::algorithm::split(subres, *it, boost::is_any_of(","));
-      std::vector<size_t> group;
+      group newGroup;
       for (std::vector<std::string>::iterator it2 = subres.begin();
            it2 != subres.end(); it2++) {
         size_t s;
         std::istringstream myStream(*it2);
         myStream >> s;
-        group.push_back(s);
+        newGroup.members.push_back(s);
+        newGroup.theta += hosts[s].theta;
       }
-      groups.push_back(group);
+      groups.push_back(newGroup);
     }
   } else {
-    // groups.push_back(std::vector<size_t>());
-    // for (size_t i = 0; i < hosts.size(); ++i) {
-    //   groups[0].push_back(i);
-    // }
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      groups.push_back(std::vector<size_t>(1,i));
+    if (vm.count("random")) { // random mixing
+      groups.push_back(group());
+      groups[0].theta = 1;
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        groups[0].members.push_back(i);
+      }
+    } else { // species-specific mixing
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        groups.push_back(group(i, hosts[i].theta));
+      }
     }
   }
 
+  // create a copy of the vector variable for each group
   for (size_t i = 1; i < groups.size(); ++i) {
     vector newVector(vectors[0]);
     vectors.push_back(newVector);
@@ -366,47 +371,96 @@ int main(int argc, char* argv[])
   
   // ********************* estimate betas *********************
   
-  std::vector <double> K;
+  arma::mat K(hosts.size() + groups.size(), hosts.size() + groups.size());
+  arma::mat S(hosts.size() + groups.size(), hosts.size() + groups.size());
+  arma::mat T(hosts.size() + groups.size(), hosts.size() + groups.size());
+  S.zeros();
+  T.zeros();
   
   betafunc_params p (hosts, vectors, groups, xi);
 
   if (samples == 0) {
 
-    if (calcBetas) {
-      // variables
+    if (calcBetas) { // estimate betas
       std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
       // find betas, p^v_is and alpha
       betaffoiv(&p, vars, jacobian, verbose);
-      // double alphaContribSum = 0;
-      // for (size_t i = 0; i < hosts.size(); ++i) {
-      //   alphaContribSum += beta[i] * hosts[i].theta * vectors[0].bitingRate *
-      //     p.hPrevalence[i];
-      // }
-      // alpha.push_back(p.vPrevalence[0] / (1-p.vPrevalence[0]) *
-      //                 vectors[0].mu / alphaContribSum);
-      
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        if (verbose) {
-          std::cout << "beta^*[" << i << "]=" << vars[i] << ", "
-                    << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
+
+      if (verbose) {
+        for (size_t i = 0; i < hosts.size(); ++i) {
+          std::cout << "beta^*[" << i << "]=" << vars[i] << std::endl;
+        }
+        for (size_t i = 0; i < groups.size(); ++i) {
+          std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
                     << std::endl;
         }
-        K.push_back
-          (vars[2*hosts.size()] *
-           pow(vars[i] * hosts[i].theta * vectors[0].bitingRate, 2) *
-           vectors[0].density /
-           hosts[i].abundance / ((hosts[i].gamma + hosts[i].mu) *
-                                 vectors[0].mu));
-      }
-      if (verbose) {
-        for (size_t i = 0; i < vectors.size(); ++i) {
-          std::cout << "alpha[" << i << "]=" << vars[i + 2*hosts.size()]
-                    << ", ";
+        for (size_t i = 0; i < 1; ++i) {
+          std::cout << "alpha[" << i << "]=" << vars[i + hosts.size() +
+                                                     groups.size()];
         }
         std::cout << std::endl;
       }
+
+      // compose NGM
+      for (size_t j = 0; j < groups.size(); ++j) {
+        S(j,j) = S(j,j) - vectors[0].mu - xi;
+        for (size_t k = 0; k < groups.size(); ++k) {
+          S(j,k) = S(j,k) + xi * groups[k].theta;
+        }
+        for (size_t i = 0; i < hosts.size(); ++i) {
+          S(i + groups.size(),i + groups.size()) =
+            S(i + groups.size(),i + groups.size()) -
+            hosts[i].gamma - hosts[i].mu;
+        }
+        for (size_t k = 0; k < groups[j].members.size(); ++k) {
+          size_t i = groups[j].members[k];
+          T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
+            vars[i] * groups[j].theta / hosts[i].abundance;
+          T(i + groups.size(),j) = vars[i] / groups[j].theta;
+        }
+      }
+
+      K = - T * inv(S);
+
+      if (verbose) {
+        T.print("T:");
+        S.print("S:");
+        arma::mat I = inv(S);
+        I.print("inv(S):");
+        K.print("K:");
+      }
+      
+      arma::cx_vec eigval;
+      arma::cx_mat eigvec;
+      
+      arma::eig_gen(eigval, eigvec, K);
+      double R0 = 0;
+      for (size_t i = 0; i < hosts.size() + groups.size(); ++i) {
+        std::complex<double> ev = eigval(i);
+        if (ev.imag() == 0 && ev.real() > R0) {
+          R0 = ev.real();
+        }
+        if (verbose) {
+          std::cout << ev << std::endl;
+        }
+      }
+
+      std::cout << "R0: " << R0 << std::endl;
+
+      // eigenvalues
+      // for (size_t j = 0; j < groups.size(); ++j) {
+      //   double group_ev = .0;
+      //   for (size_t k = 0; k < groups[j].members.size(); ++k) {
+      //     size_t i = groups[j].members[k];
+      //     // std::cout << "i: " << i << ", vars[i]=" << vars[i] << ", alpha="
+      //     //           << vars[2*hosts.size()] << std::endl;
+      //     group_ev += K(k,i+groups.size()) * K(i+groups.size(), k);
+      //   }
+      //   std::cout << "Group " << j << ": " << sqrt(group_ev) << std::endl;
+      // }
     } else {
+      std::vector<double> K;
       std::vector<double> hostContrib;
       double hostContribSum = 0;
       for (size_t i = 0; i < hosts.size(); ++i) {
@@ -427,42 +481,42 @@ int main(int argc, char* argv[])
         K.push_back(1/((1-p.vectors[0].M/vectors[0].N)*(1-p.hPrevalence[i])) *
                     hostContrib[i] / hostContribSum);
       }
-    }
 
-    double r0 = 0;
-
-    double domestic = 0;
-    double wildLife = 0;
-    double animal = 0;
-  
-    std::cout << "\nNGM contributions: \n";
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      r0 += K[i];
-      if (i == 0) {
-      } else if (i < 4) {
-        domestic += K[i];
-        animal += K[i];
-      } else {
-        wildLife += K[i];
-        animal += K[i];
-      }
+      double r0 = 0;
       
-      double contrib = sqrt(K[i]);
-      if (verbose) {
-        std::cout << "hosts[" << i << "].gamma=" << hosts[i].gamma
-                  << ", hosts[" << i << "].mu=" << hosts[i].mu
-                  << ", vectors[0].density=" << vectors[0].density
-                  << ", hosts[" << i << "].abundance="
-                  << hosts[i].abundance << std::endl;
+      double domestic = 0;
+      double wildLife = 0;
+      double animal = 0;
+  
+      std::cout << "\nNGM contributions: \n";
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        r0 += K[i];
+        if (i == 0) {
+        } else if (i < 4) {
+          domestic += K[i];
+          animal += K[i];
+        } else {
+          wildLife += K[i];
+          animal += K[i];
+        }
+      
+        double contrib = sqrt(K[i]);
+        if (verbose) {
+          std::cout << "hosts[" << i << "].gamma=" << hosts[i].gamma
+                    << ", hosts[" << i << "].mu=" << hosts[i].mu
+                    << ", vectors[0].density=" << vectors[0].density
+                    << ", hosts[" << i << "].abundance="
+                    << hosts[i].abundance << std::endl;
+        }
+        std::cout << hosts[i].name << ": " << contrib << std::endl;
+
       }
-      std::cout << hosts[i].name << ": " << contrib << std::endl;
+      std::cout << "\nR0: " << sqrt(r0) << std::endl;
 
+      std::cout << "\nDomestic cycle: " << sqrt(domestic) << std::endl;
+      std::cout << "Wildlife cycle: " << sqrt(wildLife) << std::endl;
+      std::cout << "Domestic+wildlife: " << sqrt(animal) << std::endl;
     }
-    std::cout << "\nR0: " << sqrt(r0) << std::endl;
-
-    std::cout << "\nDomestic cycle: " << sqrt(domestic) << std::endl;
-    std::cout << "Wildlife cycle: " << sqrt(wildLife) << std::endl;
-    std::cout << "Domestic+wildlife: " << sqrt(animal) << std::endl;
   } else {
 
     int seed = get_seed();
@@ -483,11 +537,6 @@ int main(int argc, char* argv[])
          (vectors[j].M+1, vectors[j].N-vectors[j].M+1));
     }
 
-    // seed = get_seed();
-    // unsigned int seed;
-    // struct timeval tv;
-    // gettimeofday(&tv, 0);
-    // seed = tv.tv_sec + tv.tv_usec;
     boost::mt19937 gen(seed);
     
     boost::variate_generator<boost::mt19937, boost::uniform_real<> >
