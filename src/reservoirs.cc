@@ -408,19 +408,19 @@ int main(int argc, char* argv[])
         for (size_t k = 0; k < groups.size(); ++k) {
           S(j,k) = S(j,k) + xi * groups[k].theta;
         }
-        for (size_t i = 0; i < hosts.size(); ++i) {
-          S(i + groups.size(),i + groups.size()) =
-            S(i + groups.size(),i + groups.size()) -
-            hosts[i].gamma - hosts[i].mu;
-        }
         for (size_t k = 0; k < groups[j].members.size(); ++k) {
           size_t i = groups[j].members[k];
           T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
-            vars[i] * groups[j].theta / hosts[i].abundance;
-          T(i + groups.size(),j) = vars[i] / groups[j].theta;
+            vars[i] * hosts[i].theta / groups[j].theta;
+          T(i + groups.size(),j) = vars[i];
         }
       }
-
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        S(i + groups.size(),i + groups.size()) =
+          S(i + groups.size(),i + groups.size()) -
+          hosts[i].gamma - hosts[i].mu;
+      }
+      
       K = - T * inv(S);
 
       if (verbose) {
