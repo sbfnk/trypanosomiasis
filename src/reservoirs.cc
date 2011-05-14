@@ -56,7 +56,8 @@ int main(int argc, char* argv[])
 
   std::vector<group> groups; //!< composition of groups
 
-  size_t firstColumn = 0;
+  std::string firstColumn = "0";
+  std::string firstHeader = "n";
   size_t attempts = 1;
 
   // main options
@@ -99,8 +100,10 @@ int main(int argc, char* argv[])
      "do not print header")
     ("print,p", 
      "print results")
-    ("firstcolumn,c", po::value<size_t>(),
+    ("firstcolumn,c", po::value<std::string>(),
      "entry of first column")
+    ("firstheader,C", po::value<std::string>(),
+     "header of first column")
     ("attempts,t", po::value<size_t>()->default_value(1),
      "number of solving attempts")
     ;
@@ -184,9 +187,18 @@ int main(int argc, char* argv[])
 
   if (vm.count("firstcolumn")) {
     if (samples == 0) {
-      firstColumn = vm["firstcolumn"].as<size_t>();
+      firstColumn = vm["firstcolumn"].as<std::string>();
     } else {
       std::cerr << "WARNING: --firstcolumn ignored because samples > 0"
+                << std::endl;
+    }
+  }
+
+  if (vm.count("firstheader")) {
+    if (samples == 0) {
+      firstHeader = vm["firstheader"].as<std::string>();
+    } else {
+      std::cerr << "WARNING: --firstheader ignored because samples > 0"
                 << std::endl;
     }
   }
@@ -434,7 +446,11 @@ int main(int argc, char* argv[])
     randGen(gen, boost::uniform_real<> (0,1));
 
   if (!(vm.count("noheader") || (outFile == "-" && vm.count("print")))) {
-    out << "n";
+    if (samples == 0) {
+      out << firstHeader;
+    } else {
+      out << "n";
+    }
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j].name << "_prev\"";
       if (lhsSamples > 0) {
