@@ -57,6 +57,7 @@ int main(int argc, char* argv[])
   std::vector<group> groups; //!< composition of groups
 
   size_t firstColumn = 0;
+  size_t attempts = 1;
 
   // main options
   po::options_description main_options
@@ -100,6 +101,8 @@ int main(int argc, char* argv[])
      "print results")
     ("firstcolumn,c", po::value<size_t>(),
      "entry of first column")
+    ("attempts,t", po::value<size_t>()->default_value(1),
+     "number of solving attempts")
     ;
 
   // read options
@@ -187,6 +190,8 @@ int main(int argc, char* argv[])
                 << std::endl;
     }
   }
+
+  attempts = vm["attempts"].as<size_t>();
 
   std::vector<host> hosts; // vector of hosts
   std::vector<vector> vectors; // vector of vectors
@@ -473,13 +478,15 @@ int main(int argc, char* argv[])
       }
     }
 
-    // to be corrected for more vectors
-    // for (size_t j = 0; j < vectors.size(); ++j) {
-    for (size_t j = 0; j < hosts.size(); ++j) {
-      p.hPrevalence[j] = quantile(*distributions[j], randGen());
+    if (samples > 0) {
+      for (size_t j = 0; j < hosts.size(); ++j) {
+        p.hPrevalence[j] = quantile(*distributions[j], randGen());
+      }
+      // to be corrected for more vectors
+      // for (size_t j = 0; j < vectors.size(); ++j) {
+      p.vPrevalence = quantile(*distributions[hosts.size()],
+                               randGen());
     }
-    p.vPrevalence = quantile(*distributions[hosts.size()],
-                             randGen());
 
     if (samples == 0) {
       outLine << firstColumn;
@@ -509,7 +516,11 @@ int main(int argc, char* argv[])
       std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
       // find betas, p^v_is and alpha
-      status = betaffoiv(&p, vars, jacobian, verbose);
+      size_t nAttempts = 0;
+      do {
+        status = betaffoiv(&p, vars, jacobian, verbose);
+        ++nAttempts;
+      } while (status != GSL_SUCCESS && nAttempts < attempts);
 
       if (status == GSL_SUCCESS) {
         if (verbose) {
