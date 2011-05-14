@@ -92,6 +92,8 @@ int main(int argc, char* argv[])
      "use simple model")
     ("random,r", 
      "assume random mixing")
+    ("noheader,a", 
+     "do not print header")
     ;
 
   // read options
@@ -411,7 +413,7 @@ int main(int argc, char* argv[])
   boost::variate_generator<boost::mt19937, boost::uniform_real<> >
     randGen(gen, boost::uniform_real<> (0,1));
 
-  if (samples > 0 || outFile != "-") {
+  if (!vm.count("noheader") && (samples > 0 || outFile != "-")) {
     out << "n";
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j].name << "_prev\"";
