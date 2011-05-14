@@ -94,6 +94,8 @@ int main(int argc, char* argv[])
      "assume random mixing")
     ("noheader,a", 
      "do not print header")
+    ("print,p", 
+     "print results")
     ;
 
   // read options
@@ -146,11 +148,6 @@ int main(int argc, char* argv[])
   if (vm.count("output-file")) {
     outFile = vm["output-file"].as<std::string>();
   } else {
-    // if (samples > 0) {
-    //   std::cerr << "Error: must specify output file for samples >0"
-    //             << std::endl;
-    //   return 1;
-    // }
     outFile = "-";
   }
 
@@ -413,7 +410,7 @@ int main(int argc, char* argv[])
   boost::variate_generator<boost::mt19937, boost::uniform_real<> >
     randGen(gen, boost::uniform_real<> (0,1));
 
-  if (!vm.count("noheader") && (samples > 0 || outFile != "-")) {
+  if (!(vm.count("noheader") || (outFile == "-" && vm.count("print")))) {
     out << "n";
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j].name << "_prev\"";
@@ -470,7 +467,7 @@ int main(int argc, char* argv[])
     p.vPrevalence = quantile(*distributions[hosts.size()],
                              randGen());
     
-    if (samples > 0 || outFile != "-") {
+    if (!(outFile == "-" && vm.count("print"))) {
       out << i;
       for (size_t j = 0; j < hosts.size(); ++j) {
         out << "," << p.hPrevalence[j];
@@ -488,122 +485,122 @@ int main(int argc, char* argv[])
     double domwild;
     double wildlife;
     double R0;
+
+    int status = GSL_SUCCESS;
     
     if (calcBetas) { // estimate betas
       std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
       // find betas, p^v_is and alpha
-      int status = betaffoiv(&p, vars, jacobian, verbose);
+      status = betaffoiv(&p, vars, jacobian, verbose);
 
-      if (status != GSL_SUCCESS) {
-        std::cout << "ERROR: Could not find solution" << std::endl;
-        return 1;
-      }
-
-      if (verbose) {
+      if (status == GSL_SUCCESS) {
+        if (verbose) {
+          for (size_t i = 0; i < hosts.size(); ++i) {
+            std::cout << "beta^*[" << i << "]=" << vars[i] << std::endl;
+          }
+          for (size_t i = 0; i < groups.size(); ++i) {
+            std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
+                      << std::endl;
+          }
+          for (size_t i = 0; i < 1; ++i) {
+            std::cout << "alpha[" << i << "]=" << vars[i + hosts.size() +
+                                                       groups.size()];
+          }
+          std::cout << std::endl;
+        }
+      
+        // compose NGM
+        S.zeros();
+        T.zeros();
+      
+        for (size_t j = 0; j < groups.size(); ++j) {
+          S(j,j) = S(j,j) - vectors[0].mu - xi;
+          for (size_t k = 0; k < groups.size(); ++k) {
+            S(j,k) = S(j,k) + xi * groups[k].theta;
+          }
+          for (size_t k = 0; k < groups[j].members.size(); ++k) {
+            size_t i = groups[j].members[k];
+            T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
+              vars[i] * hosts[i].theta / hosts[i].abundance;
+            T(i + groups.size(),j) = vars[i] * hosts[i].theta / groups[j].theta;
+          }
+        }
         for (size_t i = 0; i < hosts.size(); ++i) {
-          std::cout << "beta^*[" << i << "]=" << vars[i] << std::endl;
+          S(i + groups.size(),i + groups.size()) =
+            S(i + groups.size(),i + groups.size()) -
+            hosts[i].gamma - hosts[i].mu;
         }
+      
+        K = - T * inv(S);
+
+        if (verbose) {
+          T.print("T:");
+          S.print("S:");
+          arma::mat I = inv(S);
+          I.print("inv(S):");
+          K.print("K:");
+        }
+      
+        arma::cx_vec eigval;
+        arma::cx_mat eigvec;
+      
+        arma::eig_gen(eigval, eigvec, K);
+        arma::colvec colr0 = arma::real(eigval);
+        R0 = arma::max(colr0);
+        if (verbose) {
+          for (size_t i = 0; i < hosts.size() + groups.size(); ++i) {
+            std::cout << eigval(i) << std::endl;
+          }
+        }
+
+        arma::mat P(hosts.size() + groups.size(), hosts.size() + groups.size());
+        arma::mat KP(hosts.size() + groups.size(), hosts.size() + groups.size());
+        P.zeros();
         for (size_t i = 0; i < groups.size(); ++i) {
-          std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
-                    << std::endl;
+          P(i,i) = 1;
         }
-        for (size_t i = 0; i < 1; ++i) {
-          std::cout << "alpha[" << i << "]=" << vars[i + hosts.size() +
-                                                     groups.size()];
-        }
-        std::cout << std::endl;
-      }
-      
-      // compose NGM
-      S.zeros();
-      T.zeros();
-      
-      for (size_t j = 0; j < groups.size(); ++j) {
-        S(j,j) = S(j,j) - vectors[0].mu - xi;
-        for (size_t k = 0; k < groups.size(); ++k) {
-          S(j,k) = S(j,k) + xi * groups[k].theta;
-        }
-        for (size_t k = 0; k < groups[j].members.size(); ++k) {
-          size_t i = groups[j].members[k];
-          T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
-            vars[i] * hosts[i].theta / hosts[i].abundance;
-          T(i + groups.size(),j) = vars[i] * hosts[i].theta / groups[j].theta;
-        }
-      }
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        S(i + groups.size(),i + groups.size()) =
-          S(i + groups.size(),i + groups.size()) -
-          hosts[i].gamma - hosts[i].mu;
-      }
-      
-      K = - T * inv(S);
+        arma::mat tempP(hosts.size() + groups.size(),
+                        hosts.size() + groups.size());
 
-      if (verbose) {
-        T.print("T:");
-        S.print("S:");
-        arma::mat I = inv(S);
-        I.print("inv(S):");
-        K.print("K:");
-      }
-      
-      arma::cx_vec eigval;
-      arma::cx_mat eigvec;
-      
-      arma::eig_gen(eigval, eigvec, K);
-      arma::colvec colr0 = arma::real(eigval);
-      R0 = arma::max(colr0);
-      if (verbose) {
-        for (size_t i = 0; i < hosts.size() + groups.size(); ++i) {
-          std::cout << eigval(i) << std::endl;
+        for (size_t i = groups.size(); i < groups.size() + hosts.size(); ++i) {
+          tempP = P;
+          tempP(i,i) = 1;
+          KP = tempP * K;
+          arma::eig_gen(eigval, eigvec, KP);
+          arma::colvec col = arma::real(eigval);
+          contrib[i-groups.size()] = arma::max(col);
         }
-      }
 
-      arma::mat P(hosts.size() + groups.size(), hosts.size() + groups.size());
-      arma::mat KP(hosts.size() + groups.size(), hosts.size() + groups.size());
-      P.zeros();
-      for (size_t i = 0; i < groups.size(); ++i) {
-        P(i,i) = 1;
-      }
-      arma::mat tempP(hosts.size() + groups.size(),
-                      hosts.size() + groups.size());
-
-      for (size_t i = groups.size(); i < groups.size() + hosts.size(); ++i) {
         tempP = P;
-        tempP(i,i) = 1;
+        for (size_t i = groups.size() + 1; i < groups.size() + 4; ++i) {
+          tempP(i,i) = 1;
+        }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
-        arma::colvec col = arma::real(eigval);
-        contrib[i-groups.size()] = arma::max(col);
-      }
-
-      tempP = P;
-      for (size_t i = groups.size() + 1; i < groups.size() + 4; ++i) {
-        tempP(i,i) = 1;
-      }
-      KP = tempP * K;
-      arma::eig_gen(eigval, eigvec, KP);
-      arma::colvec coldomestic = arma::real(eigval);
-      domestic = arma::max(coldomestic);
+        arma::colvec coldomestic = arma::real(eigval);
+        domestic = arma::max(coldomestic);
       
-      tempP = P;
-      for (size_t i = groups.size() + 1; i < groups.size() + 12; ++i) {
-        tempP(i,i) = 1;
-      }
-      KP = tempP * K;
-      arma::eig_gen(eigval, eigvec, KP);
-      arma::colvec coldomwild = arma::real(eigval);
-      domwild = arma::max(coldomwild);
+        tempP = P;
+        for (size_t i = groups.size() + 1; i < groups.size() + 12; ++i) {
+          tempP(i,i) = 1;
+        }
+        KP = tempP * K;
+        arma::eig_gen(eigval, eigvec, KP);
+        arma::colvec coldomwild = arma::real(eigval);
+        domwild = arma::max(coldomwild);
       
-      tempP = P;
-      for (size_t i = groups.size() + 4; i < groups.size() + 12; ++i) {
-        tempP(i,i) = 1;
-      }
-      KP = tempP * K;
-      arma::eig_gen(eigval, eigvec, KP);
-      arma::colvec colwild = arma::real(eigval);
-      wildlife = arma::max(colwild);
-      
+        tempP = P;
+        for (size_t i = groups.size() + 4; i < groups.size() + 12; ++i) {
+          tempP(i,i) = 1;
+        }
+        KP = tempP * K;
+        arma::eig_gen(eigval, eigvec, KP);
+        arma::colvec colwild = arma::real(eigval);
+        wildlife = arma::max(colwild);
+      } else {
+        std::cerr << "ERROR: Could not find solution" << std::endl;
+      } 
     } else {
 
       std::vector<double> K;
@@ -658,33 +655,37 @@ int main(int argc, char* argv[])
       domwild = sqrt(domwild);
       wildlife = sqrt(wildlife);
     }
-    
-    if (samples == 0 && outFile == "-") {
-      std::cout << "\nNGM contributions:" << std::endl;
-    }
-    
-    for (size_t j = 0; j < groups.size(); ++j) {
-      for (size_t k = 0; k < groups[j].members.size(); ++k) {
-        size_t i = groups[j].members[k];
-        if (samples == 0 && outFile == "-") {
-          std::cout << hosts[i].name << ": " << contrib[i] << std::endl;
-        } else {
-          out << "," << contrib[i];
+
+    if (status == GSL_SUCCESS) {
+      if (vm.count("print")) {
+        std::cout << "\nNGM contributions:" << std::endl;
+      }
+      
+      for (size_t j = 0; j < groups.size(); ++j) {
+        for (size_t k = 0; k < groups[j].members.size(); ++k) {
+          size_t i = groups[j].members[k];
+          if (vm.count("print")) {
+            std::cout << hosts[i].name << ": " << contrib[i] << std::endl;
+          }
+          if (!(outFile == "-" && vm.count("print"))) {
+            out << "," << contrib[i];
+          }
         }
+      }
+    
+      if (vm.count("print")) {
+        std::cout << "\nR0: " << R0 << std::endl;
+      
+        std::cout << "\nDomestic cycle: " << domestic << std::endl;
+        std::cout << "Wildlife cycle: " << wildlife << std::endl;
+        std::cout << "Domestic+wildlife: " << domwild << std::endl;
+      }
+      if (!(outFile == "-" && vm.count("print"))) {
+        out << "," << domestic << "," << wildlife << "," << domwild << "," << R0
+            << std::endl;
       }
     }
     
-    if (samples == 0 && outFile == "-") {
-      std::cout << "\nR0: " << R0 << std::endl;
-      
-      std::cout << "\nDomestic cycle: " << domestic << std::endl;
-      std::cout << "Wildlife cycle: " << wildlife << std::endl;
-      std::cout << "Domestic+wildlife: " << domwild << std::endl;
-    } else {
-      out << "," << domestic << "," << wildlife << "," << domwild << "," << R0
-          << std::endl;
-    }
-
     ++i;
     if (lhsSamples > 0 && (i % lhsSamples == 0)) {
       free(x);
