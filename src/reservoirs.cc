@@ -74,8 +74,8 @@ int main(int argc, char* argv[])
     ("vector-file,e", po::value<std::string>()->
      default_value("data/bipindi_vector.csv"),
      "vector file")
-    ("output-file,o", po::value<std::string>()->default_value("reservoirs.dat"),
-     "output file")
+    ("output-file,o", po::value<std::string>()->default_value("-"),
+     "output file (\"-\" for output to stdout")
     ("species,s", po::value<std::string>()->default_value("g"),
      "trypanosome species to consider (g=gambiense, n=nongambiense)")
     ("groups,g", po::value<std::string>(),
@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
     ("lhs,l", po::value<size_t>()->default_value(0),
      "number of samples for latin hypercube sampling")
     ("samples,n", po::value<size_t>()->default_value(0),
-     "number of samples")
+     "number of samples (0 for no sampling)")
     ("jacobian,j", 
      "use jacobian")
     ("simple,i", 
@@ -144,11 +144,12 @@ int main(int argc, char* argv[])
   if (vm.count("output-file")) {
     outFile = vm["output-file"].as<std::string>();
   } else {
-    if (samples > 0) {
-      std::cerr << "Error: must specify output file for samples >0"
-                << std::endl;
-      return 1;
-    }
+    // if (samples > 0) {
+    //   std::cerr << "Error: must specify output file for samples >0"
+    //             << std::endl;
+    //   return 1;
+    // }
+    outFile = "-";
   }
 
   // one of the two trypanosome species must be specified
@@ -374,13 +375,118 @@ int main(int argc, char* argv[])
   arma::mat K(hosts.size() + groups.size(), hosts.size() + groups.size());
   arma::mat S(hosts.size() + groups.size(), hosts.size() + groups.size());
   arma::mat T(hosts.size() + groups.size(), hosts.size() + groups.size());
-  S.zeros();
-  T.zeros();
   
   betafunc_params p (hosts, vectors, groups, xi);
 
-  if (samples == 0) {
+  std::streambuf * buf;
+  std::ofstream of;
+  if (outFile == "-") {
+    buf = std::cout.rdbuf();
+  } else {
+    of.open(outFile.c_str());
+    buf = of.rdbuf();
+  }
+  
+  std::ostream out(buf);
 
+  int seed = get_seed();
+  int *x = 0;
+  
+  std::vector<boost::math::beta_distribution<>*> distributions;
+  
+  // generate beta distributions of prevalence
+  for (size_t j = 0; j < hosts.size(); ++j) {
+    distributions.push_back
+      (new boost::math::beta_distribution<>
+       (hosts[j].M+1, hosts[j].N-hosts[j].M+1));
+  }
+  for (size_t j = 0; j < vectors.size(); ++j) {
+    distributions.push_back
+      (new boost::math::beta_distribution<>
+       (vectors[j].M+1, vectors[j].N-vectors[j].M+1));
+  }
+  
+  boost::mt19937 gen(seed);
+  
+  boost::variate_generator<boost::mt19937, boost::uniform_real<> >
+    randGen(gen, boost::uniform_real<> (0,1));
+
+  if (samples > 0 || outFile != "-") {
+    out << "n";
+    for (size_t j = 0; j < hosts.size(); ++j) {
+      out << ",\"" << hosts[j].name << "_prev\"";
+      if (lhsSamples > 0) {
+        out << ",\"" << hosts[j].name << "_abundance\"";
+        out << ",\"" << hosts[j].name << "_mu\"";
+        out << ",\"" << hosts[j].name << "_gamma\"";
+      }
+    }
+    for (size_t j = 0; j < 1; ++j) {
+      out << ",\"" << vectors[0].name << "_prev\"";
+    }
+    for (size_t j = 0; j < hosts.size(); ++j) {
+      out << ",\"" << hosts[j].name << "\"";
+    }
+    out << ",\"domestic\",\"wildlife\",\"domestic+wildlife\",\"R0\"";
+    out << std::endl;
+  }
+
+  size_t i = 0;
+  do {
+
+    if (lhsSamples > 0) {
+      if (i % lhsSamples == 0) {
+        // generate latin hypercube samples
+        x = (int*) malloc (3 * hosts.size() * lhsSamples * sizeof(int));
+        ihs(3*hosts.size(), lhsSamples, 5, &seed, x);
+      }
+      
+      for (size_t j = 0; j < hosts.size(); ++j) {
+        hosts[j].abundance = hosts[j].abundance_limits.first +
+          (hosts[j].abundance_limits.second -
+           hosts[j].abundance_limits.first) *
+          x[i % lhsSamples * hosts.size() * 3 + j] /
+          static_cast<double>(lhsSamples);
+        hosts[j].mu = hosts[j].mu_limits.first +
+          (hosts[j].mu_limits.second -
+           hosts[j].mu_limits.first) *
+          x[i % lhsSamples * hosts.size() * 3 + j + 1] /
+          static_cast<double>(lhsSamples);
+        hosts[j].gamma = hosts[j].gamma_limits.first +
+          (hosts[j].gamma_limits.second -
+           hosts[j].gamma_limits.first) *
+          x[i % lhsSamples * hosts.size() * 3 + j + 2] /
+          static_cast<double>(lhsSamples);
+      }
+    }
+
+    // to be corrected for more vectors
+    // for (size_t j = 0; j < vectors.size(); ++j) {
+    for (size_t j = 0; j < hosts.size(); ++j) {
+      p.hPrevalence[j] = quantile(*distributions[j], randGen());
+    }
+    p.vPrevalence = quantile(*distributions[hosts.size()],
+                             randGen());
+    
+    if (samples > 0 || outFile != "-") {
+      out << i;
+      for (size_t j = 0; j < hosts.size(); ++j) {
+        out << "," << p.hPrevalence[j];
+        if (lhsSamples > 0) {
+          out << "," << hosts[j].abundance;
+          out << "," << hosts[j].mu;
+          out << "," << hosts[j].gamma;
+        }
+      }
+      out << "," << p.vPrevalence;
+    }
+
+    std::vector<double> contrib (hosts.size());
+    double domestic;
+    double domwild;
+    double wildlife;
+    double R0;
+    
     if (calcBetas) { // estimate betas
       std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
@@ -406,8 +512,11 @@ int main(int argc, char* argv[])
         }
         std::cout << std::endl;
       }
-
+      
       // compose NGM
+      S.zeros();
+      T.zeros();
+      
       for (size_t j = 0; j < groups.size(); ++j) {
         S(j,j) = S(j,j) - vectors[0].mu - xi;
         for (size_t k = 0; k < groups.size(); ++k) {
@@ -441,7 +550,7 @@ int main(int argc, char* argv[])
       
       arma::eig_gen(eigval, eigvec, K);
       arma::colvec colr0 = arma::real(eigval);
-      double R0 = arma::max(colr0);
+      R0 = arma::max(colr0);
       if (verbose) {
         for (size_t i = 0; i < hosts.size() + groups.size(); ++i) {
           std::cout << eigval(i) << std::endl;
@@ -457,16 +566,13 @@ int main(int argc, char* argv[])
       arma::mat tempP(hosts.size() + groups.size(),
                       hosts.size() + groups.size());
 
-      std::cout << "\nNGM contributions:" << std::endl;
       for (size_t i = groups.size(); i < groups.size() + hosts.size(); ++i) {
         tempP = P;
         tempP(i,i) = 1;
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
         arma::colvec col = arma::real(eigval);
-        double contrib = arma::max(col);
-
-        std::cout << hosts[i-groups.size()].name << ": " << contrib << std::endl;
+        contrib[i-groups.size()] = arma::max(col);
       }
 
       tempP = P;
@@ -476,7 +582,7 @@ int main(int argc, char* argv[])
       KP = tempP * K;
       arma::eig_gen(eigval, eigvec, KP);
       arma::colvec coldomestic = arma::real(eigval);
-      double domestic = arma::max(coldomestic);
+      domestic = arma::max(coldomestic);
       
       tempP = P;
       for (size_t i = groups.size() + 1; i < groups.size() + 12; ++i) {
@@ -485,7 +591,7 @@ int main(int argc, char* argv[])
       KP = tempP * K;
       arma::eig_gen(eigval, eigvec, KP);
       arma::colvec coldomwild = arma::real(eigval);
-      double domwild = arma::max(coldomwild);
+      domwild = arma::max(coldomwild);
       
       tempP = P;
       for (size_t i = groups.size() + 4; i < groups.size() + 12; ++i) {
@@ -494,26 +600,10 @@ int main(int argc, char* argv[])
       KP = tempP * K;
       arma::eig_gen(eigval, eigvec, KP);
       arma::colvec colwild = arma::real(eigval);
-      double wild = arma::max(colwild);
+      wildlife = arma::max(colwild);
       
-      std::cout << "\nR0: " << R0 << std::endl;
-
-      std::cout << "\nDomestic cycle: " << domestic << std::endl;
-      std::cout << "Wildlife cycle: " << wild << std::endl;
-      std::cout << "Domestic+wildlife: " << domwild << std::endl;
-
-      // eigenvalues
-      // for (size_t j = 0; j < groups.size(); ++j) {
-      //   double group_ev = .0;
-      //   for (size_t k = 0; k < groups[j].members.size(); ++k) {
-      //     size_t i = groups[j].members[k];
-      //     // std::cout << "i: " << i << ", vars[i]=" << vars[i] << ", alpha="
-      //     //           << vars[2*hosts.size()] << std::endl;
-      //     group_ev += K(k,i+groups.size()) * K(i+groups.size(), k);
-      //   }
-      //   std::cout << "Group " << j << ": " << sqrt(group_ev) << std::endl;
-      // }
     } else {
+
       std::vector<double> K;
       std::vector<double> hostContrib;
       double hostContribSum = 0;
@@ -536,25 +626,23 @@ int main(int argc, char* argv[])
                     hostContrib[i] / hostContribSum);
       }
 
-      double r0 = 0;
-      
-      double domestic = 0;
-      double wildLife = 0;
-      double animal = 0;
-  
-      std::cout << "\nNGM contributions: \n";
+      domestic = .0;
+      domwild = .0;
+      wildlife = .0;
+      R0 = .0;
+
       for (size_t i = 0; i < hosts.size(); ++i) {
-        r0 += K[i];
+        R0 += K[i];
         if (i == 0) {
         } else if (i < 4) {
           domestic += K[i];
-          animal += K[i];
+          domwild += K[i];
         } else {
-          wildLife += K[i];
-          animal += K[i];
+          wildlife += K[i];
+          domwild += K[i];
         }
       
-        double contrib = sqrt(K[i]);
+        contrib[i] = sqrt(K[i]);
         if (verbose) {
           std::cout << "hosts[" << i << "].gamma=" << hosts[i].gamma
                     << ", hosts[" << i << "].mu=" << hosts[i].mu
@@ -562,121 +650,45 @@ int main(int argc, char* argv[])
                     << ", hosts[" << i << "].abundance="
                     << hosts[i].abundance << std::endl;
         }
-        std::cout << hosts[i].name << ": " << contrib << std::endl;
-
       }
-      std::cout << "\nR0: " << sqrt(r0) << std::endl;
-
-      std::cout << "\nDomestic cycle: " << sqrt(domestic) << std::endl;
-      std::cout << "Wildlife cycle: " << sqrt(wildLife) << std::endl;
-      std::cout << "Domestic+wildlife: " << sqrt(animal) << std::endl;
+      R0 = sqrt(R0);
+      domestic = sqrt(domestic);
+      domwild = sqrt(domwild);
+      wildlife = sqrt(wildlife);
     }
-  } else {
-
-    int seed = get_seed();
-    int *x = 0;
-
-    // generate beta distributions of prevalence
-    std::ofstream out(outFile.c_str());
-    std::vector<boost::math::beta_distribution<>*> distributions;
-
-    for (size_t j = 0; j < hosts.size(); ++j) {
-      distributions.push_back
-        (new boost::math::beta_distribution<>
-         (hosts[j].M+1, hosts[j].N-hosts[j].M+1));
-    }
-    for (size_t j = 0; j < vectors.size(); ++j) {
-      distributions.push_back
-        (new boost::math::beta_distribution<>
-         (vectors[j].M+1, vectors[j].N-vectors[j].M+1));
-    }
-
-    boost::mt19937 gen(seed);
     
-    boost::variate_generator<boost::mt19937, boost::uniform_real<> >
-      randGen(gen, boost::uniform_real<> (0,1));
-
-    out << "n";
-    for (size_t j = 0; j < hosts.size(); ++j) {
-      out << ",\"" << hosts[j].name << "_prev\"";
-      if (lhsSamples > 0) {
-        out << ",\"" << hosts[j].name << "_abundance\"";
-        out << ",\"" << hosts[j].name << "_mu\"";
-        out << ",\"" << hosts[j].name << "_gamma\"";
-      }
+    if (samples == 0 && outFile == "-") {
+      std::cout << "\nNGM contributions:" << std::endl;
     }
-    for (size_t j = 0; j < vectors.size(); ++j) {
-      out << ",\"" << vectors[j].name << "_prev\"";
-    }
-    for (size_t j = 0; j < hosts.size(); ++j) {
-      out << ",\"" << hosts[j].name << "\"";
-    }
-    out << std::endl;
-
-    for (size_t i = 0; i < samples; ++i) {
-
-      if (lhsSamples > 0) {
-        // std::cout << i << " " << lhsSamples << " " << i % lhsSamples << std::endl;
-        if (i % lhsSamples == 0) {
-          // generate latin hypercube samples
-          x = (int*) malloc (3 * hosts.size() * lhsSamples * sizeof(int));
-          ihs(3*hosts.size(), lhsSamples, 5, &seed, x);
-        }
-
-        for (size_t j = 0; j < hosts.size(); ++j) {
-          hosts[j].abundance = hosts[j].abundance_limits.first +
-            (hosts[j].abundance_limits.second -
-             hosts[j].abundance_limits.first) *
-            x[i % lhsSamples * hosts.size() * 3 + j] /
-            static_cast<double>(lhsSamples);
-          hosts[j].mu = hosts[j].mu_limits.first +
-            (hosts[j].mu_limits.second -
-             hosts[j].mu_limits.first) *
-            x[i % lhsSamples * hosts.size() * 3 + j + 1] /
-            static_cast<double>(lhsSamples);
-          hosts[j].gamma = hosts[j].gamma_limits.first +
-            (hosts[j].gamma_limits.second -
-             hosts[j].gamma_limits.first) *
-            x[i % lhsSamples * hosts.size() * 3 + j + 2] /
-            static_cast<double>(lhsSamples);
+    
+    for (size_t j = 0; j < groups.size(); ++j) {
+      for (size_t k = 0; k < groups[j].members.size(); ++k) {
+        size_t i = groups[j].members[k];
+        if (samples == 0 && outFile == "-") {
+          std::cout << hosts[i].name << ": " << contrib[i] << std::endl;
+        } else {
+          out << "," << contrib[i];
         }
       }
+    }
+    
+    if (samples == 0 && outFile == "-") {
+      std::cout << "\nR0: " << R0 << std::endl;
       
-      out << i;
-      for (size_t j = 0; j < hosts.size(); ++j) {
-        p.hPrevalence[j] = quantile(*distributions[j], randGen());
-        out << "," << p.hPrevalence[j];
-        if (lhsSamples > 0) {
-          out << "," << hosts[j].abundance;
-          out << "," << hosts[j].mu;
-          out << "," << hosts[j].gamma;
-        }
-      }
-      // to be corrected for more vectors
-      // for (size_t j = 0; j < vectors.size(); ++j) {
-      p.vPrevalence = quantile(*distributions[hosts.size()],
-                                  randGen());
-      out << "," << p.vPrevalence;
-      // }
-
-      std::vector<double> contribs (hosts.size());
-      double contrib_sum = .0;
-      for (size_t j = 0; j < hosts.size(); ++j) {
-        double c = pow(p.hPrevalence[j], 2) / (1-p.hPrevalence[j]) *
-          hosts[j].abundance * (hosts[j].mu + hosts[j].gamma);
-        contribs[j] = c/((1-p.vPrevalence)*(1-p.hPrevalence[j]));
-        contrib_sum += c;
-      }
-      for (size_t j = 0; j < contribs.size(); ++j) {
-        contribs[j] = contribs[j]/contrib_sum;
-        out << "," << contribs[j];
-      }
-      out << std::endl;
+      std::cout << "\nDomestic cycle: " << domestic << std::endl;
+      std::cout << "Wildlife cycle: " << wildlife << std::endl;
+      std::cout << "Domestic+wildlife: " << domwild << std::endl;
+    } else {
+      out << "," << domestic << "," << wildlife << "," << domwild << "," << R0
+          << std::endl;
     }
 
-    out.close();
-    if (x) free(x);
-  }
+    ++i;
+    if (lhsSamples > 0 && (i % lhsSamples == 0)) {
+      free(x);
+    }
+  } while (i < samples);
+  of.close();
 }
    
 //------------------------------------------------------------
