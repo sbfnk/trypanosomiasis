@@ -293,6 +293,11 @@ int main(int argc, char* argv[])
   po::options_description long_options;
   long_options.add(main_options).
     add(host_options).add(vector_options);
+
+  if (vm.count("longhelp")) {
+    std::cout << long_options << std::endl;
+    return 0;
+  }
   
   try {
     po::store(po::command_line_parser(argc, argv).
