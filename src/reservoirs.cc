@@ -56,6 +56,8 @@ int main(int argc, char* argv[])
 
   std::vector<group> groups; //!< composition of groups
 
+  size_t firstColumn = 0;
+
   // main options
   po::options_description main_options
     ("Usage: reservoirs [options]... \n\nOptions");
@@ -96,6 +98,8 @@ int main(int argc, char* argv[])
      "do not print header")
     ("print,p", 
      "print results")
+    ("firstcolumn,c", po::value<size_t>(),
+     "entry of first column")
     ;
 
   // read options
@@ -174,6 +178,15 @@ int main(int argc, char* argv[])
   }
 
   xi = vm["xi"].as<double>();
+
+  if (vm.count("firstcolumn")) {
+    if (samples == 0) {
+      firstColumn = vm["firstcolumn"].as<size_t>();
+    } else {
+      std::cerr << "WARNING: --firstcolumn ignored because samples > 0"
+                << std::endl;
+    }
+  }
 
   std::vector<host> hosts; // vector of hosts
   std::vector<vector> vectors; // vector of vectors
@@ -467,8 +480,13 @@ int main(int argc, char* argv[])
     }
     p.vPrevalence = quantile(*distributions[hosts.size()],
                              randGen());
+
+    if (samples == 0) {
+      outLine << firstColumn;
+    } else {
+      outLine << i;
+    }
     
-    outLine << i;
     for (size_t j = 0; j < hosts.size(); ++j) {
       outLine << "," << p.hPrevalence[j];
       if (lhsSamples > 0) {
