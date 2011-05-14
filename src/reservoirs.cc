@@ -431,6 +431,7 @@ int main(int argc, char* argv[])
   }
 
   size_t i = 0;
+  std::stringstream outLine;
   do {
 
     if (lhsSamples > 0) {
@@ -467,18 +468,16 @@ int main(int argc, char* argv[])
     p.vPrevalence = quantile(*distributions[hosts.size()],
                              randGen());
     
-    if (!(outFile == "-" && vm.count("print"))) {
-      out << i;
-      for (size_t j = 0; j < hosts.size(); ++j) {
-        out << "," << p.hPrevalence[j];
-        if (lhsSamples > 0) {
-          out << "," << hosts[j].abundance;
-          out << "," << hosts[j].mu;
-          out << "," << hosts[j].gamma;
-        }
+    outLine << i;
+    for (size_t j = 0; j < hosts.size(); ++j) {
+      outLine << "," << p.hPrevalence[j];
+      if (lhsSamples > 0) {
+        outLine << "," << hosts[j].abundance;
+        outLine << "," << hosts[j].mu;
+        outLine << "," << hosts[j].gamma;
       }
-      out << "," << p.vPrevalence;
     }
+    outLine << "," << p.vPrevalence;
 
     std::vector<double> contrib (hosts.size());
     double domestic;
@@ -667,9 +666,7 @@ int main(int argc, char* argv[])
           if (vm.count("print")) {
             std::cout << hosts[i].name << ": " << contrib[i] << std::endl;
           }
-          if (!(outFile == "-" && vm.count("print"))) {
-            out << "," << contrib[i];
-          }
+          outLine << "," << contrib[i];
         }
       }
     
@@ -680,12 +677,12 @@ int main(int argc, char* argv[])
         std::cout << "Wildlife cycle: " << wildlife << std::endl;
         std::cout << "Domestic+wildlife: " << domwild << std::endl;
       }
+      outLine << "," << domestic << "," << wildlife << "," << domwild << "," << R0;
       if (!(outFile == "-" && vm.count("print"))) {
-        out << "," << domestic << "," << wildlife << "," << domwild << "," << R0
-            << std::endl;
+        out << outLine.str() << std::endl;
       }
     }
-    
+      
     ++i;
     if (lhsSamples > 0 && (i % lhsSamples == 0)) {
       free(x);
