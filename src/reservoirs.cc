@@ -51,6 +51,7 @@ int main(int argc, char* argv[])
                       //!< distribution around measured prevalence
 
   double xi; //!< xi (assortativity)
+  double eta; //!< eta (habitat preference)
 
   unsigned int verbose = 0; //!< be verbose
 
@@ -86,6 +87,8 @@ int main(int argc, char* argv[])
      "groups (semicolon-separated list of comma-separated hosts")
     ("xi,x", po::value<double>()->default_value(.0),
      "assortativity parameter xi")
+    ("eta,a", po::value<double>()->default_value(.0),
+     "habitat preference xi")
     ("lhs,l", po::value<size_t>()->default_value(0),
      "number of samples for latin hypercube sampling")
     ("samples,n", po::value<size_t>()->default_value(0),
@@ -96,7 +99,7 @@ int main(int argc, char* argv[])
      "use simple model")
     ("random,r", 
      "assume random mixing")
-    ("noheader,a", 
+    ("noheader,d", 
      "do not print header")
     ("print,p", 
      "print results")

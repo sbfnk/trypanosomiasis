@@ -73,6 +73,8 @@ struct host {
   size_t M, N;
   double mu, gamma, theta, abundance;
   std::pair<double, double> mu_limits, gamma_limits, abundance_limits;
+  std::vector<double> habitat;
+  std::vector<std::pair<double, double> > habitat_limits;
 };
 
 struct vector {
@@ -154,11 +156,12 @@ struct betafunc_params
   betafunc_params(std::vector<host> const &hosts,
                   std::vector<vector> const &vectors,
                   std::vector<group> const &groups,
-                  double xi) :
+                  double xi, double eta) :
     hosts(hosts),
     vectors(vectors),
     groups(groups),
     xi(xi),
+    eta(eta),
     hPrevalence(std::vector<double>(hosts.size()))
   {
     for (size_t i = 0; i < hosts.size(); ++i) {
@@ -174,7 +177,7 @@ struct betafunc_params
   std::vector<vector> const &vectors;
   std::vector<group> const &groups;
 
-  double xi;
+  double xi, eta;
   
   std::vector<double> hPrevalence;
   double vPrevalence;
@@ -370,6 +373,7 @@ int betaffoiv(void *p, std::vector<double> &vars,
     std::cout << std::endl;
 
     std::cout << "xi:" << params->xi << std::endl;
+    std::cout << "eta:" << params->xi << std::endl;
   }
 
   // adapt for more vectors
