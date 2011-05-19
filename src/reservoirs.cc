@@ -1,3 +1,4 @@
+// -*- compile-command: "cd .. ; make -k; cd -"; -*-
 /*! \file reservoirs.cc
   \brief Main program for reservoir analysis based on prevalence data
 
@@ -9,6 +10,8 @@
   the multi-host system. Some parts of the code are specific to analysing data
   for African Trypanosomiasis, but this can be easily generalised.
 */
+
+
 
 #include <iostream>
 #include <sstream>
@@ -87,7 +90,7 @@ int main(int argc, char* argv[])
      "groups (semicolon-separated list of comma-separated hosts")
     ("xi,x", po::value<double>()->default_value(.0),
      "assortativity parameter xi")
-    ("eta,a", po::value<string>()->default_value("0"),
+    ("eta,a", po::value<std::string>()->default_value("0"),
      "habitat preference xi")
     ("lhs,l", po::value<size_t>()->default_value(0),
      "number of samples for latin hypercube sampling")
@@ -200,10 +203,10 @@ int main(int argc, char* argv[])
     std::vector<std::string> result;
     boost::algorithm::split(result, eta_string, boost::is_any_of(","));
 
-    std::pair<std::stringstream, std::stringstream> iStr =
-      std::make_pair(result[0], result[1]);
-    iStr.first >> eta.first;
-    iStr.second >> eta.second;
+    std::istringstream iStr(result[0]);
+    iStr >> eta.first;
+    iStr.str(result[1]);
+    iStr >> eta.second;
   }
 
   if (vm.count("firstcolumn")) {
@@ -431,7 +434,7 @@ int main(int argc, char* argv[])
   arma::mat S(hosts.size() + groups.size(), hosts.size() + groups.size());
   arma::mat T(hosts.size() + groups.size(), hosts.size() + groups.size());
   
-  betafunc_params p (hosts, vectors, groups, xi);
+  betafunc_params p (hosts, vectors, groups, xi, eta);
 
   std::streambuf * buf;
   std::ofstream of;
