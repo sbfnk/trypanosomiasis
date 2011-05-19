@@ -1,4 +1,3 @@
-
 all %:
-	$(MAKE) -C .. PWD=${patsubst %/,%,${dir $(shell pwd)}} $@
+	$(MAKE) -C .. 
 # DO NOT DELETE
