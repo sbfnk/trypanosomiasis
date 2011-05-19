@@ -161,6 +161,26 @@ struct betafunc_params
     vectors(vectors),
     groups(groups),
     xi(xi),
+    eta(std::make_pair(eta, eta)),
+    hPrevalence(std::vector<double>(hosts.size()))
+  {
+    for (size_t i = 0; i < hosts.size(); ++i) {
+      hPrevalence[i] = hosts[i].M /
+        static_cast<double>(hosts[i].N);
+    }
+
+    vPrevalence = vectors[0].M /
+        static_cast<double>(vectors[0].N);
+  }
+
+  betafunc_params(std::vector<host> const &hosts,
+                  std::vector<vector> const &vectors,
+                  std::vector<group> const &groups,
+                  double xi, std::pair<double> eta) :
+    hosts(hosts),
+    vectors(vectors),
+    groups(groups),
+    xi(xi),
     eta(eta),
     hPrevalence(std::vector<double>(hosts.size()))
   {
@@ -177,9 +197,11 @@ struct betafunc_params
   std::vector<vector> const &vectors;
   std::vector<group> const &groups;
 
-  double xi, eta;
+  double xi;
+
+  std::pair<double, double> eta;
   
-  std::vector<double> hPrevalence;
+  eta::vector<double> hPrevalence;
   double vPrevalence;
 };
 
@@ -211,8 +233,48 @@ void print_state (size_t iter, gsl_multiroot_fsolver * s, size_t n)
   printf("\n");
 }
 
-// function to find root of
+// function to find root of (host-assortative)
 int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
+{
+  betafunc_params* params = ((struct betafunc_params*) p);
+
+  double pv[params->groups.size()];
+  double beta[params->hosts.size()];
+  double alpha = gsl_vector_get(x, params->hosts.size() +
+                                params->groups.size());
+  
+  double weightedVectorPrevSum = 0;
+  for (size_t i = 0; i < params->hosts.size(); ++i) {
+    beta[i] = gsl_vector_get(x, i);
+  }
+  for (size_t j = 0; j < params->groups.size(); ++j) {
+    pv[j] = gsl_vector_get(x, j+params->hosts.size());
+    weightedVectorPrevSum += pv[j] * params->groups[j].theta;
+  }
+  for (size_t j = 0; j < params->groups.size(); ++j) {
+    double yv = (pv[j] * params->vectors[j].mu + params->xi *
+                 (pv[j] - params->vPrevalence)) /
+      (1 - pv[j]);
+    for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
+      size_t i = params->groups[j].members[k];
+      double yh = params->hPrevalence[i] / (1 - params->hPrevalence[i]) *
+        (params->hosts[i].mu + params->hosts[i].gamma) -
+        beta[i] * params->hosts[i].theta / params->hosts[i].abundance *
+        pv[j];
+      yv -= alpha * beta[i] * params->hosts[i].theta * params->hPrevalence[i] /
+        params->groups[j].theta;
+      gsl_vector_set(f, i, yh);
+    }
+    gsl_vector_set(f, j + params->hosts.size(), yv);
+  }
+  gsl_vector_set(f, params->hosts.size() + params->groups.size(),
+                 params->vPrevalence - weightedVectorPrevSum);
+    
+  return GSL_SUCCESS;
+}
+
+// function to find root of (pachy area version)
+int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
@@ -335,6 +397,11 @@ int betaffoiv(void *p, std::vector<double> &vars,
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
+  bool area = false;
+  if (params->xi == 0 && (params->eta.first == 0 || params->eta.second == 0)) {
+    area = true;
+  }
+
   if (verbose) {
     std::cout << "vdensity:";
     for (size_t i = 0; i < params->vectors.size(); ++i) {
@@ -372,12 +439,17 @@ int betaffoiv(void *p, std::vector<double> &vars,
     }
     std::cout << std::endl;
 
-    std::cout << "xi:" << params->xi << std::endl;
-    std::cout << "eta:" << params->xi << std::endl;
+    std::cout << "xi: " << params->xi << std::endl;
+    std::cout << "eta: " << params->eta.first << "," << params->eta.second << std::endl;
   }
 
-  // adapt for more vectors
-  size_t nvars = params->hosts.size() + params->groups.size() + 1;
+  size_t nvars;
+  
+  if (area) {
+    nvars = params->hosts.size() * params->hosts[0].habitat.size() + 2;
+  } else {
+    nvars = params->hosts.size() + params->groups.size() + 1;
+  }
 
   const gsl_multiroot_fdfsolver_type * Tdf =
     gsl_multiroot_fdfsolver_hybridsj;
@@ -389,8 +461,13 @@ int betaffoiv(void *p, std::vector<double> &vars,
   const gsl_multiroot_fsolver_type * T =
     gsl_multiroot_fsolver_hybrids;
   gsl_multiroot_fsolver * s =
-    gsl_multiroot_fsolver_alloc (T, nvars);
-  gsl_multiroot_function f = {&betafunc_f, nvars, p};
+     gsl_multiroot_fsolver_alloc (T, nvars);
+  gsl_multiroot_function f;
+  if (area) {
+    f = {&betafunc_area_f, nvars, p};
+  } else {
+    f = {&betafunc_f, nvars, p};
+  }
 
   gsl_vector* x_init = gsl_vector_alloc(nvars);
   for (size_t i = 0; i < params->hosts.size(); ++i) {
@@ -400,7 +477,7 @@ int betaffoiv(void *p, std::vector<double> &vars,
     gsl_vector_set(x_init, j + params->hosts.size(), params->vPrevalence);
   }
   gsl_vector_set(x_init, params->hosts.size() + params->groups.size(), 1);
-  
+
   gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
   gsl_multiroot_fsolver_set(s, &f, x_init);
 
@@ -470,6 +547,6 @@ int betaffoiv(void *p, std::vector<double> &vars,
   gsl_vector_free (x_init);
 
   return status;
-}
+ }
 
-#endif
+ #endif

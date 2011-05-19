@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
                       //!< distribution around measured prevalence
 
   double xi; //!< xi (assortativity)
-  double eta; //!< eta (habitat preference)
+  std::pair<double, double> eta; //!< eta (habitat preference)
 
   unsigned int verbose = 0; //!< be verbose
 
@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
      "groups (semicolon-separated list of comma-separated hosts")
     ("xi,x", po::value<double>()->default_value(.0),
      "assortativity parameter xi")
-    ("eta,a", po::value<double>()->default_value(.0),
+    ("eta,a", po::value<string>()->default_value("0"),
      "habitat preference xi")
     ("lhs,l", po::value<size_t>()->default_value(0),
      "number of samples for latin hypercube sampling")
@@ -187,6 +187,24 @@ int main(int argc, char* argv[])
   }
 
   xi = vm["xi"].as<double>();
+  std::string eta_string = vm["eta"].as<std::string>();
+  
+  if (eta_string.find(",") == std::string::npos) {
+    // no comma
+    std::istringstream iStr(eta_string);
+    double eta_value;
+    iStr >> eta_value;
+    eta = std::make_pair(eta_value, eta_value);
+  } else {
+    // found a comma
+    std::vector<std::string> result;
+    boost::algorithm::split(result, eta_string, boost::is_any_of(","));
+
+    std::pair<std::stringstream, std::stringstream> iStr =
+      std::make_pair(result[0], result[1]);
+    iStr.first >> eta.first;
+    iStr.second >> eta.second;
+  }
 
   if (vm.count("firstcolumn")) {
     if (samples == 0) {
