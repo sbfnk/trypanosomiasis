@@ -16,6 +16,8 @@ struct host {
        bool tbg = true, bool tbng = false) :
     M(0)
   {
+    double habitatSum = .0;
+    
     for (size_t i = 0; i < header.size(); ++i) {
       if (header[i] == "name") {
         name  = data[i];
@@ -63,10 +65,34 @@ struct host {
       } else if (header[i] == "abundance_high") {
         std::istringstream s(data[i]);
         s >> abundance_limits.second;
+      } else if (header[i].find("habitat_") != std::string::npos) {
+        std::istringstream s(data[i]);
+        size_t index;
+        size_t numPos = header[i].find_first_of("0123456789");
+        std::istringstream numStr(header[i].substr(numPos));
+        numStr >> index;
+        while (index > habitat.size()) {
+          habitat.push_back(.0);
+          habitat_limits.push_back(std::make_pair(.0,.0));
+        }
+        if (header[i].find("_low_") != std::string::npos) {
+          s >> habitat_limits[index-1].first;
+        } else if (header[i].find("_high_") != std::string::npos) {
+          s >> habitat_limits[index-1].second;
+        } else if (numPos == 8) {
+          s >> habitat[index-1];
+          habitatSum += habitat[index-1];
+        }
       } else if (header[i] == "theta") {
         std::istringstream s(data[i]);
         s >> theta;
       }
+    }
+
+    // normalise habitat data
+    for (std::vector<double>::iterator it = habitat.begin();
+         it != habitat.end(); it++) {
+      (*it) /= habitatSum;
     }
   }
 
@@ -84,6 +110,8 @@ struct vector {
          bool tbg = true, bool tbng = false) :
     M(0)
   {
+    double habitatSum = .0;
+    
     for (size_t i = 0; i < header.size(); ++i) {
        if (header[i] == "name") {
          name  = data[i];
@@ -114,9 +142,28 @@ struct vector {
          std::istringstream s(data[i]);
          s >> density;
        } else if (header[i] == "biting_rate") {
-        std::istringstream s(data[i]);
-        s >> bitingRate;
+         std::istringstream s(data[i]);
+         s >> bitingRate;
+       } else if (header[i].find("habitat_") != std::string::npos) {
+         std::istringstream s(data[i]);
+         size_t index;
+         size_t numPos = header[i].find_first_of("0123456789");
+         std::istringstream numStr(header[i].substr(numPos));
+         numStr >> index;
+         while (index > habitat.size()) {
+           habitat.push_back(.0);
+         }
+         if (numPos == 8) {
+           s >> habitat[index-1];
+           habitatSum += habitat[index-1];
+         }
        }
+    }
+
+    // normalise habitat data
+    for (std::vector<double>::iterator it = habitat.begin();
+         it != habitat.end(); it++) {
+      (*it) /= habitatSum;
     }
   }
 
@@ -127,12 +174,14 @@ struct vector {
     mu(v.mu),
     gamma(v.gamma),
     density(v.density),
-    bitingRate(v.bitingRate)
+    bitingRate(v.bitingRate),
+    habitat(v.habitat)
   {}
 
   std::string name;
   size_t M, N;
   double mu, gamma, density, bitingRate;
+  std::vector<double> habitat;
 };
 
 struct group
@@ -280,6 +329,7 @@ int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
   betafunc_params* params = ((struct betafunc_params*) p);
 
   size_t nAreas = params->hosts[0].habitat.size();
+  size_t varCount = 0;
 
   double pv[nAreas];
   double ph[params->hosts.size()][nAreas];
@@ -289,20 +339,26 @@ int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
   
   double weightedVectorPrevSum = 0;
   double weightedHostPrevSum[params->hosts.size()];
-  double weightedHostAreaPrevSum[nAreas];
+  double weightedPrefSum[nAreas];
   for (size_t i = 0; i < params->hosts.size(); ++i) {
-    beta[i] = gsl_vector_get(x, i);
+    beta[i] = gsl_vector_get(x, varCount);
+    ++varCount;
     weightedHostPrevSum[i] = 0;
   }
   for (size_t j = 0; j < nAreas; ++j) {
-    weightedHostAreaPrevSum[j] = 0;
-    pv[j] = gsl_vector_get(x, j+params->hosts.size()* (nAreas + 1));
-    // we assume the vector to be equally prevalent in all areas
-    weightedVectorPrevSum += pv[j] / static_cast<double>(nAreas);
+    weightedPrefSum[j] = .0;
+    if (params->vectors[0].habitat[j] > 0) {
+      pv[j] = gsl_vector_get(x, varCount);
+      varCount++;
+      weightedVectorPrevSum += pv[j] * params->vectors[0].habitat[j];
+    }
     for (size_t i = 0; i < params->hosts.size(); ++i) {
-      ph[i][j] = gsl_vector_get(x, j + nAreas * i);
+      if (params->hosts[i].habitat[j] > 0) {
+        ph[i][j] = gsl_vector_get(x, varCount);
+        varCount++;
+      }
       weightedHostPrevSum[i] += params->hosts[i].habitat[j] * ph[i][j];
-      weightedHostAreaPrevSum[j] += params->hosts[i].theta * params->hosts[i].habitat[j];
+      weightedPrefSum[j] += params->hosts[i].theta * params->hosts[i].habitat[j];
     }
   }
   
@@ -310,13 +366,14 @@ int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
     double yv = (pv[j] * params->vectors[j].mu + params->eta.second *
                  (pv[j] - params->vPrevalence)) / (1 - pv[j]);
     for (size_t i = 0; i < params->hosts.size(); ++i) {
-      double yh = ph[i][j] / (1 - ph[i][j]) *
-        (params->hosts[i].mu + params->hosts[i].gamma) -
+      double yh = (ph[i][j] * (params->hosts[i].mu + params->hosts[i].gamma) +
+                   params->eta.first * (ph[i][j] - params->hPrevalence[i])) /
+        (1 - ph[i][j]) -
         beta[i] * params->hosts[i].theta /
-        (weightedHostAreaPrevSum[j]) * // params->hosts[i].abundance) *
+        (weightedPrefSum[j] * params->hosts[i].abundance) *
         pv[j];
       yv -= alpha * beta[i] * params->hosts[i].theta * 
-        params->hosts[i].habitat[j] / weightedHostAreaPrevSum[j] * ph[i][j];
+        params->hosts[i].habitat[j] / weightedPrefSum[j] * ph[i][j];
       gsl_vector_set(f, j + nAreas * i, yh);
     }
     gsl_vector_set(f, j + nAreas * params->hosts.size(), yv);
@@ -415,10 +472,9 @@ int betaffoiv(void *p, std::vector<double> &vars,
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
-  bool area = false;
-  if (params->xi == 0 && (params->eta.first == 0 || params->eta.second == 0)) {
-    area = true;
-  }
+  bool area = (params->xi == 0 && (params->eta.first > 0 ||
+                                   params->eta.second > 0));
+  size_t nAreas = params->hosts[0].habitat.size();
 
   if (verbose) {
     std::cout << "vdensity:";
@@ -465,19 +521,25 @@ int betaffoiv(void *p, std::vector<double> &vars,
   
   if (area) {
     // p_H + p_V + beta + alpha
-    nvars = (params->hosts.size() + 1) * params->hosts[0].habitat.size() +
+    nvars = (params->hosts.size() + 1) * nAreas +
       params->hosts.size() + 1;
   } else {
     // beta + p_V + alpha
     nvars = params->hosts.size() + params->groups.size() + 1;
   }
 
-  const gsl_multiroot_fdfsolver_type * Tdf =
-    gsl_multiroot_fdfsolver_hybridsj;
-  gsl_multiroot_fdfsolver * sdf =
-    gsl_multiroot_fdfsolver_alloc (Tdf, nvars);
-  gsl_multiroot_function_fdf fdf = {&betafunc_f, &betafunc_df, &betafunc_fdf,
-                                    nvars, p};
+  const gsl_multiroot_fdfsolver_type * Tdf;
+  gsl_multiroot_fdfsolver * sdf;
+  gsl_multiroot_function_fdf fdf;
+  if (jac) {
+    Tdf = gsl_multiroot_fdfsolver_hybridsj;
+    sdf = gsl_multiroot_fdfsolver_alloc (Tdf, nvars);
+    fdf.f = &betafunc_f;
+    fdf.df = &betafunc_df;
+    fdf.fdf = &betafunc_fdf;
+    fdf.n = nvars;
+    fdf.params = p;
+  }
 
   const gsl_multiroot_fsolver_type * T =
     gsl_multiroot_fsolver_hybrids;
@@ -498,12 +560,26 @@ int betaffoiv(void *p, std::vector<double> &vars,
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     gsl_vector_set(x_init, i, 1);
   }
-  for (size_t j = 0; j < params->groups.size(); ++j) {
-    gsl_vector_set(x_init, j + params->hosts.size(), params->vPrevalence);
+  if (area) {
+    for (size_t j = 0; j < nAreas; ++j) {
+      for (size_t i = 0; i < params->hosts.size(); ++i) {
+        gsl_vector_set(x_init, j + nAreas * i + params->hosts.size(),
+                       params->hPrevalence[i]);
+      }
+      gsl_vector_set(x_init, j + (nAreas + 1) * params->hosts.size(),
+                     params->vPrevalence);
+    }
+    gsl_vector_set(x_init, params->hosts.size() * (nAreas + 1) + nAreas, 1);
+  } else {
+    for (size_t j = 0; j < params->groups.size(); ++j) {
+      gsl_vector_set(x_init, j + params->hosts.size(), params->vPrevalence);
+    }
+    gsl_vector_set(x_init, params->hosts.size() + params->groups.size(), 1);
   }
-  gsl_vector_set(x_init, params->hosts.size() + params->groups.size(), 1);
 
-  gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
+  if (jac) {
+    gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
+  }
   gsl_multiroot_fsolver_set(s, &f, x_init);
 
   size_t iter = 0;
@@ -558,16 +634,31 @@ int betaffoiv(void *p, std::vector<double> &vars,
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     vars[i] = gsl_vector_get(sol, i);
   }
-  for (size_t j = 0; j < params->groups.size(); ++j) {
-    vars[j+params->hosts.size()] =
-      gsl_vector_get(sol, j+params->hosts.size());
+  if (area) {
+    for (size_t j = 0; j < nAreas; ++j) {
+      for (size_t i = 0; i < params->hosts.size(); ++i) {
+        vars[j + nAreas * i + params->hosts.size()] = 
+          gsl_vector_get(sol, j + nAreas * i + params->hosts.size());
+      }
+      vars[j + (nAreas + 1) * params->hosts.size()] =
+          gsl_vector_get(sol, j + (nAreas + 1) * params->hosts.size());
+    }
+    vars[params->hosts.size() * (nAreas + 1) + nAreas] =
+      gsl_vector_get(sol, params->hosts.size() * (nAreas + 1) + nAreas);
+  } else {
+    for (size_t j = 0; j < params->groups.size(); ++j) {
+      vars[j+params->hosts.size()] =
+        gsl_vector_get(sol, j+params->hosts.size());
+    }
+    for (size_t i = 0; i < 1; ++i) {
+      vars[i+params->hosts.size() + params->groups.size()] =
+        gsl_vector_get(sol, i+params->hosts.size()+params->groups.size());
+    }
   }
-  for (size_t i = 0; i < 1; ++i) {
-    vars[i+params->hosts.size() + params->groups.size()] =
-      gsl_vector_get(sol, i+params->hosts.size()+params->groups.size());
+  
+  if (jac) {
+    gsl_multiroot_fdfsolver_free (sdf);
   }
-
-  gsl_multiroot_fdfsolver_free (sdf);
   gsl_multiroot_fsolver_free (s);
   gsl_vector_free (x_init);
 
