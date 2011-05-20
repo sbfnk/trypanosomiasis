@@ -430,6 +430,40 @@ int main(int argc, char* argv[])
   
   // ********************* estimate betas *********************
   
+  if (area) {
+    // renormalise habitats to avoid zeroes
+    for (std::vector<host>::iterator it = params->hosts.begin();
+         it != params->hosts.end(); it++) {
+      size_t zeroHabitats = 0;
+      for (size_t j = 0; j < nAreas; j++) {
+        if (it->habitat[j] == 0) {
+          ++zeroHabitats;
+        }
+      }
+      for (size_t j = 0; j < nAreas; j++) {
+        if (it->habitat[j] == 0) {
+          it->habitat[j] = 0.01;
+        } else {
+          it->habitat[j] *= (1 - 0.01 * zeroHabitats);
+        }
+      }
+    }
+
+    size_t zeroHabitats = 0;
+    for (size_t j = 0; j < nAreas; j++) {
+      if (params->vectors[0].habitat[j] == 0) {
+        ++zeroHabitats;
+      }
+    }
+    for (size_t j = 0; j < nAreas; j++) {
+      if (params->vectors[0].habitat[j] == 0) {
+        params->vectors[0].habitat[j] = 0.01;
+      } else {
+        params->vectors[0].habitat[j] *= (1 - 0.01 * zeroHabitats);
+      }
+    }
+  }
+
   arma::mat K(hosts.size() + groups.size(), hosts.size() + groups.size());
   arma::mat S(hosts.size() + groups.size(), hosts.size() + groups.size());
   arma::mat T(hosts.size() + groups.size(), hosts.size() + groups.size());
