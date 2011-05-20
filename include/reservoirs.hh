@@ -329,7 +329,6 @@ int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
   betafunc_params* params = ((struct betafunc_params*) p);
 
   size_t nAreas = params->hosts[0].habitat.size();
-  size_t varCount = 0;
 
   double pv[nAreas];
   double ph[params->hosts.size()][nAreas];
@@ -341,39 +340,42 @@ int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
   double weightedHostPrevSum[params->hosts.size()];
   double weightedPrefSum[nAreas];
   for (size_t i = 0; i < params->hosts.size(); ++i) {
-    beta[i] = gsl_vector_get(x, varCount);
-    ++varCount;
+    beta[i] = gsl_vector_get(x, i);
     weightedHostPrevSum[i] = 0;
   }
   for (size_t j = 0; j < nAreas; ++j) {
     weightedPrefSum[j] = .0;
-    if (params->vectors[0].habitat[j] > 0) {
-      pv[j] = gsl_vector_get(x, varCount);
-      varCount++;
-      weightedVectorPrevSum += pv[j] * params->vectors[0].habitat[j];
-    }
+    pv[j] = gsl_vector_get(x, j + params->hosts.size() * (nAreas + 1));
+    weightedVectorPrevSum += pv[j] * params->vectors[0].habitat[j];
     for (size_t i = 0; i < params->hosts.size(); ++i) {
-      if (params->hosts[i].habitat[j] > 0) {
-        ph[i][j] = gsl_vector_get(x, varCount);
-        varCount++;
-      }
+      ph[i][j] = gsl_vector_get(x, j + i * nAreas + params->hosts.size());
       weightedHostPrevSum[i] += params->hosts[i].habitat[j] * ph[i][j];
       weightedPrefSum[j] += params->hosts[i].theta * params->hosts[i].habitat[j];
     }
   }
   
   for (size_t j = 0; j < nAreas; ++j) {
-    double yv = (pv[j] * params->vectors[j].mu + params->eta.second *
-                 (pv[j] - params->vPrevalence)) / (1 - pv[j]);
+    double yv;
+    if (params->vectors[0].habitat[j] > 0) {
+      yv = (pv[j] * params->vectors[0].mu + params->eta.second *
+            (pv[j] - params->vPrevalence)) / (1 - pv[j]);
+    } else {
+      yv = pv[j];
+    }
     for (size_t i = 0; i < params->hosts.size(); ++i) {
-      double yh = (ph[i][j] * (params->hosts[i].mu + params->hosts[i].gamma) +
-                   params->eta.first * (ph[i][j] - params->hPrevalence[i])) /
-        (1 - ph[i][j]) -
-        beta[i] * params->hosts[i].theta /
-        (weightedPrefSum[j] * params->hosts[i].abundance) *
-        pv[j];
-      yv -= alpha * beta[i] * params->hosts[i].theta * 
-        params->hosts[i].habitat[j] / weightedPrefSum[j] * ph[i][j];
+      double yh;
+      if (params->vectors[0].habitat[j] > 0) {
+        yh = (ph[i][j] * (params->hosts[i].mu + params->hosts[i].gamma) +
+              params->eta.first * (ph[i][j] - params->hPrevalence[i])) /
+          (1 - ph[i][j]) -
+          beta[i] * params->hosts[i].theta * params->vectors[0].habitat[j] /
+          (weightedPrefSum[j] * params->hosts[i].abundance) *
+          pv[j];
+        yv -= alpha * beta[i] * params->hosts[i].theta * 
+          params->hosts[i].habitat[j] / weightedPrefSum[j] * ph[i][j];
+      } else {
+        yh = ph[i][j];
+      }
       gsl_vector_set(f, j + nAreas * i, yh);
     }
     gsl_vector_set(f, j + nAreas * params->hosts.size(), yv);
