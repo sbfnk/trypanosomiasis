@@ -1,3 +1,4 @@
+// -*- compile-command: "cd .. ; make -k; cd -"; -*-
 #ifndef RESERVOIRS_HH
 #define RESERVOIRS_HH
 
@@ -312,7 +313,7 @@ int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
       double yh = ph[i][j] / (1 - ph[i][j]) *
         (params->hosts[i].mu + params->hosts[i].gamma) -
         beta[i] * params->hosts[i].theta /
-        (weightedHostAreaPrevSum[j] * params->hosts[i].abundance) *
+        (weightedHostAreaPrevSum[j]) * // params->hosts[i].abundance) *
         pv[j];
       yv -= alpha * beta[i] * params->hosts[i].theta * 
         params->hosts[i].habitat[j] / weightedHostAreaPrevSum[j] * ph[i][j];
@@ -408,7 +409,7 @@ int betafunc_fdf(const gsl_vector * x, void * p, gsl_vector* f, gsl_matrix * J)
   return GSL_SUCCESS;
 }
 
-// find beta (and alpha and p^v_i( from forces of infection
+// find beta (and alpha and p^v_i) from forces of infection
 int betaffoiv(void *p, std::vector<double> &vars,
               bool jac = false, unsigned int verbose = 0)
 {
