@@ -366,26 +366,39 @@ int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
     }
     for (size_t i = 0; i < params->hosts.size(); ++i) {
       double yh;
-      if (params->vectors[0].habitat[j] > 0) {
+      if (params->hosts[i].habitat[j] > 0) {
         yh = (ph[i][j] * (params->hosts[i].mu + params->hosts[i].gamma) +
               params->eta.first * (ph[i][j] - params->hPrevalence[i])) /
           (1 - ph[i][j]) -
           beta[i] * params->hosts[i].theta * params->vectors[0].habitat[j] /
           (weightedPrefSum[j] * params->hosts[i].abundance) *
           pv[j];
+        // std::cout << "yh[" << i << "][" << j << "]=("
+        //           << ph[i][j] << "*" << (params->hosts[i].mu + params->hosts[i].gamma)
+        //           << "+" << params->eta.first << "*(" << ph[i][j] << "-" << params->hPrevalence[i]
+        //           << ")/" << (1-ph[i][j]) << "-" << beta[i] << "*" << params->hosts[i].theta
+        //           << "*" << params->vectors[0].habitat[j] << "/(" << weightedPrefSum[j] << "*"
+        //           << params->hosts[i].abundance << ")*" << pv[j] << std::endl;
         yv -= alpha * beta[i] * params->hosts[i].theta * 
           params->hosts[i].habitat[j] / weightedPrefSum[j] * ph[i][j];
       } else {
         yh = ph[i][j];
       }
+      // std::cout << "i=" << i << ", j=" << j << ", f[" << j+nAreas*i << "]=" << yh << std::endl;
       gsl_vector_set(f, j + nAreas * i, yh);
     }
+    // std::cout << "j=" << j << ", f[" << j+nAreas*params->hosts.size() << "]=" << yv << std::endl;
     gsl_vector_set(f, j + nAreas * params->hosts.size(), yv);
   }
   for (size_t i = 0; i < params->hosts.size(); ++i) {
+    // std::cout << "i=" << i << ", f[" << i+nAreas*(params->hosts.size() + 1) << "]="
+    //           << (params->hPrevalence[i] - weightedHostPrevSum[i]) << std::endl;
     gsl_vector_set(f, i + nAreas * (params->hosts.size() + 1),
                    params->hPrevalence[i] - weightedHostPrevSum[i]);
   }
+  // std::cout << "f["
+  //           << (nAreas * (params->hosts.size() + 1) + params->hosts.size()) << "]="
+  //           << (params->vPrevalence - weightedVectorPrevSum) << std::endl;
   gsl_vector_set(f, nAreas * (params->hosts.size() + 1) + params->hosts.size(),
                  params->vPrevalence - weightedVectorPrevSum);
     
@@ -478,6 +491,7 @@ int betaffoiv(void *p, std::vector<double> &vars,
 
   bool area = (params->xi == 0 && (params->eta.first > 0 ||
                                    params->eta.second > 0));
+  // bool area = true;
   size_t nAreas = params->hosts[0].habitat.size();
 
   if (verbose) {

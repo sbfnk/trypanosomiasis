@@ -432,30 +432,30 @@ int main(int argc, char* argv[])
 
   betafunc_params p (hosts, vectors, groups, xi, eta);
   
-  // bool area = (xi == 0 && (eta.first > 0 || eta.second > 0));
-  bool area = true;
+  bool area = (xi == 0 && (eta.first > 0 || eta.second > 0));
+  // bool area = true;
   size_t nAreas = hosts[0].habitat.size();
 
   if (area) {
     // renormalise habitats to avoid zeroes
-    // for (std::vector<host>::iterator it = hosts.begin();
-    //      it != hosts.end(); it++) {
-    //   size_t zeroHabitats = 0;
-    //   for (size_t j = 0; j < nAreas; j++) {
-    //     if (it->habitat[j] == 0) {
-    //       ++zeroHabitats;
-    //     }
-    //   }
-    //   for (size_t j = 0; j < nAreas; j++) {
-    //     if (it->habitat[j] == 0) {
-    //       it->habitat[j] = 0.01;
-    //     } else {
-    //       it->habitat[j] *= (1 - 0.01 * zeroHabitats);
-    //     }
-    //     std::cout << "habitat[" << it->name << "]["
-    //               << j << "]=" << it->habitat[j] << std::endl;
-    //   }
-    // }
+    for (std::vector<host>::iterator it = hosts.begin();
+         it != hosts.end(); it++) {
+      // size_t zeroHabitats = 0;
+      // for (size_t j = 0; j < nAreas; j++) {
+      //   if (it->habitat[j] == 0) {
+      //     ++zeroHabitats;
+      //   }
+      // }
+      for (size_t j = 0; j < nAreas; j++) {
+        // if (it->habitat[j] == 0) {
+        //   it->habitat[j] = 0.01;
+        // } else {
+        //   it->habitat[j] *= (1 - 0.01 * zeroHabitats);
+        // }
+        // std::cout << "habitat[" << it->name << "]["
+        //           << j << "]=" << it->habitat[j] << std::endl;
+      }
+    }
 
     size_t zeroHabitats = 0;
     for (size_t j = 0; j < nAreas; j++) {
@@ -469,8 +469,8 @@ int main(int argc, char* argv[])
       } else {
         vectors[0].habitat[j] *= (1 - 0.01 * zeroHabitats);
       }
-      std::cout << "habitat[" << vectors[0].name << "]["
-                << j << "]=" << vectors[0].habitat[j] << std::endl;
+      // std::cout << "habitat[" << vectors[0].name << "]["
+      //           << j << "]=" << vectors[0].habitat[j] << std::endl;
     }
   }
 
@@ -779,6 +779,29 @@ int main(int argc, char* argv[])
           arma::eig_gen(eigval, eigvec, KP);
           arma::colvec col = arma::real(eigval);
           contrib[i] = arma::max(col);
+        }
+
+        if (area) {
+          std::vector<double> area_contrib (nAreas, .0);
+          for (size_t j = 0; j < nAreas; ++j) {
+            tempP = P;
+            for (size_t i = 0; i < hosts.size(); ++i) {
+              tempP(j + (i + 1) * nAreas, j + (i + 1) * nAreas) = 1;
+            }
+            KP = tempP * K;
+            if (verbose) {
+              std::stringstream s;
+              s << "AreaKP[" << j << "]";
+              KP.print(s.str());
+            }
+            arma::eig_gen(eigval, eigvec, KP);
+            arma::colvec col = arma::real(eigval);
+            area_contrib[j] = arma::max(col);
+          }
+          std::cout << std::endl << "Area contributions: " << std::endl;
+          for (size_t j = 0; j < nAreas; ++j) {
+            std::cout << j << ": " << area_contrib[j] << std::endl;
+          }
         }
 
         tempP = P;
