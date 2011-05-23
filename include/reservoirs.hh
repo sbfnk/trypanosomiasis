@@ -16,7 +16,8 @@ struct host {
        bool tbg = true, bool tbng = false) :
     M(0)
   {
-    double habitatSum = .0;
+    double habitatSum = .0; //!< sum of all habitat contributions (for
+                            //!normalisation) 
     
     for (size_t i = 0; i < header.size(); ++i) {
       if (header[i] == "name") {
@@ -110,7 +111,8 @@ struct vector {
          bool tbg = true, bool tbng = false) :
     M(0)
   {
-    double habitatSum = .0;
+    double habitatSum = .0; //!< sum of all habitat contributions (for
+                            //!normalisation) 
     
     for (size_t i = 0; i < header.size(); ++i) {
        if (header[i] == "name") {
