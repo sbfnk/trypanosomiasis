@@ -409,7 +409,7 @@ int main(int argc, char* argv[])
       groups.push_back(newGroup);
     }
   } else {
-    if (vm.count("random")) { // random mixing
+    if (vm.count("random") || (xi == 0)) { // random mixing
       groups.push_back(group());
       groups[0].theta = 1;
       for (size_t i = 0; i < hosts.size(); ++i) {
@@ -429,46 +429,50 @@ int main(int argc, char* argv[])
   }
   
   // ********************* estimate betas *********************
+
+  betafunc_params p (hosts, vectors, groups, xi, eta);
   
+  // bool area = (xi == 0 && (eta.first > 0 || eta.second > 0));
+  bool area = true;
+  size_t nAreas = hosts[0].habitat.size();
+
   if (area) {
     // renormalise habitats to avoid zeroes
-    for (std::vector<host>::iterator it = params->hosts.begin();
-         it != params->hosts.end(); it++) {
-      size_t zeroHabitats = 0;
-      for (size_t j = 0; j < nAreas; j++) {
-        if (it->habitat[j] == 0) {
-          ++zeroHabitats;
-        }
-      }
-      for (size_t j = 0; j < nAreas; j++) {
-        if (it->habitat[j] == 0) {
-          it->habitat[j] = 0.01;
-        } else {
-          it->habitat[j] *= (1 - 0.01 * zeroHabitats);
-        }
-      }
-    }
+    // for (std::vector<host>::iterator it = hosts.begin();
+    //      it != hosts.end(); it++) {
+    //   size_t zeroHabitats = 0;
+    //   for (size_t j = 0; j < nAreas; j++) {
+    //     if (it->habitat[j] == 0) {
+    //       ++zeroHabitats;
+    //     }
+    //   }
+    //   for (size_t j = 0; j < nAreas; j++) {
+    //     if (it->habitat[j] == 0) {
+    //       it->habitat[j] = 0.01;
+    //     } else {
+    //       it->habitat[j] *= (1 - 0.01 * zeroHabitats);
+    //     }
+    //     std::cout << "habitat[" << it->name << "]["
+    //               << j << "]=" << it->habitat[j] << std::endl;
+    //   }
+    // }
 
     size_t zeroHabitats = 0;
     for (size_t j = 0; j < nAreas; j++) {
-      if (params->vectors[0].habitat[j] == 0) {
+      if (vectors[0].habitat[j] == 0) {
         ++zeroHabitats;
       }
     }
     for (size_t j = 0; j < nAreas; j++) {
-      if (params->vectors[0].habitat[j] == 0) {
-        params->vectors[0].habitat[j] = 0.01;
+      if (vectors[0].habitat[j] == 0) {
+        vectors[0].habitat[j] = 0.01;
       } else {
-        params->vectors[0].habitat[j] *= (1 - 0.01 * zeroHabitats);
+        vectors[0].habitat[j] *= (1 - 0.01 * zeroHabitats);
       }
+      std::cout << "habitat[" << vectors[0].name << "]["
+                << j << "]=" << vectors[0].habitat[j] << std::endl;
     }
   }
-
-  arma::mat K(hosts.size() + groups.size(), hosts.size() + groups.size());
-  arma::mat S(hosts.size() + groups.size(), hosts.size() + groups.size());
-  arma::mat T(hosts.size() + groups.size(), hosts.size() + groups.size());
-  
-  betafunc_params p (hosts, vectors, groups, xi, eta);
 
   std::streambuf * buf;
   std::ofstream of;
@@ -591,6 +595,20 @@ int main(int argc, char* argv[])
 
     int status = GSL_SUCCESS;
     
+    arma::mat K;
+    arma::mat S;
+    arma::mat T;
+
+    if (area) {
+      K.set_size(nAreas * (hosts.size() + 1), nAreas * (hosts.size() + 1));
+      S.set_size(nAreas * (hosts.size() + 1), nAreas * (hosts.size() + 1));
+      T.set_size(nAreas * (hosts.size() + 1), nAreas * (hosts.size() + 1));
+    } else {
+      K.set_size(hosts.size() + groups.size(), hosts.size() + groups.size());
+      S.set_size(hosts.size() + groups.size(), hosts.size() + groups.size());
+      T.set_size(hosts.size() + groups.size(), hosts.size() + groups.size());
+    }
+    
     if (calcBetas) { // estimate betas
       std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
@@ -606,13 +624,27 @@ int main(int argc, char* argv[])
           for (size_t i = 0; i < hosts.size(); ++i) {
             std::cout << "beta^*[" << i << "]=" << vars[i] << std::endl;
           }
-          for (size_t i = 0; i < groups.size(); ++i) {
-            std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
-                      << std::endl;
-          }
-          for (size_t i = 0; i < 1; ++i) {
-            std::cout << "alpha[" << i << "]=" << vars[i + hosts.size() +
-                                                       groups.size()];
+          if (area) {
+            for (size_t i = 0; i < hosts.size(); ++i) {
+              for (size_t j = 0; j < nAreas; ++j) {
+                std::cout << "ph[" << i << "][" << j << "]="
+                          << vars[j + nAreas * i + hosts.size()]
+                          << std::endl;
+              }
+            }
+            for (size_t j = 0; j < nAreas; ++j) {
+              std::cout << "pv[" << j << "]="
+                        << vars[j + (nAreas + 1) * hosts.size()]
+                        << std::endl;
+            }
+            std::cout << "alpha="
+                      << vars[hosts.size() * (nAreas + 1) + nAreas];
+           } else {
+            for (size_t i = 0; i < groups.size(); ++i) {
+              std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
+                        << std::endl;
+            }
+            std::cout << "alpha=" << vars[hosts.size() + groups.size()];
           }
           std::cout << std::endl;
         }
@@ -620,32 +652,83 @@ int main(int argc, char* argv[])
         // compose NGM
         S.zeros();
         T.zeros();
-      
-        for (size_t j = 0; j < groups.size(); ++j) {
-          S(j,j) = S(j,j) - vectors[0].mu - xi;
-          for (size_t k = 0; k < groups.size(); ++k) {
-            S(j,k) = S(j,k) + xi * groups[k].theta;
+
+        if (area) {
+          std::vector<double> weightedPrefSum(nAreas, .0);
+          for (size_t j = 0; j < nAreas; ++j) {
+            S(j,j) = S(j,j) - vectors[0].mu;
+            if (vectors[0].habitat[j] > 0) {
+              S(j,j) = S(j,j) - eta.second;
+            }
+            for (size_t k = 0; k < nAreas; ++k) {
+              S(j,k) = S(j,k) + eta.second * vectors[0].habitat[j];
+            }
           }
-          for (size_t k = 0; k < groups[j].members.size(); ++k) {
-            size_t i = groups[j].members[k];
-            T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
-              vars[i] * hosts[i].theta / hosts[i].abundance;
-            T(i + groups.size(),j) = vars[i] * hosts[i].theta / groups[j].theta;
+          for (size_t i = 0; i < hosts.size(); ++i) {
+            for (size_t j = 0; j < nAreas; ++j) {
+              S(j + (i + 1) * nAreas, j + (i + 1) * nAreas) =
+                S(j + (i + 1) * nAreas, j + (i + 1) * nAreas) -
+                hosts[i].gamma - hosts[i].mu;
+              if (hosts[i].habitat[j] > 0) {
+                S(j + (i + 1) * nAreas, j + (i + 1) * nAreas) =
+                  S(j + (i + 1) * nAreas, j + (i + 1) * nAreas) - eta.first;
+              }
+              // if (i == hosts.size() - 1 && j == nAreas - 1) {
+              //   std::cout << S(nAreas * (hosts.size() + 1) - 1,
+              //                  nAreas * (hosts.size() + 1) - 1)
+              //             << std::endl;
+              // }
+              for (size_t k = 0; k < hosts.size(); ++k) {
+                for (size_t l = 0; l < nAreas; ++l) {
+                  S(j + (i + 1) * nAreas, l + (k + 1) * nAreas) =
+                    S(j + (i + 1) * nAreas, l + (k + 1) * nAreas) +
+                    eta.first * hosts[i].habitat[j];
+                }
+              }
+              weightedPrefSum[j] += hosts[i].theta * hosts[i].habitat[j];
+            }
+          }
+          for (size_t j = 0; j < nAreas; ++j) {
+            for (size_t i = 0; i < hosts.size(); ++i) {
+              T(j, (i + 1) * nAreas + j) =
+                vars[i] * hosts[i].theta * hosts[i].habitat[j] /
+                weightedPrefSum[j];
+              T((i + 1) * nAreas + j, j) =
+                vars[hosts.size() * (nAreas + 1) + nAreas] *
+                vars[i] * hosts[i].theta * vectors[0].habitat[j] /
+                (weightedPrefSum[j] * hosts[i].abundance);
+            }
+          }
+        } else {
+          for (size_t j = 0; j < groups.size(); ++j) {
+            S(j,j) = S(j,j) - vectors[0].mu - xi;
+            for (size_t k = 0; k < groups.size(); ++k) {
+              S(j,k) = S(j,k) + xi * groups[k].theta;
+            }
+            for (size_t k = 0; k < groups[j].members.size(); ++k) {
+              size_t i = groups[j].members[k];
+              T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
+                vars[i] * hosts[i].theta / hosts[i].abundance;
+              T(i + groups.size(),j) = vars[i] * hosts[i].theta / groups[j].theta;
+            }
+          }
+          for (size_t i = 0; i < hosts.size(); ++i) {
+            S(i + groups.size(),i + groups.size()) =
+              S(i + groups.size(),i + groups.size()) -
+              hosts[i].gamma - hosts[i].mu;
           }
         }
-        for (size_t i = 0; i < hosts.size(); ++i) {
-          S(i + groups.size(),i + groups.size()) =
-            S(i + groups.size(),i + groups.size()) -
-            hosts[i].gamma - hosts[i].mu;
-        }
-      
-        K = - T * inv(S);
 
         if (verbose) {
           T.print("T:");
           S.print("S:");
           arma::mat I = inv(S);
           I.print("inv(S):");
+        }
+
+        K = - T * inv(S);
+
+        if (verbose) {
           K.print("K:");
         }
       
@@ -661,27 +744,52 @@ int main(int argc, char* argv[])
           }
         }
 
-        arma::mat P(hosts.size() + groups.size(), hosts.size() + groups.size());
-        arma::mat KP(hosts.size() + groups.size(), hosts.size() + groups.size());
+        arma::mat P;
+        arma::mat KP;
+        P.copy_size(K);
+        KP.copy_size(K);
         P.zeros();
-        for (size_t i = 0; i < groups.size(); ++i) {
-          P(i,i) = 1;
+        if (area) {
+          for (size_t i = 0; i < nAreas; ++i) {
+            P(i,i) = 1;
+          }
+        } else {
+          for (size_t i = 0; i < groups.size(); ++i) {
+            P(i,i) = 1;
+          }
         }
-        arma::mat tempP(hosts.size() + groups.size(),
-                        hosts.size() + groups.size());
+        arma::mat tempP;
+        tempP.copy_size(P);
 
-        for (size_t i = groups.size(); i < groups.size() + hosts.size(); ++i) {
+        for (size_t i = 0; i < hosts.size(); ++i) {
           tempP = P;
-          tempP(i,i) = 1;
+          if (area) {
+            for (size_t j = 0; j < nAreas; ++j) {
+              tempP(j + (i + 1) * nAreas, j + (i + 1) * nAreas) = 1;
+            }
+          } else {
+            tempP(i + groups.size(),i + groups.size()) = 1;
+          }
           KP = tempP * K;
+          if (verbose) {
+            std::stringstream s;
+            s << "KP[" << i << "]";
+            KP.print(s.str());
+          }
           arma::eig_gen(eigval, eigvec, KP);
           arma::colvec col = arma::real(eigval);
-          contrib[i-groups.size()] = arma::max(col);
+          contrib[i] = arma::max(col);
         }
 
         tempP = P;
-        for (size_t i = groups.size() + 1; i < groups.size() + 4; ++i) {
-          tempP(i,i) = 1;
+        for (size_t i = 1; i < 4; ++i) {
+          if (area) {
+            for (size_t j = 0; j < nAreas; ++j) {
+              tempP(j + (i + 1) * nAreas, j + (i + 1) * nAreas) = 1;
+            }
+          } else {
+            tempP(i + groups.size(),i + groups.size()) = 1;
+          }
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
@@ -689,8 +797,14 @@ int main(int argc, char* argv[])
         domestic = arma::max(coldomestic);
       
         tempP = P;
-        for (size_t i = groups.size() + 1; i < groups.size() + 12; ++i) {
-          tempP(i,i) = 1;
+        for (size_t i = 1; i < 12; ++i) {
+          if (area) {
+            for (size_t j = 0; j < nAreas; ++j) {
+              tempP(j + (i + 1) * nAreas, j + (i + 1) * nAreas) = 1;
+            }
+          } else {
+            tempP(i + groups.size(),i + groups.size()) = 1;
+          }
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
@@ -698,8 +812,14 @@ int main(int argc, char* argv[])
         domwild = arma::max(coldomwild);
       
         tempP = P;
-        for (size_t i = groups.size() + 4; i < groups.size() + 12; ++i) {
-          tempP(i,i) = 1;
+        for (size_t i = 4; i < 12; ++i) {
+          if (area) {
+            for (size_t j = 0; j < nAreas; ++j) {
+              tempP(j + (i + 1) * nAreas, j + (i + 1) * nAreas) = 1;
+            }
+          } else {
+            tempP(i + groups.size(),i + groups.size()) = 1;
+          }
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
