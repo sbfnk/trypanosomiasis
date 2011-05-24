@@ -208,32 +208,13 @@ struct betafunc_params
   betafunc_params(std::vector<host> const &hosts,
                   std::vector<vector> const &vectors,
                   std::vector<group> const &groups,
-                  double xi, double eta) :
+                  double xi,
+                  std::vector<std::vector<double> > const &habitatOverlap) :
     hosts(hosts),
     vectors(vectors),
     groups(groups),
     xi(xi),
-    eta(std::make_pair(eta, eta)),
-    hPrevalence(std::vector<double>(hosts.size()))
-  {
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      hPrevalence[i] = hosts[i].M /
-        static_cast<double>(hosts[i].N);
-    }
-
-    vPrevalence = vectors[0].M /
-        static_cast<double>(vectors[0].N);
-  }
-
-  betafunc_params(std::vector<host> const &hosts,
-                  std::vector<vector> const &vectors,
-                  std::vector<group> const &groups,
-                  double xi, std::pair<double, double> eta) :
-    hosts(hosts),
-    vectors(vectors),
-    groups(groups),
-    xi(xi),
-    eta(eta),
+    habitatOverlap(habitatOverlap),
     hPrevalence(std::vector<double>(hosts.size()))
   {
     for (size_t i = 0; i < hosts.size(); ++i) {
@@ -251,7 +232,7 @@ struct betafunc_params
 
   double xi;
 
-  std::pair<double, double> eta;
+  std::vector<std::vector<double> > const &habitatOverlap;
   
   std::vector<double> hPrevalence;
   double vPrevalence;
@@ -296,6 +277,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
                                 params->groups.size());
   
   double weightedVectorPrevSum = 0;
+  std::vector<double> incomingVectorSum(params->groups.size(), .0);
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     beta[i] = gsl_vector_get(x, i);
   }
@@ -304,8 +286,14 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     weightedVectorPrevSum += pv[j] * params->groups[j].theta;
   }
   for (size_t j = 0; j < params->groups.size(); ++j) {
+    for (size_t l = 0; l < params->groups.size(); ++l) {
+      incomingVectorSum[j] += pv[l] * params->habitatOverlap[j][l] *
+        params->groups[l].theta;
+    }
+    incomingVectorSum[j] /= params->groups[j].theta;
+    
     double yv = (pv[j] * params->vectors[j].mu + params->xi *
-                 (pv[j] - params->vPrevalence)) /
+                 (pv[j] - incomingVectorSum[j])) /
       (1 - pv[j]);
     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
       size_t i = params->groups[j].members[k];
@@ -320,86 +308,6 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     gsl_vector_set(f, j + params->hosts.size(), yv);
   }
   gsl_vector_set(f, params->hosts.size() + params->groups.size(),
-                 params->vPrevalence - weightedVectorPrevSum);
-    
-  return GSL_SUCCESS;
-}
-
-// function to find root of (pachy area version)
-int betafunc_area_f(const gsl_vector * x, void * p, gsl_vector * f)
-{
-  betafunc_params* params = ((struct betafunc_params*) p);
-
-  size_t nAreas = params->hosts[0].habitat.size();
-
-  double pv[nAreas];
-  double ph[params->hosts.size()][nAreas];
-  double beta[params->hosts.size()];
-  double alpha = gsl_vector_get(x, (params->hosts.size() + 1) * nAreas +
-                                params->hosts.size());
-  
-  double weightedVectorPrevSum = 0;
-  double weightedHostPrevSum[params->hosts.size()];
-  double weightedPrefSum[nAreas];
-  for (size_t i = 0; i < params->hosts.size(); ++i) {
-    beta[i] = gsl_vector_get(x, i);
-    weightedHostPrevSum[i] = 0;
-  }
-  for (size_t j = 0; j < nAreas; ++j) {
-    weightedPrefSum[j] = .0;
-    pv[j] = gsl_vector_get(x, j + params->hosts.size() * (nAreas + 1));
-    weightedVectorPrevSum += pv[j] * params->vectors[0].habitat[j];
-    for (size_t i = 0; i < params->hosts.size(); ++i) {
-      ph[i][j] = gsl_vector_get(x, j + i * nAreas + params->hosts.size());
-      weightedHostPrevSum[i] += params->hosts[i].habitat[j] * ph[i][j];
-      weightedPrefSum[j] += params->hosts[i].theta * params->hosts[i].habitat[j];
-    }
-  }
-  
-  for (size_t j = 0; j < nAreas; ++j) {
-    double yv;
-    if (params->vectors[0].habitat[j] > 0) {
-      yv = (pv[j] * params->vectors[0].mu + params->eta.second *
-            (pv[j] - params->vPrevalence)) / (1 - pv[j]);
-    } else {
-      yv = pv[j];
-    }
-    for (size_t i = 0; i < params->hosts.size(); ++i) {
-      double yh;
-      if (params->hosts[i].habitat[j] > 0) {
-        yh = (ph[i][j] * (params->hosts[i].mu + params->hosts[i].gamma) +
-              params->eta.first * (ph[i][j] - params->hPrevalence[i])) /
-          (1 - ph[i][j]) -
-          beta[i] * params->hosts[i].theta * params->vectors[0].habitat[j] /
-          (weightedPrefSum[j] * params->hosts[i].abundance) *
-          pv[j];
-        // std::cout << "yh[" << i << "][" << j << "]=("
-        //           << ph[i][j] << "*" << (params->hosts[i].mu + params->hosts[i].gamma)
-        //           << "+" << params->eta.first << "*(" << ph[i][j] << "-" << params->hPrevalence[i]
-        //           << ")/" << (1-ph[i][j]) << "-" << beta[i] << "*" << params->hosts[i].theta
-        //           << "*" << params->vectors[0].habitat[j] << "/(" << weightedPrefSum[j] << "*"
-        //           << params->hosts[i].abundance << ")*" << pv[j] << std::endl;
-        yv -= alpha * beta[i] * params->hosts[i].theta * 
-          params->hosts[i].habitat[j] / weightedPrefSum[j] * ph[i][j];
-      } else {
-        yh = ph[i][j];
-      }
-      // std::cout << "i=" << i << ", j=" << j << ", f[" << j+nAreas*i << "]=" << yh << std::endl;
-      gsl_vector_set(f, j + nAreas * i, yh);
-    }
-    // std::cout << "j=" << j << ", f[" << j+nAreas*params->hosts.size() << "]=" << yv << std::endl;
-    gsl_vector_set(f, j + nAreas * params->hosts.size(), yv);
-  }
-  for (size_t i = 0; i < params->hosts.size(); ++i) {
-    // std::cout << "i=" << i << ", f[" << i+nAreas*(params->hosts.size() + 1) << "]="
-    //           << (params->hPrevalence[i] - weightedHostPrevSum[i]) << std::endl;
-    gsl_vector_set(f, i + nAreas * (params->hosts.size() + 1),
-                   params->hPrevalence[i] - weightedHostPrevSum[i]);
-  }
-  // std::cout << "f["
-  //           << (nAreas * (params->hosts.size() + 1) + params->hosts.size()) << "]="
-  //           << (params->vPrevalence - weightedVectorPrevSum) << std::endl;
-  gsl_vector_set(f, nAreas * (params->hosts.size() + 1) + params->hosts.size(),
                  params->vPrevalence - weightedVectorPrevSum);
     
   return GSL_SUCCESS;
@@ -489,11 +397,6 @@ int betaffoiv(void *p, std::vector<double> &vars,
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
-  bool area = (params->xi == 0 && (params->eta.first > 0 ||
-                                   params->eta.second > 0));
-  // bool area = true;
-  size_t nAreas = params->hosts[0].habitat.size();
-
   if (verbose) {
     std::cout << "vdensity:";
     for (size_t i = 0; i < params->vectors.size(); ++i) {
@@ -532,19 +435,12 @@ int betaffoiv(void *p, std::vector<double> &vars,
     std::cout << std::endl;
 
     std::cout << "xi: " << params->xi << std::endl;
-    std::cout << "eta: " << params->eta.first << "," << params->eta.second << std::endl;
   }
 
   size_t nvars;
   
-  if (area) {
-    // p_H + p_V + beta + alpha
-    nvars = (params->hosts.size() + 1) * nAreas +
-      params->hosts.size() + 1;
-  } else {
-    // beta + p_V + alpha
-    nvars = params->hosts.size() + params->groups.size() + 1;
-  }
+  // beta + p_V + alpha
+  nvars = params->hosts.size() + params->groups.size() + 1;
 
   const gsl_multiroot_fdfsolver_type * Tdf;
   gsl_multiroot_fdfsolver * sdf;
@@ -565,11 +461,7 @@ int betaffoiv(void *p, std::vector<double> &vars,
      gsl_multiroot_fsolver_alloc (T, nvars);
   gsl_multiroot_function f;
 
-  if (area) {
-    f.f = &betafunc_area_f;
-  } else {
-    f.f = &betafunc_f;
-  }
+  f.f = &betafunc_f;
 
   f.n = nvars;
   f.params = p;
@@ -578,22 +470,10 @@ int betaffoiv(void *p, std::vector<double> &vars,
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     gsl_vector_set(x_init, i, 1);
   }
-  if (area) {
-    for (size_t j = 0; j < nAreas; ++j) {
-      for (size_t i = 0; i < params->hosts.size(); ++i) {
-        gsl_vector_set(x_init, j + nAreas * i + params->hosts.size(),
-                       params->hPrevalence[i]);
-      }
-      gsl_vector_set(x_init, j + (nAreas + 1) * params->hosts.size(),
-                     params->vPrevalence);
-    }
-    gsl_vector_set(x_init, params->hosts.size() * (nAreas + 1) + nAreas, 1);
-  } else {
-    for (size_t j = 0; j < params->groups.size(); ++j) {
-      gsl_vector_set(x_init, j + params->hosts.size(), params->vPrevalence);
-    }
-    gsl_vector_set(x_init, params->hosts.size() + params->groups.size(), 1);
+  for (size_t j = 0; j < params->groups.size(); ++j) {
+    gsl_vector_set(x_init, j + params->hosts.size(), params->vPrevalence);
   }
+  gsl_vector_set(x_init, params->hosts.size() + params->groups.size(), 1);
 
   if (jac) {
     gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
@@ -652,26 +532,13 @@ int betaffoiv(void *p, std::vector<double> &vars,
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     vars[i] = gsl_vector_get(sol, i);
   }
-  if (area) {
-    for (size_t j = 0; j < nAreas; ++j) {
-      for (size_t i = 0; i < params->hosts.size(); ++i) {
-        vars[j + nAreas * i + params->hosts.size()] = 
-          gsl_vector_get(sol, j + nAreas * i + params->hosts.size());
-      }
-      vars[j + (nAreas + 1) * params->hosts.size()] =
-          gsl_vector_get(sol, j + (nAreas + 1) * params->hosts.size());
-    }
-    vars[params->hosts.size() * (nAreas + 1) + nAreas] =
-      gsl_vector_get(sol, params->hosts.size() * (nAreas + 1) + nAreas);
-  } else {
-    for (size_t j = 0; j < params->groups.size(); ++j) {
-      vars[j+params->hosts.size()] =
-        gsl_vector_get(sol, j+params->hosts.size());
-    }
-    for (size_t i = 0; i < 1; ++i) {
-      vars[i+params->hosts.size() + params->groups.size()] =
-        gsl_vector_get(sol, i+params->hosts.size()+params->groups.size());
-    }
+  for (size_t j = 0; j < params->groups.size(); ++j) {
+    vars[j+params->hosts.size()] =
+      gsl_vector_get(sol, j+params->hosts.size());
+  }
+  for (size_t i = 0; i < 1; ++i) {
+    vars[i+params->hosts.size() + params->groups.size()] =
+      gsl_vector_get(sol, i+params->hosts.size()+params->groups.size());
   }
   
   if (jac) {
