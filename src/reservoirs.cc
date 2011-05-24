@@ -436,8 +436,8 @@ int main(int argc, char* argv[])
                 }
                 habitatOverlap[j][m] += overlap;
                 habitatOverlap[j][m] += overlap;
-                normaliseSum[j] += overlap + hosts[m].theta;
-                normaliseSum[m] += overlap + hosts[j].theta;
+                normaliseSum[j] += overlap + groups[m].theta;
+                normaliseSum[m] += overlap + groups[j].theta;
               }
             }
           }
@@ -446,16 +446,16 @@ int main(int argc, char* argv[])
     }
     
     // normalise
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      for (size_t j = i; j < hosts.size(); ++j) {
-        habitatOverlap[i][j] *= hosts[i].theta / normaliseSum[i];
+    for (size_t j = 0; j < groups.size(); ++j) {
+      for (size_t m = j; m < groups.size(); ++m) {
+        habitatOverlap[j][m] *= groups[j].theta / normaliseSum[j];
       }
     }
   } else if (vm["habitat"].as<std::string>() == "n") {
-    for (size_t i = 0; i < groups.size(); ++i) {
-      for (size_t j = i; j < groups.size(); ++j) {
-        habitatOverlap[i][j] = groups[i].theta;
-        habitatOverlap[j][i] = groups[j].theta;
+    for (size_t j = 0; j < groups.size(); ++j) {
+      for (size_t m = j; m < groups.size(); ++m) {
+        habitatOverlap[j][m] = groups[j].theta;
+        habitatOverlap[m][j] = groups[m].theta;
       }
     }
   } else {
