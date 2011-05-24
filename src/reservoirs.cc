@@ -428,20 +428,20 @@ int main(int argc, char* argv[])
             for (size_t o = 0; o < hosts[0].habitat.size(); ++o) {
               if (hosts[i].habitat[o] > 0 &&
                   hosts[l].habitat[o] > 0) {
-                double overlap;
                 if (vm["habitat"].as<std::string>() == "b") {
-                  overlap = 1;
+                  habitatOverlap[j][m] = 1;
+                  habitatOverlap[m][j] = 1;
                 } else {
-                  overlap = hosts[i].habitat[o] * hosts[l].habitat[o];
+                  double overlap = hosts[i].habitat[o] * hosts[l].habitat[o];
+                  habitatOverlap[j][m] += overlap;
+                  habitatOverlap[m][j] += overlap;
                 }
-                habitatOverlap[j][m] += overlap;
-                habitatOverlap[j][m] += overlap;
-                normaliseSum[j] += overlap + groups[m].theta;
-                normaliseSum[m] += overlap + groups[j].theta;
               }
             }
           }
         }
+        normaliseSum[j] += habitatOverlap[j][m] * groups[m].theta;
+        normaliseSum[m] += habitatOverlap[m][j] * groups[j].theta;
       }
     }
     
