@@ -289,8 +289,12 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     for (size_t l = 0; l < params->groups.size(); ++l) {
       incomingVectorSum[j] += pv[l] * params->habitatOverlap[j][l] *
         params->groups[l].theta;
+      // std::cout << j << " " << l << " " << incomingVectorSum[j] << " "
+      //           << pv[l] << " " << params->habitatOverlap[j][l]
+      //           << " " << params->groups[l].theta << std::endl;
     }
     incomingVectorSum[j] /= params->groups[j].theta;
+    // std::cout << j << " " << incomingVectorSum[j] << std::endl;
     
     double yv = (pv[j] * params->vectors[j].mu + params->xi *
                  (pv[j] - incomingVectorSum[j])) /
@@ -303,6 +307,12 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
         pv[j];
       yv -= alpha * beta[i] * params->hosts[i].theta * params->hPrevalence[i] /
         params->groups[j].theta;
+      // std::cout << k << " " << i << " " << j << " " << yh << " " << yv << " "
+      //           << params->groups[j].theta << " " << alpha
+      //           << " " << beta[i] << " " << params->hosts[i].theta
+      //           << " " << params->hPrevalence[i] << " " << pv[j]
+      //           << " " << params->vectors[j].mu << " "
+      //           << params->xi << " " << incomingVectorSum[j] << std::endl;
       gsl_vector_set(f, i, yh);
     }
     gsl_vector_set(f, j + params->hosts.size(), yv);
