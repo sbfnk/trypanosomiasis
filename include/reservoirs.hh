@@ -286,8 +286,8 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     weightedVectorPrevSum += pv[j] * params->groups[j].theta;
   }
   for (size_t j = 0; j < params->groups.size(); ++j) {
-    double enumerator;
-    double denominator;
+    double enumerator = .0;
+    double denominator = .0;
     for (size_t l = 0; l < params->groups.size(); ++l) {
       enumerator += pv[l] * params->habitatOverlap[j][l] *
         params->groups[l].theta;
@@ -300,7 +300,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     incomingVectorSum[j] = enumerator / denominator;
     // std::cout << j << " " << incomingVectorSum[j] << std::endl;
     
-    double yv = (pv[j] * params->vectors[j].mu + params->xi *
+    double yv = (pv[j] * params->vectors[0].mu + params->xi *
                  (pv[j] - incomingVectorSum[j])) /
       (1 - pv[j]);
     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
