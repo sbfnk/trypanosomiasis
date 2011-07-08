@@ -283,7 +283,6 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
   }
   for (size_t j = 0; j < params->groups.size(); ++j) {
     pv[j] = gsl_vector_get(x, j+params->hosts.size());
-    weightedVectorPrevSum += pv[j] * params->groups[j].theta;
   }
   for (size_t j = 0; j < params->groups.size(); ++j) {
     double enumerator = .0;
@@ -320,6 +319,8 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       gsl_vector_set(f, i, yh);
     }
     gsl_vector_set(f, j + params->hosts.size(), yv);
+
+    weightedVectorPrevSum += pv[j] * params->groups[j].theta;
   }
   gsl_vector_set(f, params->hosts.size() + params->groups.size(),
                  params->vPrevalence - weightedVectorPrevSum);
