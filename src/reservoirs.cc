@@ -638,10 +638,15 @@ int main(int argc, char* argv[])
         T.zeros();
 
         for (size_t j = 0; j < groups.size(); ++j) {
-          S(j,j) = S(j,j) - vectors[0].mu - xi;
+          double denominator = .0;
+          for (size_t l = 0; l < groups.size(); ++l) {
+            denominator += habitatOverlap[j][l] *
+              groups[l].theta;
+          }
+          S(j,j) = S(j,j) + vectors[0].mu + xi;
           for (size_t k = 0; k < groups.size(); ++k) {
-            S(j,k) = S(j,k) + xi * groups[k].theta *
-              habitatOverlap[j][k] / groups[j].theta;
+            S(j,k) = S(j,k) - xi * groups[j].theta *
+              habitatOverlap[j][k] / denominator;
           }
           for (size_t k = 0; k < groups[j].members.size(); ++k) {
             size_t i = groups[j].members[k];
@@ -652,8 +657,8 @@ int main(int argc, char* argv[])
         }
         for (size_t i = 0; i < hosts.size(); ++i) {
           S(i + groups.size(),i + groups.size()) =
-            S(i + groups.size(),i + groups.size()) -
-            hosts[i].gamma - hosts[i].mu;
+            S(i + groups.size(),i + groups.size()) +
+            hosts[i].gamma + hosts[i].mu;
         }
 
         if (verbose) {
@@ -663,7 +668,7 @@ int main(int argc, char* argv[])
           I.print("inv(S):");
         }
 
-        K = - T * inv(S);
+        K = T * inv(S);
 
         if (verbose) {
           K.print("K:");
