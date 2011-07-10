@@ -623,13 +623,13 @@ int main(int argc, char* argv[])
       if (status == GSL_SUCCESS) {
         if (verbose) {
           for (size_t i = 0; i < hosts.size(); ++i) {
-            std::cout << "\hat{beta}[" << i << "]=" << vars[i] << std::endl;
+            std::cout << "\\hat{beta}[" << i << "]=" << vars[i] << std::endl;
           }
           for (size_t i = 0; i < groups.size(); ++i) {
             std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
                       << std::endl;
           }
-          std::cout << "\hat{alpha}=" << vars[hosts.size() + groups.size()];
+          std::cout << "\\hat{alpha}=" << vars[hosts.size() + groups.size()];
           std::cout << std::endl;
         }
       
