@@ -308,7 +308,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
         (params->hosts[i].mu + params->hosts[i].gamma) -
         beta[i] * params->hosts[i].theta / params->hosts[i].abundance *
         pv[j];
-      yv -= alpha * beta[i] * params->hosts[i].theta * params->hPrevalence[i] /
+      yv -= alpha * params->hosts[i].theta * params->hPrevalence[i] /
         params->groups[j].theta;
       // std::cout << k << " " << i << " " << j << " " << yh << " " << yv << " "
       //           << params->groups[j].theta << " " << alpha

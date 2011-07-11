@@ -651,7 +651,7 @@ int main(int argc, char* argv[])
           for (size_t k = 0; k < groups[j].members.size(); ++k) {
             size_t i = groups[j].members[k];
             T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
-              vars[i] * hosts[i].theta / hosts[i].abundance;
+              hosts[i].theta / hosts[i].abundance;
             T(i + groups.size(),j) = vars[i] * hosts[i].theta / groups[j].theta;
           }
         }
