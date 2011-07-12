@@ -19,7 +19,7 @@ if (is.null(opt$offset)) {
   offset <- opt$offset
 }
 
-tab <- read.table(opt$file, header=T, sep=",")
+tab <- read.table(opt$file, header=T, sep=",", colClasses = "numeric", comment.char = "", )
 nam <- names(tab)
 res_data <- as.matrix(tab) 
 #res_data <- matrix(scan(opt$file), byrow=TRUE, ncol=2*(offset-1))
@@ -32,7 +32,7 @@ for (i in 1:12)  {
   CIrand <- quantile(x=species_data, probs=c(0.025, 0.975))
   abline(v=CIrand, col="blue", lwd=2)
   abline(v=1, col="green", lwd=2)
-  mtext(paste("p(R0>1) =", sum(species_data>1)/nrow(res_data)))
+  mtext(paste(mean(species_data), " (", CIrand[1], ",", CIrand[2], "), p(R0>1) = ", sum(species_data>1)/nrow(res_data), sep=""))
   if (i == 1) {
     cat("humans",h$mids[h$intensities==max(h$intensities)],CIrand,"\n");
   }
@@ -52,7 +52,7 @@ if (is.null(opt$noplot)) {
   CIrand <- quantile(x=species_data, probs=c(0.025, 0.975))
   abline(v=CIrand, col="blue", lwd=2)
   abline(v=1, col="green", lwd=2)
-  mtext(paste("p(R0>1) =", sum(species_data>1)/nrow(res_data)))
+  mtext(paste(mean(species_data), " (", CIrand[1], ",", CIrand[2], "), p(R0>1) = ", sum(species_data>1)/nrow(res_data), sep=""))
   dev.off()
 
   pdf(paste("wildlife.pdf"))
@@ -67,7 +67,7 @@ if (is.null(opt$noplot)) {
   CIrand <- quantile(x=species_data, probs=c(0.025, 0.975))
   abline(v=CIrand, col="blue", lwd=2)
   abline(v=1, col="green", lwd=2)
-  mtext(paste("p(R0>1) =", sum(species_data>1)/nrow(res_data)))
+  mtext(paste(mean(species_data), " (", CIrand[1], ",", CIrand[2], "), p(R0>1) = ", sum(species_data>1)/nrow(res_data), sep=""))
 }
 dev.off()
 
@@ -83,18 +83,18 @@ lines(density(species_data), col="red")
 CIrand <- quantile(x=species_data, probs=c(0.025, 0.975))
 abline(v=CIrand, col="blue", lwd=2)
 abline(v=1, col="green", lwd=2)
-mtext(paste("p(R0>1) =", sum(species_data>1)/nrow(res_data)))
+mtext(paste(mean(species_data), " (", CIrand[1], ",", CIrand[2], "), p(R0>1) = ", sum(species_data>1)/nrow(res_data), sep=""))
 cat("animals",h$mids[h$intensities==max(h$intensities)],CIrand,"\n");
 dev.off()
 
-pdf(paste("human_vs_wildlife.pdf"))
-human_data<-res_data[,1+offset]
-df=data.frame(humans=human_data, animals=species_data)
-qplot(data=df, humans, animals, geom="point")
-dev.off()
+#pdf(paste("human_vs_wildlife.pdf"))
+#human_data<-res_data[,1+offset]
+#df=data.frame(humans=human_data, animals=species_data)
+#qplot(data=df, humans, animals, geom="point")
+#dev.off()
 
-pdf(paste("r0.pdf"))
 if (is.null(opt$noplot)) {
+  pdf(paste("r0.pdf"))
   species_data <- rep(0, nrow(res_data))
   for (i in 1:12) {
     species_data <- species_data +
@@ -106,20 +106,22 @@ if (is.null(opt$noplot)) {
   CIrand <- quantile(x=species_data, probs=c(0.025, 0.975))
   abline(v=CIrand, col="blue", lwd=2)
   abline(v=1, col="green", lwd=2)
-  mtext(paste("p(R0>1) =", sum(species_data>1)/nrow(res_data)))
+  mtext(paste(mean(species_data), " (", CIrand[1], ",", CIrand[2], "), p(R0>1) = ", sum(species_data>1)/nrow(res_data), sep=""))
+  dev.off()
 
   if (!is.null(opt$alpha)) {
-    pdf(paste("vprev.pdf"))
-    hist(main="vprev", breaks=100, freq=F, x=res_data[,offset], xlab="vprev", ylab="Likelihood")
+#    pdf(paste("vprev.pdf"))
+#    hist(main="vprev", breaks=100, freq=F, x=res_data[,offset], xlab="vprev", ylab="Likelihood")
+#    lines(density(res_data[,offset]), col="red")
+#    CIrand <- quantile(x=res_data[,offset], probs=c(0.025, 0.975))
+#    abline(v=CIrand, col="blue", lwd=2)
+#    dev.off()
+    pdf(paste("alpha.pdf"))
+    hist(main="b_v", breaks=100, freq=F, x=res_data[,offset], xlab="alpha", ylab="Likelihood")
     lines(density(res_data[,offset]), col="red")
     CIrand <- quantile(x=res_data[,offset], probs=c(0.025, 0.975))
     abline(v=CIrand, col="blue", lwd=2)
-    dev.off()
-    pdf(paste("alpha.pdf"))
-    hist(main="alpha", breaks=100, freq=F, x=res_data[,2*offset-1], xlab="alpha", ylab="Likelihood")
-    lines(density(res_data[,2*offset-1]), col="red")
-    CIrand <- quantile(x=res_data[,14], probs=c(0.025, 0.975))
+    mtext(paste(mean(res_data[,offset]), " (", CIrand[1], ",", CIrand[2], ")", sep=""))
     dev.off()
   }
-  dev.off();
 }
