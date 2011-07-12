@@ -14,7 +14,7 @@ opt = getopt(c(
 ))
 
 if (is.null(opt$offset)) {
-  offset <- 14
+  offset <- 27
 } else {
   offset <- opt$offset
 }
