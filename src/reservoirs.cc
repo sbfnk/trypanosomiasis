@@ -527,9 +527,11 @@ int main(int argc, char* argv[])
         out << ",\"" << hosts[j].name << "_mu\"";
         out << ",\"" << hosts[j].name << "_gamma\"";
       }
+      out << ",\"" << hosts[j].name << "_b\"";
     }
     for (size_t j = 0; j < 1; ++j) {
       out << ",\"" << vectors[0].name << "_prev\"";
+      out << ",\"" << vectors[0].name << "_b\"";
     }
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j].name << "\"";
@@ -584,16 +586,6 @@ int main(int argc, char* argv[])
       outLine << i;
     }
     
-    for (size_t j = 0; j < hosts.size(); ++j) {
-      outLine << "," << p.hPrevalence[j];
-      if (lhsSamples > 0) {
-        outLine << "," << hosts[j].abundance;
-        outLine << "," << hosts[j].mu;
-        outLine << "," << hosts[j].gamma;
-      }
-    }
-    outLine << "," << p.vPrevalence;
-
     std::vector<double> contrib (hosts.size());
     double domestic;
     double domwild;
@@ -610,8 +602,9 @@ int main(int argc, char* argv[])
     S.set_size(hosts.size() + groups.size(), hosts.size() + groups.size());
     T.set_size(hosts.size() + groups.size(), hosts.size() + groups.size());
     
+    std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
+
     if (calcBetas) { // estimate betas
-      std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
       // find betas, p^v_is and alpha
       size_t nAttempts = 0;
@@ -621,17 +614,6 @@ int main(int argc, char* argv[])
       } while (status != GSL_SUCCESS && nAttempts < attempts);
 
       if (status == GSL_SUCCESS) {
-        if (verbose) {
-          for (size_t i = 0; i < hosts.size(); ++i) {
-            std::cout << "\\hat{beta}[" << i << "]=" << vars[i] << std::endl;
-          }
-          for (size_t i = 0; i < groups.size(); ++i) {
-            std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
-                      << std::endl;
-          }
-          std::cout << "\\hat{alpha}=" << vars[hosts.size() + groups.size()];
-          std::cout << std::endl;
-        }
       
         // compose NGM
         S.zeros();
@@ -651,8 +633,9 @@ int main(int argc, char* argv[])
           for (size_t k = 0; k < groups[j].members.size(); ++k) {
             size_t i = groups[j].members[k];
             T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
-              hosts[i].theta / hosts[i].abundance;
-            T(i + groups.size(),j) = vars[i] * hosts[i].theta / groups[j].theta;
+              vectors[0].bitingRate * hosts[i].theta / hosts[i].abundance;
+            T(i + groups.size(),j) = vars[i] * vectors[0].bitingRate *
+              hosts[i].theta / groups[j].theta;
           }
         }
         for (size_t i = 0; i < hosts.size(); ++i) {
@@ -661,7 +644,7 @@ int main(int argc, char* argv[])
             hosts[i].gamma + hosts[i].mu;
         }
 
-        if (verbose) {
+        if (verbose >= 2) {
           T.print("T:");
           S.print("S:");
           arma::mat I = inv(S);
@@ -701,7 +684,7 @@ int main(int argc, char* argv[])
           tempP = P;
           tempP(i + groups.size(),i + groups.size()) = 1;
           KP = tempP * K;
-          if (verbose) {
+          if (verbose >= 2) {
             std::stringstream s;
             s << "KP[" << i << "]";
             KP.print(s.str());
@@ -742,26 +725,38 @@ int main(int argc, char* argv[])
       } 
     } else {
 
-      std::vector<double> K;
       std::vector<double> hostContrib;
+      vars.resize(hosts.size() + groups.size() + 1);
+
+      double hostSum = .0;
+      
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        hostSum += hosts[i].theta * p.hPrevalence[i];
+      }
+      
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        vars[i] = p.hPrevalence[i] / (1-p.hPrevalence[i]) * hosts[i].abundance *
+          (hosts[i].gamma + hosts[i].mu) / (vectors[0].bitingRate *
+                                            hosts[i].theta * p.vPrevalence);
+      }
+
+      vars[hosts.size()] = p.vPrevalence;
+
+      vars[hosts.size() + groups.size()] =
+        p.vPrevalence / (1-p.vPrevalence) *
+        vectors[0].mu / vectors[0].bitingRate / hostSum;
+      
       double hostContribSum = 0;
       for (size_t i = 0; i < hosts.size(); ++i) {
         double newContrib =
-          pow(p.hPrevalence[i], 2) / (1 - p.hPrevalence[i]) *
-          hosts[i].abundance * (hosts[i].gamma + hosts[i].mu);
-        if (verbose) {
-          std::cout << "Host contrib " << i << ": " << newContrib << std::endl;
-        }
+          1 / ((1 - p.hPrevalence[i]) * (1 - p.vPrevalence)) *
+          p.hPrevalence[i] * hosts[i].theta / hostSum;
         hostContrib.push_back(newContrib);
         hostContribSum += newContrib;
       }
       if (verbose) {
         std::cout << "Measured vector prevalence: " 
-                  << vectors[0].M/vectors[0].N << std::endl;
-      }
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        K.push_back(1/((1-p.vPrevalence)*(1-p.hPrevalence[i])) *
-                    hostContrib[i] / hostContribSum);
+                  << vectors[0].M/static_cast<double>(vectors[0].N) << std::endl;
       }
 
       domestic = .0;
@@ -770,21 +765,20 @@ int main(int argc, char* argv[])
       R0 = .0;
 
       for (size_t i = 0; i < hosts.size(); ++i) {
-        R0 += K[i];
+        R0 += hostContrib[i];
         if (i == 0) {
         } else if (i < 4) {
-          domestic += K[i];
-          domwild += K[i];
+          domestic += hostContrib[i];
+          domwild += hostContrib[i];
         } else {
-          wildlife += K[i];
-          domwild += K[i];
+          wildlife += hostContrib[i];
+          domwild += hostContrib[i];
         }
       
-        contrib[i] = sqrt(K[i]);
+        contrib[i] = sqrt(hostContrib[i]);
         if (verbose) {
           std::cout << "hosts[" << i << "].gamma=" << hosts[i].gamma
                     << ", hosts[" << i << "].mu=" << hosts[i].mu
-                    << ", vectors[0].density=" << vectors[0].density
                     << ", hosts[" << i << "].abundance="
                     << hosts[i].abundance << std::endl;
         }
@@ -794,6 +788,32 @@ int main(int argc, char* argv[])
       domwild = sqrt(domwild);
       wildlife = sqrt(wildlife);
     }
+
+    // output
+
+    if (verbose) {
+      for (size_t i = 0; i < hosts.size(); ++i) {
+        std::cout << "\\hat{b_" << i << "}=" << vars[i] << std::endl;
+      }
+      for (size_t i = 0; i < groups.size(); ++i) {
+        std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
+                  << std::endl;
+      }
+      std::cout << "b_v=" << vars[hosts.size() + groups.size()];
+      std::cout << std::endl;
+    }
+    
+    for (size_t j = 0; j < hosts.size(); ++j) {
+      outLine << "," << p.hPrevalence[j];
+      if (lhsSamples > 0) {
+        outLine << "," << hosts[j].abundance;
+        outLine << "," << hosts[j].mu;
+        outLine << "," << hosts[j].gamma;
+      }
+      outLine << "," << vars[j];
+    }
+    outLine << "," << p.vPrevalence;
+    outLine << "," << vars[hosts.size() + groups.size()];
 
     if (status == GSL_SUCCESS) {
       if (vm.count("print")) {

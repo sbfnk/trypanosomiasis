@@ -306,10 +306,10 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       size_t i = params->groups[j].members[k];
       double yh = params->hPrevalence[i] / (1 - params->hPrevalence[i]) *
         (params->hosts[i].mu + params->hosts[i].gamma) -
-        beta[i] * params->hosts[i].theta / params->hosts[i].abundance *
-        pv[j];
-      yv -= alpha * params->hosts[i].theta * params->hPrevalence[i] /
-        params->groups[j].theta;
+        beta[i] * params->vectors[0].bitingRate * params->hosts[i].theta /
+        params->hosts[i].abundance * pv[j];
+      yv -= alpha * params->vectors[0].bitingRate * params->hosts[i].theta *
+        params->hPrevalence[i] / params->groups[j].theta;
       // std::cout << k << " " << i << " " << j << " " << yh << " " << yv << " "
       //           << params->groups[j].theta << " " << alpha
       //           << " " << beta[i] << " " << params->hosts[i].theta
