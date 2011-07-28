@@ -306,20 +306,18 @@ int main(int argc, char* argv[])
         std::istringstream myStream(*it2);
         myStream >> s;
         newGroup.members.push_back(s);
-        newGroup.f += hosts[s]->f.first;
       }
       groups.push_back(newGroup);
     }
   } else {
     if (vm.count("random")) { // random mixing
       groups.push_back(Group());
-      groups[0].f = 1;
       for (size_t i = 0; i < hosts.size(); ++i) {
         groups[0].members.push_back(i);
       }
     } else { // species-specific mixing
       for (size_t i = 0; i < hosts.size(); ++i) {
-        groups.push_back(Group(i, hosts[i]->f.first));
+        groups.push_back(Group(i));
       }
     }
   }
@@ -423,6 +421,25 @@ int main(int argc, char* argv[])
       for (size_t j = 0; j < vectors.size(); ++j) {
         p.vPrevalence[j] = quantile(*distributions[j + hosts.size()],
                                     randGen());
+      }
+    }
+
+    // normalise biting
+    double bitingSum = .0;
+    for (std::vector<Host*>::iterator it = hosts.begin();
+         it != hosts.end(); it++) {
+      bitingSum += (*it)->f.first;
+    }
+    for (std::vector<Host*>::iterator it = hosts.begin();
+         it != hosts.end(); it++) {
+      (*it)->f.first /= bitingSum;
+    }
+    for (std::vector<Group>::iterator it = groups.begin();
+         it != groups.end(); it++) {
+      it->f = .0;
+      for (std::vector<size_t>::iterator it2 = it->members.begin();
+           it2 != it->members.end(); it2++) {
+        it->f += hosts[*it2]->f.first;
       }
     }
 

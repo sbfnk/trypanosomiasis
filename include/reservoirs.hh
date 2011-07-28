@@ -118,8 +118,8 @@ struct Group
     f(.0)
   {}
   
-  Group(size_t initMember, double f) :
-    f(f),
+  Group(size_t initMember) :
+    f(.0),
     members(std::vector<size_t>(1, initMember))
   {}
   
@@ -371,12 +371,7 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
           size_t i = groups[j].members[k];
           for (size_t n = 0; n < groups[m].members.size(); ++n) {
             size_t l = groups[m].members[n];
-            // std::cout << i << " " << l << " " << hosts[0]->habitat.size()
-            //           << std::endl;
             for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
-              // std::cout << "A " << i << " " << l << " " << o
-              //           << " " << hosts[i]->habitat[o] << " "
-              //           << hosts[l]->habitat[o] << std::endl;
               if (hosts[i]->habitat[o].first > 0 &&
                   hosts[l]->habitat[o].first > 0) {
                 if (global->habType == "b") {
@@ -395,9 +390,6 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
         }
         // normaliseSum[j] += habitatOverlap[j][m] * groups[m].f;
         // normaliseSum[m] += habitatOverlap[m][j] * groups[j].f;
-        // std::cout << "Y " << j << " " << m << " " << habitatOverlap[j][m]
-        //           << " " << groups[m].f << " " << groups[j].f
-        //           << std::endl;
       }
     }
     
@@ -406,9 +398,6 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
     //   for (size_t m = j; m < groups.size(); ++m) {
     //     habitatOverlap[j][m] *= groups[j].f / normaliseSum[j];
     //     habitatOverlap[m][j] *= groups[m].f / normaliseSum[m];
-    //     // std::cout << "X " << j << " " << m << " "
-    //     //           << normaliseSum[j] << " " << habitatOverlap[j][m]
-    //     //           << std::endl;
     //   }
     // }
   } else {
@@ -464,7 +453,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
   
   std::vector<double> weightedVectorPrevSum(params->vectors.size(), .0);
   std::vector<std::vector<double> > incomingVectorSum
-    (params->vectors.size(), std::vector<double>(params->groups.size(), .0));
+    (params->groups.size(), std::vector<double>(params->vectors.size(), .0));
 
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     bhost[i] = gsl_vector_get(x, i);
@@ -487,22 +476,25 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
                        params->hosts.size() + params->vectors.size());
     }
   }
-  double yv[params->groups.size()][params->vectors.size()];
-  double yh[params->hosts.size()];
+
+  std::vector<std::vector<double> > yv
+    (params->groups.size(), std::vector<double>(params->vectors.size(), .0));
+  std::vector<double> yh(params->hosts.size(), .0);
+
   for (size_t j = 0; j < params->groups.size(); ++j) {
     double enumerator = .0;
     double denominator = .0;
     for (size_t v = 0; v < params->vectors.size(); ++v) {
-      // for (size_t l = 0; l < params->groups.size(); ++l) {
-      //   enumerator += pv[l][v] * params->habitatOverlap[j][l] *
-      //     params->groups[l].f;
-      //   denominator += params->habitatOverlap[j][l] *
-      //     params->groups[l].f;
-      // }
-      // incomingVectorSum[v][j] = enumerator / denominator;
-      // std::cout << pv[j][v] << " " << incomingVectorSum[v][j] << std::endl;
+      for (size_t l = 0; l < params->groups.size(); ++l) {
+        enumerator += pv[l][v] * params->habitatOverlap[j][l] *
+          params->groups[l].f;
+        denominator += params->habitatOverlap[j][l] *
+          params->groups[l].f;
+      }
+      incomingVectorSum[j][v] = enumerator / denominator;
       yv[j][v] = (pv[j][v] * params->vectors[v]->mu.first + xi[v] *
-                  (pv[j][v] - params->vPrevalence[v]) /
+                  // (pv[j][v] - params->vPrevalence[v])) /
+                  (pv[j][v] - incomingVectorSum[j][v])) /
         (1 - pv[j][v]);
     }
     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
@@ -517,7 +509,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
         size_t i = params->groups[j].members[k];
         yh[i] -= bhost[i] * params->vectors[v]->tau.first * params->hosts[i]->f.first /
-          params->hosts[i]->n.first * pv[j][v];
+          params->hosts[i]->n.first / params->groups[j].f * pv[j][v];
         yv[j][v] -= bvector[v] * params->vectors[v]->tau.first *
           params->hosts[i]->f.first * params->hPrevalence[i] / params->groups[j].f;
         // std::cout << k << " " << i << " " << j << " " << yh << " " << yv << " "
