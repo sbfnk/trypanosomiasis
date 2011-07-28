@@ -126,11 +126,14 @@ int main(int argc, char* argv[])
   }
 
   if (vm.count("longhelp")) {
-    Host host;
-    Vector vector;
-    GlobalParams global;
-    std::cout << main_options << *(global.getOptions())
-              << *(host.getOptions()) << *(vector.getOptions()) << std::endl;
+    Host *host = new Host();
+    Vector *vector = new Vector();
+    GlobalParams *global = new GlobalParams();
+    std::cout << main_options << *(global->getOptions())
+              << *(host->getOptions()) << *(vector->getOptions()) << std::endl;
+    delete host;
+    delete vector;
+    delete global;
     return 0;
   }
   
@@ -199,8 +202,8 @@ int main(int argc, char* argv[])
 
   attempts = vm["attempts"].as<size_t>();
 
-  std::vector<Host> hosts; // vector of hosts
-  std::vector<Vector> vectors; // vector of vectors
+  std::vector<Host*> hosts; // vector of hosts
+  std::vector<Vector*> vectors; // vector of vectors
 
   // tokenizer for reading csv file
   typedef boost::tokenizer<boost::escaped_list_separator<char> > Tokenizer;
@@ -209,8 +212,8 @@ int main(int argc, char* argv[])
   std::vector<std::string> headings;
   bool firstLine = true;
 
-  GlobalParams global;
-  main_options.add(*(global.getOptions()));
+  GlobalParams* global = new GlobalParams();
+  main_options.add(*(global->getOptions()));
 
   // ********************** read data file ********************
   
@@ -230,9 +233,9 @@ int main(int argc, char* argv[])
       headings = lineVector;
       firstLine = false;
     } else {
-      Host newHost;
-      main_options.add(*(newHost.getOptions()));
-      newHost.ReadTable(lineVector, headings);
+      Host* newHost = new Host();
+      newHost->ReadTable(lineVector, headings);
+      main_options.add(*(newHost->getOptions()));
       hosts.push_back(newHost);
     }
   }
@@ -257,9 +260,9 @@ int main(int argc, char* argv[])
       headings = lineVector;
       firstLine = false;
     } else {
-      Vector newVector;
-      main_options.add(*(newVector.getOptions()));
-      newVector.ReadTable(lineVector, headings);
+      Vector* newVector = new Vector();
+      newVector->ReadTable(lineVector, headings);
+      main_options.add(*(newVector->getOptions()));
       vectors.push_back(newVector);
     }
   }
@@ -273,17 +276,17 @@ int main(int argc, char* argv[])
   }
   catch (std::exception& e) {
     std::cerr << "Error parsing command line parameters: " << e.what()
-              << std::endl;
+              << std::cout << main_options << std::endl;
     return 1;
   }
   po::notify(vm);
 
-  global.ReadParams(vm);
+  global->ReadParams(vm);
   for (size_t i = 0; i < hosts.size(); ++i) {
-    hosts[i].ReadParams(vm);
+    hosts[i]->ReadParams(vm);
   }
   for (size_t i = 0; i < vectors.size(); ++i) {
-    vectors[i].ReadParams(vm);
+    vectors[i]->ReadParams(vm);
   }
 
   // ************** read group composition option ****************
@@ -303,7 +306,7 @@ int main(int argc, char* argv[])
         std::istringstream myStream(*it2);
         myStream >> s;
         newGroup.members.push_back(s);
-        newGroup.f += hosts[s].f.first;
+        newGroup.f += hosts[s]->f.first;
       }
       groups.push_back(newGroup);
     }
@@ -316,7 +319,7 @@ int main(int argc, char* argv[])
       }
     } else { // species-specific mixing
       for (size_t i = 0; i < hosts.size(); ++i) {
-        groups.push_back(Group(i, hosts[i].f.first));
+        groups.push_back(Group(i, hosts[i]->f.first));
       }
     }
   }
@@ -345,12 +348,12 @@ int main(int argc, char* argv[])
   for (size_t j = 0; j < hosts.size(); ++j) {
     distributions.push_back
       (new boost::math::beta_distribution<>
-       (hosts[j].M.first+1, hosts[j].N.first-hosts[j].M.first+1));
+       (hosts[j]->M.first+1, hosts[j]->N.first-hosts[j]->M.first+1));
   }
   for (size_t j = 0; j < vectors.size(); ++j) {
     distributions.push_back
       (new boost::math::beta_distribution<>
-       (vectors[j].M.first+1, vectors[j].N.first-vectors[j].M.first+1));
+       (vectors[j]->M.first+1, vectors[j]->N.first-vectors[j]->M.first+1));
   }
   
   boost::mt19937 gen(seed);
@@ -365,20 +368,20 @@ int main(int argc, char* argv[])
       out << "n";
     }
     for (size_t j = 0; j < hosts.size(); ++j) {
-      out << ",\"" << hosts[j].getName() << "_prev\"";
+      out << ",\"" << hosts[j]->getName() << "_prev\"";
       if (lhsSamples > 0) {
-        out << ",\"" << hosts[j].getName() << "_abundance\"";
-        out << ",\"" << hosts[j].getName() << "_mu\"";
-        out << ",\"" << hosts[j].getName() << "_gamma\"";
+        out << ",\"" << hosts[j]->getName() << "_abundance\"";
+        out << ",\"" << hosts[j]->getName() << "_mu\"";
+        out << ",\"" << hosts[j]->getName() << "_gamma\"";
       }
-      out << ",\"" << hosts[j].getName() << "_b\"";
+      out << ",\"" << hosts[j]->getName() << "_b\"";
     }
     for (size_t j = 0; j < vectors.size(); ++j) {
-      out << ",\"" << vectors[j].getName() << "_prev\"";
-      out << ",\"" << vectors[j].getName() << "_b\"";
+      out << ",\"" << vectors[j]->getName() << "_prev\"";
+      out << ",\"" << vectors[j]->getName() << "_b\"";
     }
     for (size_t j = 0; j < hosts.size(); ++j) {
-      out << ",\"" << hosts[j].getName() << "\"";
+      out << ",\"" << hosts[j]->getName() << "\"";
     }
     out << ",\"domestic\",\"wildlife\",\"domestic+wildlife\",\"R0\"";
     out << std::endl;
@@ -395,19 +398,19 @@ int main(int argc, char* argv[])
       }
       
       for (size_t j = 0; j < hosts.size(); ++j) {
-        hosts[j].n.first = hosts[j].n.second.first +
-          (hosts[j].n.second.second -
-           hosts[j].n.second.first) *
+        hosts[j]->n.first = hosts[j]->n.second.first +
+          (hosts[j]->n.second.second -
+           hosts[j]->n.second.first) *
           x[i % lhsSamples * hosts.size() * 3 + j] /
           static_cast<double>(lhsSamples);
-        hosts[j].mu.first = hosts[j].mu.second.first +
-          (hosts[j].mu.second.second -
-           hosts[j].mu.second.first) *
+        hosts[j]->mu.first = hosts[j]->mu.second.first +
+          (hosts[j]->mu.second.second -
+           hosts[j]->mu.second.first) *
           x[i % lhsSamples * hosts.size() * 3 + j + 1] /
           static_cast<double>(lhsSamples);
-        hosts[j].gamma.first = hosts[j].gamma.second.first +
-          (hosts[j].gamma.second.second -
-           hosts[j].gamma.second.first) *
+        hosts[j]->gamma.first = hosts[j]->gamma.second.first +
+          (hosts[j]->gamma.second.second -
+           hosts[j]->gamma.second.first) *
           x[i % lhsSamples * hosts.size() * 3 + j + 2] /
           static_cast<double>(lhsSamples);
       }
@@ -442,10 +445,13 @@ int main(int argc, char* argv[])
     arma::mat S;
     arma::mat T;
 
-    K.set_size(hosts.size() + groups.size(), hosts.size() + groups.size());
-    S.set_size(hosts.size() + groups.size(), hosts.size() + groups.size());
-    T.set_size(hosts.size() + groups.size(), hosts.size() + groups.size());
-    
+    K.set_size(hosts.size() + groups.size() * vectors.size(),
+               hosts.size() + groups.size() * vectors.size());
+    S.set_size(hosts.size() + groups.size() * vectors.size(),
+               hosts.size() + groups.size() * vectors.size());
+    T.set_size(hosts.size() + groups.size() * vectors.size(),
+               hosts.size() + groups.size() * vectors.size());
+
     std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
     if (calcBetas) { // estimate betas
@@ -466,15 +472,15 @@ int main(int argc, char* argv[])
         for (size_t i = 0; i < hosts.size(); ++i) {
           bhost[i] = vars[i];
         }
-        if (global.estimateXi) {
+        if (global->estimateXi) {
           for (size_t v = 0; v < vectors.size(); ++v) {
-            bvector[v] = vectors[v].b.first;
-            xi[v] = vars[hosts.size()];
+            bvector[v] = vectors[v]->b.first;
+            xi[v] = vars[v + hosts.size()];
           }
         } else {
           for (size_t v = 0; v < vectors.size(); ++v) {
             bvector[v] = vars[v + hosts.size()];
-            xi[v] = vectors[v].xi.first;
+            xi[v] = vectors[v]->xi.first;
           }
         }
 
@@ -490,7 +496,7 @@ int main(int argc, char* argv[])
                 groups[l].f;
             }
             S(v*groups.size()+j,v*groups.size()+j) =
-              S(v*groups.size()+j,v*groups.size()+j) + vectors[v].mu.first + xi[v];
+              S(v*groups.size()+j,v*groups.size()+j) + vectors[v]->mu.first + xi[v];
             for (size_t k = 0; k < groups.size(); ++k) {
               S(v*groups.size()+j,v*groups.size()+k) =
                 S(v*groups.size()+j,v*groups.size()+k) - xi[v] * groups[j].f *
@@ -499,10 +505,10 @@ int main(int argc, char* argv[])
             for (size_t k = 0; k < groups[j].members.size(); ++k) {
               size_t i = groups[j].members[k];
               T(v*groups.size() + j,i + vectors.size() * groups.size()) =
-                bvector[v] * vectors[v].tau.first * hosts[i].f.first /
-                hosts[i].n.first;
-              T(i + vectors.size() + groups.size(),v*groups.size() + j) =
-                bhost[i] * vectors[v].tau.first * hosts[i].f.first /
+                bvector[v] * vectors[v]->tau.first * hosts[i]->f.first /
+                hosts[i]->n.first;
+              T(i + vectors.size() * groups.size(),v*groups.size() + j) =
+                bhost[i] * vectors[v]->tau.first * hosts[i]->f.first /
                 groups[j].f;
             }
           }
@@ -512,7 +518,7 @@ int main(int argc, char* argv[])
             i + vectors.size() * groups.size()) =
             S(i + vectors.size() * groups.size(),
               i + vectors.size() * groups.size()) +
-            hosts[i].gamma.first + hosts[i].mu.first;
+            hosts[i]->gamma.first + hosts[i]->mu.first;
         }
 
         if (verbose >= 2) {
@@ -606,32 +612,32 @@ int main(int argc, char* argv[])
       double hostSum = .0;
       
       for (size_t i = 0; i < hosts.size(); ++i) {
-        hostSum += hosts[i].f.first * p.hPrevalence[i];
+        hostSum += hosts[i]->f.first * p.hPrevalence[i];
       }
       
       for (size_t i = 0; i < hosts.size(); ++i) {
-        vars[i] = p.hPrevalence[i] / (1-p.hPrevalence[i]) * hosts[i].n.first *
-          (hosts[i].gamma.first + hosts[i].mu.first) /
-          (vectors[0].tau.first * hosts[i].f.first * p.vPrevalence[0]);
+        vars[i] = p.hPrevalence[i] / (1-p.hPrevalence[i]) * hosts[i]->n.first *
+          (hosts[i]->gamma.first + hosts[i]->mu.first) /
+          (vectors[0]->tau.first * hosts[i]->f.first * p.vPrevalence[0]);
       }
 
       vars[hosts.size() + groups.size()] = p.vPrevalence[0];
 
       vars[hosts.size()] =
         p.vPrevalence[0] / (1-p.vPrevalence[0]) *
-        vectors[0].mu.first / vectors[0].tau.first / hostSum;
+        vectors[0]->mu.first / vectors[0]->tau.first / hostSum;
       
       double hostContribSum = 0;
       for (size_t i = 0; i < hosts.size(); ++i) {
         double newContrib =
           1 / ((1 - p.hPrevalence[i]) * (1 - p.vPrevalence[0])) *
-          p.hPrevalence[i] * hosts[i].f.first / hostSum;
+          p.hPrevalence[i] * hosts[i]->f.first / hostSum;
         hostContrib.push_back(newContrib);
         hostContribSum += newContrib;
       }
       if (verbose) {
         std::cout << "Measured vector prevalence: " 
-                  << vectors[0].M.first/static_cast<double>(vectors[0].N.first)
+                  << vectors[0]->M.first/static_cast<double>(vectors[0]->N.first)
                   << std::endl;
       }
 
@@ -653,10 +659,10 @@ int main(int argc, char* argv[])
       
         contrib[i] = sqrt(hostContrib[i]);
         if (verbose) {
-          std::cout << "hosts[" << i << "].gamma=" << hosts[i].gamma.first
-                    << ", hosts[" << i << "].mu=" << hosts[i].mu.first
+          std::cout << "hosts[" << i << "].gamma=" << hosts[i]->gamma.first
+                    << ", hosts[" << i << "].mu=" << hosts[i]->mu.first
                     << ", hosts[" << i << "].n="
-                    << hosts[i].n.first << std::endl;
+                    << hosts[i]->n.first << std::endl;
         }
       }
       R0 = sqrt(R0);
@@ -673,11 +679,16 @@ int main(int argc, char* argv[])
       }
       std::cout << std::endl;
       for (size_t v = 0; v < vectors.size(); ++v) {
-        std::cout << "b^v_" << v << "}=" << vars[v + hosts.size()] << std::endl;
+        if (global->estimateXi) {
+          std::cout << "xi[" << v << "]";
+        } else {
+          std::cout << "b^v_" << v;
+        }
+        std::cout << "=" << vars[v + hosts.size()] << std::endl;
       }
       for (size_t v = 0; v < vectors.size(); ++v) {
         for (size_t j = 0; j < groups.size(); ++j) {
-          std::cout << "p_{" << j << "," << v << "]="
+          std::cout << "p_{" << j << "," << v << "}="
                     << vars[j+v * groups.size() + hosts.size() + vectors.size()]
                     << std::endl;
         }
@@ -687,9 +698,9 @@ int main(int argc, char* argv[])
     for (size_t j = 0; j < hosts.size(); ++j) {
       outLine << "," << p.hPrevalence[j];
       if (lhsSamples > 0) {
-        outLine << "," << hosts[j].n.first;
-        outLine << "," << hosts[j].mu.first;
-        outLine << "," << hosts[j].gamma.first;
+        outLine << "," << hosts[j]->n.first;
+        outLine << "," << hosts[j]->mu.first;
+        outLine << "," << hosts[j]->gamma.first;
       }
       outLine << "," << vars[j];
     }
@@ -707,7 +718,7 @@ int main(int argc, char* argv[])
         for (size_t k = 0; k < groups[j].members.size(); ++k) {
           size_t i = groups[j].members[k];
           if (vm.count("print")) {
-            std::cout << hosts[i].getName() << ": " << contrib[i] << std::endl;
+            std::cout << hosts[i]->getName() << ": " << contrib[i] << std::endl;
           }
           outLine << "," << contrib[i];
         }
@@ -732,6 +743,16 @@ int main(int argc, char* argv[])
     }
   } while (i < samples);
   of.close();
+
+  for (std::vector<Host*>::iterator it = hosts.begin();
+       it != hosts.end(); it++) {
+    delete *it;
+  }
+  for (std::vector<Vector*>::iterator it = vectors.begin();
+       it != vectors.end(); it++) {
+    delete *it;
+  }
+  if (global) delete global;
 }
    
 //------------------------------------------------------------

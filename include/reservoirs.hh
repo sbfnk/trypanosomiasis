@@ -40,10 +40,6 @@ public:
                  std::vector<std::string> const &header);
   void ReadParams(po::variables_map const &vm);
 
-  void addParam(std::string option,
-                std::string description,
-                Parameter* param);
-
   //! Accessor for options
   const po::options_description* getOptions() const
   { return options; }
@@ -53,11 +49,21 @@ public:
   { return name; }
 
 protected:
+  struct ParamInfo {
+    ParamInfo(std::string o, std::string d, Parameter* p) :
+      option(o), description(d), param(p) 
+    {;}
+    
+    std::string option;
+    std::string description;
+    Parameter* param;
+  };
+    
   /*! \brief Parameters
     
     A map of command line options to the species parameters
   */
-  std::map<std::string, Parameter*> params;
+  std::vector<ParamInfo> params;
   //! Command line options
   po::options_description* options;
 
@@ -77,7 +83,7 @@ public:
 
   void Normalise();
   void ReadTable(std::vector<std::string> const &data,
-                                   std::vector<std::string> const &header);
+                 std::vector<std::string> const &header);
   void ReadParams(po::variables_map const &vm);
   std::vector<Parameter> habitat;
 
@@ -98,6 +104,11 @@ class Vector :
 {
 public:
   Vector();
+  
+  void ReadParams(po::variables_map const &vm) {
+    HabitatContainer::ReadParams(vm);
+  }
+    
   Parameter M, N, mu, tau, b, xi;
 };
 
@@ -131,16 +142,16 @@ public:
 struct betafunc_params
 {
 
-  betafunc_params(std::vector<Host> const &hosts,
-                  std::vector<Vector> const &vector,
+  betafunc_params(std::vector<Host*> const &hosts,
+                  std::vector<Vector*> const &vector,
                   std::vector<Group> const &groups,
-                  GlobalParams const &global);
+                  GlobalParams const *global);
 
-  std::vector<Host> const &hosts;
-  std::vector<Vector> const &vectors;
+  std::vector<Host*> const &hosts;
+  std::vector<Vector*> const &vectors;
   std::vector<Group> const &groups;
 
-  GlobalParams const &global;
+  GlobalParams const *global;
 
   std::vector<double> hPrevalence; //!< auxiliary variable so the parasite
                                    //!prevalence in hosts does not have to be
@@ -160,24 +171,34 @@ void ParamContainer::ReadTable(std::vector<std::string> const &data,
                                std::vector<std::string> const &header)
 {
   for (size_t i = 0; i < header.size(); ++i) {
-    for (std::map<std::string, Parameter*>::iterator it = params.begin();
+    for (std::vector<ParamInfo>::iterator it = params.begin();
          it != params.end(); it++) {
       if (header[i] == "name") {
-        name = header[i];
+        name = data[i];
       } else {
-        if ((header[i] == it->first)) {
+        if ((header[i] == it->option)) {
           std::istringstream s(data[i]);
-          s >> it->second->first;
-        } else if (header[i].substr(0, it->first.length() + 1) ==
-                   (it->first + "_low")) {
+          s >> it->param->first;
+        } else if (header[i].substr(0, it->option.length() + 1) ==
+                   (it->option + "_low")) {
           std::istringstream s(data[i]);
-          s >> it->second->second.first;
-        } else if (header[i].substr(0, it->first.length() + 1) ==
-                   (it->first + "_high")) {
+
+          s >> it->param->second.first;
+        } else if (header[i].substr(0, it->option.length() + 1) ==
+                   (it->option + "_high")) {
           std::istringstream s(data[i]);
-          s >> it->second->second.second;
+          s >> it->param->second.second;
         }
       }
+    }
+  }
+
+  if (name.length() > 0) {
+    for (std::vector<ParamInfo>::iterator it = params.begin();
+         it != params.end(); it++) {
+      options->add_options()
+        ((name+"-"+it->option).c_str(), po::value<double>(),
+         it->description.c_str());
     }
   }
 }
@@ -194,27 +215,17 @@ void ParamContainer::ReadParams(po::variables_map const &vm) {
   // if we have a name, we add a prefix to parameter names
   std::string paramPrefix = "";
   if (name != "") paramPrefix = name + "-";
-  for (std::map<std::string, Parameter*>::iterator it = params.begin();
+  for (std::vector<ParamInfo>::iterator it = params.begin();
        it != params.end(); it++) {
-    if (vm.count(paramPrefix + it->first)) {
+    if (vm.count(paramPrefix + it->option)) {
       // command line parameter has been specified, assign to model variable
-      it->second->first = vm[paramPrefix + it->first].as<double>();
-    } else if (vm.count(paramPrefix + it->first + "_low")){
-      it->second->second.first = vm[paramPrefix + it->first].as<double>();
-    } else if (vm.count(paramPrefix + it->first + "_high")){
-      it->second->second.second = vm[paramPrefix + it->first].as<double>();
+      it->param->first = vm[paramPrefix + it->option].as<double>();
+    } else if (vm.count(paramPrefix + it->option + "_low")){
+      it->param->second.first = vm[paramPrefix + it->option].as<double>();
+    } else if (vm.count(paramPrefix + it->option + "_high")){
+      it->param->second.second = vm[paramPrefix + it->option].as<double>();
     }
   }
-}
-
-
-void ParamContainer::addParam(std::string option,
-                              std::string description,
-                              Parameter* param)
-{
-  params.insert(std::make_pair(option, param));
-  options->add_options()
-    (option.c_str(), po::value<double>(), description.c_str());
 }
 
 void HabitatContainer::Normalise()
@@ -262,6 +273,7 @@ void HabitatContainer::ReadTable(std::vector<std::string> const &data,
 
 void HabitatContainer::ReadParams(po::variables_map const &vm) 
 {
+  ParamContainer::ReadParams(vm);
   for (size_t i = 0; i < habitat.size(); ++i) {
     std::stringstream ss;
     ss << i;
@@ -295,25 +307,25 @@ void GlobalParams::ReadParams(po::variables_map const &vm)
 }
 
 Host::Host() :
-  HabitatContainer("hosts") 
+  HabitatContainer("host")
 {
-  addParam("N", "Population size", &N);
-  addParam("M", "Number infected", &M);
-  addParam("mu", "Mortality rate", &mu);
-  addParam("gamma", "Recovery rate", &gamma);
-  addParam("n", "Abundance", &n);
-  addParam("f", "Biting preference", &f);
+  params.push_back(ParamInfo("N", "Population size", &N));
+  params.push_back(ParamInfo("M", "Number infected", &M));
+  params.push_back(ParamInfo("mu", "Mortality rate", &mu));
+  params.push_back(ParamInfo("gamma", "Recovery rate", &gamma));
+  params.push_back(ParamInfo("n", "Abundance", &n));
+  params.push_back(ParamInfo("f", "Biting preference", &f));
 }
   
 Vector::Vector() :
-  HabitatContainer("vectors") 
+  HabitatContainer("vector")
 {
-  addParam("N", "Population size", &N);
-  addParam("M", "Number infected", &M);
-  addParam("mu", "Mortality rate", &mu);
-  addParam("tau", "Biting rate", &tau);
-  addParam("b", "Susceptibility", &b);
-  addParam("xi", "Correlation", &xi);
+  params.push_back(ParamInfo("N", "Population size", &N));
+  params.push_back(ParamInfo("M", "Number infected", &M));
+  params.push_back(ParamInfo("mu", "Mortality rate", &mu));
+  params.push_back(ParamInfo("tau", "Biting rate", &tau));
+  params.push_back(ParamInfo("b", "Susceptibility", &b));
+  params.push_back(ParamInfo("xi", "Correlation", &xi));
 }
   
 GlobalParams::GlobalParams() :
@@ -327,10 +339,10 @@ GlobalParams::GlobalParams() :
     ;
 }
 
-betafunc_params::betafunc_params(std::vector<Host> const &hosts,
-                                 std::vector<Vector> const &vectors,
+betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
+                                 std::vector<Vector*> const &vectors,
                                  std::vector<Group> const &groups,
-                                 GlobalParams const &global) :
+                                 GlobalParams const *global) :
   hosts(hosts),
   vectors(vectors),
   groups(groups),
@@ -339,19 +351,19 @@ betafunc_params::betafunc_params(std::vector<Host> const &hosts,
   vPrevalence(std::vector<double>(vectors.size()))
 {
   for (size_t i = 0; i < hosts.size(); ++i) {
-    hPrevalence[i] = hosts[i].M.first / hosts[i].N.first;
+    hPrevalence[i] = hosts[i]->M.first / hosts[i]->N.first;
   }
     
   for (size_t v = 0; v < vectors.size(); ++v) {
-    vPrevalence[v] = vectors[v].M.first / vectors[v].N.first;
+    vPrevalence[v] = vectors[v]->M.first / vectors[v]->N.first;
   }
     
   //!< amount of overlap between host habitats
   habitatOverlap = std::vector<std::vector<double> >
     (groups.size(), std::vector<double>(groups.size(), .0));
     
-  if (global.habType == "b" ||
-      global.habType == "f") {
+  if (global->habType == "b" ||
+      global->habType == "f") {
     std::vector<double> normaliseSum(hosts.size(), .0);
     for (size_t j = 0; j < groups.size(); ++j) {
       for (size_t m = j; m < groups.size(); ++m) {
@@ -359,21 +371,21 @@ betafunc_params::betafunc_params(std::vector<Host> const &hosts,
           size_t i = groups[j].members[k];
           for (size_t n = 0; n < groups[m].members.size(); ++n) {
             size_t l = groups[m].members[n];
-            // std::cout << i << " " << l << " " << hosts[0].habitat.size()
+            // std::cout << i << " " << l << " " << hosts[0]->habitat.size()
             //           << std::endl;
-            for (size_t o = 0; o < hosts[0].habitat.size(); ++o) {
+            for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
               // std::cout << "A " << i << " " << l << " " << o
-              //           << " " << hosts[i].habitat[o] << " "
-              //           << hosts[l].habitat[o] << std::endl;
-              if (hosts[i].habitat[o].first > 0 &&
-                  hosts[l].habitat[o].first > 0) {
-                if (global.habType == "b") {
+              //           << " " << hosts[i]->habitat[o] << " "
+              //           << hosts[l]->habitat[o] << std::endl;
+              if (hosts[i]->habitat[o].first > 0 &&
+                  hosts[l]->habitat[o].first > 0) {
+                if (global->habType == "b") {
                   habitatOverlap[j][m] = 1;
                   habitatOverlap[m][j] = 1;
                 } else {
                   double overlap =
-                    hosts[i].habitat[o].first *
-                    hosts[l].habitat[o].first;
+                    hosts[i]->habitat[o].first *
+                    hosts[l]->habitat[o].first;
                   habitatOverlap[j][m] += overlap;
                   habitatOverlap[m][j] += overlap;
                 }
@@ -381,8 +393,8 @@ betafunc_params::betafunc_params(std::vector<Host> const &hosts,
             }
           }
         }
-        normaliseSum[j] += habitatOverlap[j][m] * groups[m].f;
-        normaliseSum[m] += habitatOverlap[m][j] * groups[j].f;
+        // normaliseSum[j] += habitatOverlap[j][m] * groups[m].f;
+        // normaliseSum[m] += habitatOverlap[m][j] * groups[j].f;
         // std::cout << "Y " << j << " " << m << " " << habitatOverlap[j][m]
         //           << " " << groups[m].f << " " << groups[j].f
         //           << std::endl;
@@ -390,20 +402,22 @@ betafunc_params::betafunc_params(std::vector<Host> const &hosts,
     }
     
     // normalise
-    for (size_t j = 0; j < groups.size(); ++j) {
-      for (size_t m = j; m < groups.size(); ++m) {
-        habitatOverlap[j][m] *= groups[j].f / normaliseSum[j];
-        habitatOverlap[m][j] *= groups[m].f / normaliseSum[m];
-        // std::cout << "X " << j << " " << m << " "
-        //           << normaliseSum[j] << " " << habitatOverlap[j][m]
-        //           << std::endl;
-      }
-    }
+    // for (size_t j = 0; j < groups.size(); ++j) {
+    //   for (size_t m = j; m < groups.size(); ++m) {
+    //     habitatOverlap[j][m] *= groups[j].f / normaliseSum[j];
+    //     habitatOverlap[m][j] *= groups[m].f / normaliseSum[m];
+    //     // std::cout << "X " << j << " " << m << " "
+    //     //           << normaliseSum[j] << " " << habitatOverlap[j][m]
+    //     //           << std::endl;
+    //   }
+    // }
   } else {
     for (size_t j = 0; j < groups.size(); ++j) {
       for (size_t m = j; m < groups.size(); ++m) {
-        habitatOverlap[j][m] = groups[j].f;
-        habitatOverlap[m][j] = groups[m].f;
+        // habitatOverlap[j][m] = groups[j].f;
+        // habitatOverlap[m][j] = groups[m].f;
+        habitatOverlap[j][m] = 1;
+        habitatOverlap[m][j] = 1;
       }
     }
   }
@@ -442,26 +456,28 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
 {
   betafunc_params* params = ((struct betafunc_params*) p);
 
-  double bhost[params->hosts.size()];
-  double bvector[params->vectors.size()];
-  double pv[params->groups.size()][params->vectors.size()];
-  double xi[params->vectors.size()];
+  std::vector<double> bhost(params->hosts.size(), .0);
+  std::vector<double> bvector(params->vectors.size(), .0);
+  std::vector<std::vector<double> > pv
+    (params->groups.size(), std::vector<double>(params->vectors.size(), .0));
+  std::vector<double> xi(params->vectors.size(), .0);
   
-  double weightedVectorPrevSum[params->vectors.size()];
+  std::vector<double> weightedVectorPrevSum(params->vectors.size(), .0);
   std::vector<std::vector<double> > incomingVectorSum
     (params->vectors.size(), std::vector<double>(params->groups.size(), .0));
+
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     bhost[i] = gsl_vector_get(x, i);
   }
-  if (params->global.estimateXi) {
+  if (params->global->estimateXi) {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
-      bvector[v] = params->vectors[v].b.first;
-      xi[v] = gsl_vector_get(x, params->hosts.size());
+      bvector[v] = params->vectors[v]->b.first;
+      xi[v] = gsl_vector_get(x, v + params->hosts.size());
     }
   } else {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
       bvector[v] = gsl_vector_get(x, v + params->hosts.size());
-      xi[v] = params->vectors[v].xi.first;
+      xi[v] = params->vectors[v]->xi.first;
     }
   }
   for (size_t v = 0; v < params->vectors.size(); ++v) {
@@ -477,25 +493,22 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     double enumerator = .0;
     double denominator = .0;
     for (size_t v = 0; v < params->vectors.size(); ++v) {
-      for (size_t l = 0; l < params->groups.size(); ++l) {
-        enumerator += pv[l][v] * params->habitatOverlap[j][l] *
-          params->groups[l].f;
-        denominator += params->habitatOverlap[j][l] *
-          params->groups[l].f;
-        // std::cout << j << " " << l << " " << incomingVectorSum[j] << " "
-        //           << pv[l] << " " << params->habitatOverlap[j][l]
-        //           << " " << params->groups[l].f << std::endl;
-      }
-      incomingVectorSum[v][j] = enumerator / denominator;
-      // std::cout << j << " " << incomingVectorSum[j] << std::endl;
-      yv[j][v] = (pv[j][v] * params->vectors[v].mu.first + xi[v] *
-                  (pv[j][v] - incomingVectorSum[v][j])) /
+      // for (size_t l = 0; l < params->groups.size(); ++l) {
+      //   enumerator += pv[l][v] * params->habitatOverlap[j][l] *
+      //     params->groups[l].f;
+      //   denominator += params->habitatOverlap[j][l] *
+      //     params->groups[l].f;
+      // }
+      // incomingVectorSum[v][j] = enumerator / denominator;
+      // std::cout << pv[j][v] << " " << incomingVectorSum[v][j] << std::endl;
+      yv[j][v] = (pv[j][v] * params->vectors[v]->mu.first + xi[v] *
+                  (pv[j][v] - params->vPrevalence[v]) /
         (1 - pv[j][v]);
     }
     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
       size_t i = params->groups[j].members[k];
       yh[i] = params->hPrevalence[i] / (1 - params->hPrevalence[i]) *
-        (params->hosts[i].mu.first + params->hosts[i].gamma.first);
+        (params->hosts[i]->mu.first + params->hosts[i]->gamma.first);
     }
   }
   
@@ -503,15 +516,15 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     for (size_t j = 0; j < params->groups.size(); ++j) {
       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
         size_t i = params->groups[j].members[k];
-        yh[i] -= bhost[i] * params->vectors[v].tau.first * params->hosts[i].f.first /
-          params->hosts[i].n.first * pv[v][j];
-        yv[j][v] -= bvector[v] * params->vectors[v].tau.first *
-          params->hosts[i].f.first * params->hPrevalence[i] / params->groups[j].f;
+        yh[i] -= bhost[i] * params->vectors[v]->tau.first * params->hosts[i]->f.first /
+          params->hosts[i]->n.first * pv[j][v];
+        yv[j][v] -= bvector[v] * params->vectors[v]->tau.first *
+          params->hosts[i]->f.first * params->hPrevalence[i] / params->groups[j].f;
         // std::cout << k << " " << i << " " << j << " " << yh << " " << yv << " "
         //           << params->groups[j].f << " " << alpha
-        //           << " " << bhost[i] << " " << params->hosts[i].f
+        //           << " " << bhost[i] << " " << params->hosts[i]->f
         //           << " " << params->hPrevalence[i] << " " << pv[j]
-        //           << " " << params->vectors[j].mu << " "
+        //           << " " << params->vectors[j]->mu << " "
         //           << params->xi << " " << incomingVectorSum[j] << std::endl;
       }
     }
@@ -524,12 +537,11 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
         gsl_vector_set(f, i, yh[i]);
       }
       gsl_vector_set(f, j + v * params->groups.size() +
-                     params->hosts.size() + params->vectors.size(), yv[j][v]);
-      weightedVectorPrevSum[v] += pv[v][j] * params->groups[j].f;
+                     params->hosts.size(), yv[j][v]);
+      weightedVectorPrevSum[v] += pv[j][v] * params->groups[j].f;
     }
     gsl_vector_set(f, params->hosts.size() +
-                   params->groups.size() * params->vectors.size() +
-                   params->vectors.size(),
+                   params->groups.size() * params->vectors.size() + v,
                    params->vPrevalence[v] - weightedVectorPrevSum[v]);
   }
 
@@ -568,24 +580,24 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
 //     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
 //       size_t i = params->groups[j].members[k];
 
-//       double dfidbi = params->hosts[i].f / params->hosts[i].n *
+//       double dfidbi = params->hosts[i]->f / params->hosts[i]->n *
 //         pv[j];
 //       gsl_matrix_set(J, i, i, dfidbi);
       
-//       double dfidpj = bhost[i] * params->hosts[i].f /
-//         params->hosts[i].n;
+//       double dfidpj = bhost[i] * params->hosts[i]->f /
+//         params->hosts[i]->n;
 //       gsl_matrix_set(J, i, j + params->hosts.size(), dfidpj);
 
-//       double dgjdbi = -alpha * params->hosts[i].f *
+//       double dgjdbi = -alpha * params->hosts[i]->f *
 //         params->hPrevalence[i] / params->groups[j].f;
 //       gsl_matrix_set(J, j + params->hosts.size(), i, dgjdbi);
 
-//       double dgjdpj = -(params->vectors[0].mu + params->xi) /
+//       double dgjdpj = -(params->vectors[0]->mu + params->xi) /
 //         pow(1-pv[j], 2);
 //       gsl_matrix_set(J, j + params->hosts.size(), j + params->hosts.size(),
 //                      dgjdpj);
       
-//       dgjda -= bhost[i] * params->hosts[i].f * params->hPrevalence[i];
+//       dgjda -= bhost[i] * params->hosts[i]->f * params->hPrevalence[i];
 //     }
 //     dgjda /= params->groups[j].f;
 //     gsl_matrix_set(J, j + params->hosts.size(), params->hosts.size() +
@@ -624,19 +636,19 @@ int betaffoiv(void *p, std::vector<double> &vars,
   if (verbose) {
     std::cout << "rabundance:";
     for (size_t i = 0; i < params->hosts.size(); ++i) {
-      std::cout << " " << params->hosts[i].n.first;
+      std::cout << " " << params->hosts[i]->n.first;
     }
     std::cout << std::endl;
   
     std::cout << "biting:";
     for (size_t i = 0; i < params->hosts.size(); ++i) {
-      std::cout << " " << params->hosts[i].f.first;
+      std::cout << " " << params->hosts[i]->f.first;
     }
     std::cout << std::endl;
   
     std::cout << "biting_rate:";
     for (size_t i = 0; i < params->vectors.size(); ++i) {
-      std::cout << " " << params->vectors[i].tau.first;
+      std::cout << " " << params->vectors[i]->tau.first;
     }
     std::cout << std::endl;
 
@@ -646,22 +658,36 @@ int betaffoiv(void *p, std::vector<double> &vars,
     }
     std::cout << std::endl;
   
+    std::cout << "vprev:";
+    for (size_t i = 0; i < params->vectors.size(); ++i) {
+      std::cout << " " << params->vPrevalence[i];
+    }
+    std::cout << std::endl;
+  
     std::cout << "vmu:";
     for (size_t i = 0; i < params->vectors.size(); ++i) {
-      std::cout << " " << params->vectors[i].mu.first;
+      std::cout << " " << params->vectors[i]->mu.first;
     }
     std::cout << std::endl;
 
-    std::cout << "xi:";
-    for (size_t i = 0; i < params->vectors.size(); ++i) {
-      std::cout << " " << params->vectors[i].xi.first;
+    if (params->global->estimateXi) {
+      std::cout << "bvector:";
+      for (size_t i = 0; i < params->vectors.size(); ++i) {
+        std::cout << " " << params->vectors[i]->b.first;
+      }
+      std::cout << std::endl;
+    } else {  
+      std::cout << "xi:";
+      for (size_t i = 0; i < params->vectors.size(); ++i) {
+        std::cout << " " << params->vectors[i]->xi.first;
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
   }
 
   size_t nvars =
     params->hosts.size() + params->groups.size() * params->vectors.size() +
-    params->vectors.size() + 1;
+    params->vectors.size();
 
   // beta + p_V + alpha
   
@@ -693,8 +719,10 @@ int betaffoiv(void *p, std::vector<double> &vars,
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     gsl_vector_set(x_init, i, 1);
   }
-  if (params->global.estimateXi) {
-    gsl_vector_set(x_init, params->hosts.size(), .5);
+  if (params->global->estimateXi) {
+    for (size_t v = 0; v < params->vectors.size(); ++v) {
+      gsl_vector_set(x_init, params->hosts.size() + v, .5);
+    }
   } else {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
       gsl_vector_set(x_init, params->hosts.size() + v, 1);
@@ -773,7 +801,8 @@ int betaffoiv(void *p, std::vector<double> &vars,
     for (size_t j = 0; j < params->groups.size(); ++j) {
       vars[j + v * params->groups.size() + params->hosts.size() +
            params->vectors.size()] =
-        gsl_vector_get(sol, j+params->hosts.size());
+        gsl_vector_get(sol, j + v * params->groups.size() +
+                       params->hosts.size() + params->vectors.size());
     }
   }
   
