@@ -85,8 +85,6 @@ int main(int argc, char* argv[])
      "output file (\"-\" for output to stdout")
     ("groups,g", po::value<std::string>(),
      "groups (semicolon-separated list of comma-separated hosts")
-    ("habitat,b", po::value<std::string>()->default_value("n"),
-     "type of habitat overlap (n=none,b=binary, f=fractional)")
     ("lhs,l", po::value<size_t>()->default_value(0),
      "number of samples for latin hypercube sampling")
     ("samples,n", po::value<size_t>()->default_value(0),
@@ -462,33 +460,59 @@ int main(int argc, char* argv[])
       } while (status != GSL_SUCCESS && nAttempts < attempts);
 
       if (status == GSL_SUCCESS) {
-      
+
+        double bhost[hosts.size()];
+        double bvector[vectors.size()];
+        double pv[vectors.size()][groups.size()];
+        double xi[vectors.size()];
+
+        for (size_t i = 0; i < hosts.size(); ++i) {
+          bhost[i] = vars[i];
+        }
+        if (global.estimateXi) {
+          for (size_t v = 0; v < vectors.size(); ++v) {
+            bvector[v] = vectors[v].b;
+            xi[v] = vars[hosts.size];
+          }
+        } else {
+          for (size_t v = 0; i < vectors.size(); ++v) {
+            bvector[v] = vars[v + hosts.size()];
+          }
+          xi[v] = vectors[v].xi;
+        }
+
         // compose NGM
         S.zeros();
         T.zeros();
-
-        for (size_t j = 0; j < groups.size(); ++j) {
-          double denominator = .0;
-          for (size_t l = 0; l < groups.size(); ++l) {
-            denominator += habitatOverlap[j][l] *
-              groups[l].f;
-          }
-          S(j,j) = S(j,j) + vectors[0].mu + xi;
-          for (size_t k = 0; k < groups.size(); ++k) {
-            S(j,k) = S(j,k) - xi * groups[j].f *
-              habitatOverlap[j][k] / denominator;
-          }
-          for (size_t k = 0; k < groups[j].members.size(); ++k) {
-            size_t i = groups[j].members[k];
-            T(j,i + groups.size()) = vars[hosts.size() + groups.size()] *
-              vectors[0].tau * hosts[i].f / hosts[i].n;
-            T(i + groups.size(),j) = vars[i] * vectors[0].tau *
-              hosts[i].f / groups[j].f;
+          
+        for (size_t v = 0; i < vectors.size(); ++v) {
+          for (size_t j = 0; j < groups.size(); ++j) {
+            double denominator = .0;
+            for (size_t l = 0; l < groups.size(); ++l) {
+              denominator += habitatOverlap[j][l] *
+                groups[l].f;
+            }
+            S(v*groups.size()+j,v*groups.size()+j) =
+              S(v*groups.size()+j,v*groups.size()+j) + vectors[v].mu + xi[v];
+            for (size_t k = 0; k < groups.size(); ++k) {
+              S(v*groups.size()+j,v*groups.size()+k) =
+                S(v*groups.size()+j,v*groups.size()+k) - xi[v] * groups[j].f *
+                habitatOverlap[j][k] / denominator;
+            }
+            for (size_t k = 0; k < groups[j].members.size(); ++k) {
+              size_t i = groups[j].members[k];
+              T(v*groups.size() + j,i + vectors.size() * groups.size()) =
+                bvector[v] * vectors[v].tau * hosts[i].f / hosts[i].n;
+              T(i + vectors.size() + groups.size(),v*groups.size() + j) =
+                bhost[i] * vectors[v].tau * hosts[i].f / groups[j].f;
+            }
           }
         }
         for (size_t i = 0; i < hosts.size(); ++i) {
-          S(i + groups.size(),i + groups.size()) =
-            S(i + groups.size(),i + groups.size()) +
+          S(i + vectors.size() * groups.size(),
+            i + vectors.size() * groups.size()) =
+            S(i + vectors.size() * groups.size(),
+              i + vectors.size() * groups.size()) +
             hosts[i].gamma + hosts[i].mu;
         }
 
@@ -522,7 +546,7 @@ int main(int argc, char* argv[])
         P.copy_size(K);
         KP.copy_size(K);
         P.zeros();
-        for (size_t i = 0; i < groups.size(); ++i) {
+        for (size_t i = 0; i < vectors.size() * groups.size(); ++i) {
           P(i,i) = 1;
         }
         arma::mat tempP;
@@ -530,7 +554,8 @@ int main(int argc, char* argv[])
 
         for (size_t i = 0; i < hosts.size(); ++i) {
           tempP = P;
-          tempP(i + groups.size(),i + groups.size()) = 1;
+          tempP(i + vectors.size() * groups.size(),
+                i + vectors.size() * groups.size()) = 1;
           KP = tempP * K;
           if (verbose >= 2) {
             std::stringstream s;
@@ -544,7 +569,8 @@ int main(int argc, char* argv[])
 
         tempP = P;
         for (size_t i = 1; i < 4; ++i) {
-          tempP(i + groups.size(),i + groups.size()) = 1;
+          tempP(i + vectors.size() * groups.size(),
+                i + vectors.size() * groups.size()) = 1;
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
@@ -553,7 +579,8 @@ int main(int argc, char* argv[])
       
         tempP = P;
         for (size_t i = 1; i < 12; ++i) {
-          tempP(i + groups.size(),i + groups.size()) = 1;
+          tempP(i + vectors.size() * groups.size(),
+                i + vectors.size() * groups.size()) = 1;
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
@@ -562,7 +589,8 @@ int main(int argc, char* argv[])
       
         tempP = P;
         for (size_t i = 4; i < 12; ++i) {
-          tempP(i + groups.size(),i + groups.size()) = 1;
+          tempP(i + vectors.size() * groups.size(),
+                i + vectors.size() * groups.size()) = 1;
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
@@ -588,9 +616,9 @@ int main(int argc, char* argv[])
                                             hosts[i].f * p.vPrevalence);
       }
 
-      vars[hosts.size()] = p.vPrevalence;
+      vars[hosts.size() + groups.size()] = p.vPrevalence;
 
-      vars[hosts.size() + groups.size()] =
+      vars[hosts.size()] =
         p.vPrevalence / (1-p.vPrevalence) *
         vectors[0].mu / vectors[0].tau / hostSum;
       
@@ -641,14 +669,19 @@ int main(int argc, char* argv[])
 
     if (verbose) {
       for (size_t i = 0; i < hosts.size(); ++i) {
-        std::cout << "\\hat{b_" << i << "}=" << vars[i] << std::endl;
+        std::cout << "\\hat{b^h_" << i << "}=" << vars[i] << std::endl;
       }
-      for (size_t i = 0; i < groups.size(); ++i) {
-        std::cout << "p^v_i[" << i << "]=" << vars[i+hosts.size()]
-                  << std::endl;
-      }
-      std::cout << "b_v=" << vars[hosts.size() + groups.size()];
       std::cout << std::endl;
+      for (size_t v = 0; v < vectors.size(); ++v) {
+        std::cout << "b^v_" << v << "}=" << vars[v + hosts.size()] << std::endl;
+      }
+      for (size_t v = 0; v < vectors.size(); ++v) {
+        for (size_t j = 0; j < groups.size(); ++j) {
+          std::cout << "p_{" << j << "," << v << "]="
+                    << vars[j+v * groups.size() + hosts.size() + vectors.size()]
+                    << std::endl;
+        }
+      }
     }
     
     for (size_t j = 0; j < hosts.size(); ++j) {

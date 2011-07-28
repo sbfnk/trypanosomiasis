@@ -65,7 +65,7 @@ class HabitatContainer :
 {
 public:
 
-  HabitatContainer(std::string optionName = ""):
+  HabitatContainer(std::string optionName = "") :
     ParamContainer(optionName) {;}
   //! Destructor -- this is a virtual class
   virtual ~HabitatContainer() = 0; 
@@ -74,8 +74,8 @@ public:
   void ReadTable(std::vector<std::string> const &data,
                                    std::vector<std::string> const &header);
   void ReadParams(po::variables_map const &vm);
-private:
   std::vector<Parameter> habitat;
+
 };
   
 /*! Class for host species and its data/parameters */
@@ -122,6 +122,7 @@ class GlobalParams :
   void ReadParams(po::variables_map const &vm);
 
 public:
+  std::string habType;
   bool estimateXi; //!< estimate xi or alpha
 };
 
@@ -273,7 +274,7 @@ void HabitatContainer::ReadParams(po::variables_map const &vm)
       habitat[i].second.second = vm[name + "-X" + ss.str() + "_low"].as<double>();
     }
   }
-
+  
   Normalise();
 }
 
@@ -282,6 +283,14 @@ void GlobalParams::ReadParams(po::variables_map const &vm)
   ParamContainer::ReadParams(vm);
   if (vm.count("estimate-xi")) {
     estimateXi = true;
+  }
+  habType = vm["habitat"].as<std::string>();
+  if (!(habType == "b" || habType == "f")) {
+    if (habType != "n") {
+      std::cerr << "WARNING: Overlap type " << habType << "unrecognised, "
+                << "not considering habitats" << std::endl;
+    }
+    habType = "n";
   }
 }
 
@@ -312,7 +321,10 @@ GlobalParams::GlobalParams() :
   estimateXi(false)
 {
   options.add_options()
-    ("estimate-xi", "Estimate xi (with vector susceptibility set)");
+    ("estimate-xi", "Estimate xi (with vector susceptibility set)")
+    ("habitat,a", po::value<std::string>()->default_value("n"),
+     "type of habitat overlap (n=none,b=binary, f=fractional)")
+    ;
 }
 
 betafunc_params::betafunc_params(std::vector<Host> const &hosts,
@@ -328,19 +340,19 @@ betafunc_params::betafunc_params(std::vector<Host> const &hosts,
   vPrevalence(std::vector<double>(vectors.size()))
 {
   for (size_t i = 0; i < hosts.size(); ++i) {
-    hPrevalence[i] = hosts[i].M / hosts[i].N;
+    hPrevalence[i] = hosts[i].M.first / hosts[i].N.first;
   }
     
   for (size_t v = 0; v < vectors.size(); ++v) {
-    vPrevalence[v] = vectors[v].M / vectors[v].N;
+    vPrevalence[v] = vectors[v].M.first / vectors[v].N.first;
   }
     
   //!< amount of overlap between host habitats
   habitatOverlap = std::vector<std::vector<double> >
     (groups.size(), std::vector<double>(groups.size(), .0));
     
-  if (overlapType == "b" ||
-      overlapType == "f") {
+  if (global.habType == "b" ||
+      global.habType == "f") {
     std::vector<double> normaliseSum(hosts.size(), .0);
     for (size_t j = 0; j < groups.size(); ++j) {
       for (size_t m = j; m < groups.size(); ++m) {
@@ -354,13 +366,15 @@ betafunc_params::betafunc_params(std::vector<Host> const &hosts,
               // std::cout << "A " << i << " " << l << " " << o
               //           << " " << hosts[i].habitat[o] << " "
               //           << hosts[l].habitat[o] << std::endl;
-              if (hosts[i].habitat[o] > 0 &&
-                  hosts[l].habitat[o] > 0) {
-                if (vm["habitat"].as<std::string>() == "b") {
+              if (hosts[i].habitat[o].first > 0 &&
+                  hosts[l].habitat[o].first > 0) {
+                if (global.habType == "b") {
                   habitatOverlap[j][m] = 1;
                   habitatOverlap[m][j] = 1;
                 } else {
-                  double overlap = hosts[i].habitat[o] * hosts[l].habitat[o];
+                  double overlap =
+                    hosts[i].habitat[o].first *
+                    hosts[l].habitat[o].first;
                   habitatOverlap[j][m] += overlap;
                   habitatOverlap[m][j] += overlap;
                 }
@@ -386,17 +400,13 @@ betafunc_params::betafunc_params(std::vector<Host> const &hosts,
         //           << std::endl;
       }
     }
-  } else if (overlapType == "n") {
+  } else {
     for (size_t j = 0; j < groups.size(); ++j) {
       for (size_t m = j; m < groups.size(); ++m) {
         habitatOverlap[j][m] = groups[j].f;
         habitatOverlap[m][j] = groups[m].f;
       }
     }
-  } else {
-    std::cerr << "WARNING: Ignoring unknown habitat option "
-              << overlapType
-              << std::endl;
   }
 }
 
