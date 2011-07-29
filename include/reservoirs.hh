@@ -457,16 +457,21 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
 
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     bhost[i] = gsl_vector_get(x, i);
+    std::cout << "bhost[" << i << "]: " << bhost[i] << std::endl;
   }
   if (params->global->estimateXi) {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
       bvector[v] = params->vectors[v]->b.first;
       xi[v] = gsl_vector_get(x, v + params->hosts.size());
+      std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
+      std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
     }
   } else {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
       bvector[v] = gsl_vector_get(x, v + params->hosts.size());
       xi[v] = params->vectors[v]->xi.first;
+      std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
+      std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
     }
   }
   for (size_t v = 0; v < params->vectors.size(); ++v) {
@@ -474,6 +479,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       pv[j][v] =
         gsl_vector_get(x, j + v * params->groups.size() +
                        params->hosts.size() + params->vectors.size());
+      std::cout << "pv[" << j << "," << v << "]: " << pv[j][v] << std::endl;
     }
   }
 
@@ -527,97 +533,128 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
         size_t i = params->groups[j].members[k];
         gsl_vector_set(f, i, yh[i]);
+        std::cout << "yh[" << i << "]: " << yh[i] << std::endl;
       }
       gsl_vector_set(f, j + v * params->groups.size() +
                      params->hosts.size(), yv[j][v]);
+      std::cout << "yv[" << j << "," << v << "]: " << yv[j][v] << std::endl;
       weightedVectorPrevSum[v] += pv[j][v] * params->groups[j].f;
     }
     gsl_vector_set(f, params->hosts.size() +
                    params->groups.size() * params->vectors.size() + v,
                    params->vPrevalence[v] - weightedVectorPrevSum[v]);
+    std::cout << "y[" << v << "]: "
+              << (params->vPrevalence[v] - weightedVectorPrevSum[v])
+              << std::endl;
   }
 
     
   return GSL_SUCCESS;
 }
 
-// // function to find root of (derivative)
-// int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
-// {
-//   betafunc_params* params = ((struct betafunc_params*) p);
+// function to find root of (derivative)
+int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
+{
+  betafunc_params* params = ((struct betafunc_params*) p);
 
-//   double pv[params->groups.size()];
-//   double bhost[params->hosts.size()];
-//   double alpha = gsl_vector_get(x, params->hosts.size() +
-//                                 params->groups.size());
+  std::vector<double> bhost(params->hosts.size(), .0);
+  std::vector<double> bvector(params->vectors.size(), .0);
+  std::vector<std::vector<double> > pv
+    (params->groups.size(), std::vector<double>(params->vectors.size(), .0));
+  std::vector<double> xi(params->vectors.size(), .0);
   
-//   for (size_t i = 0; i < params->hosts.size() + params->groups.size() + 1;
-//        ++i) {
-//     for (size_t j = 0; j < params->hosts.size() + params->groups.size() + 1;
-//          ++j) {
-//       gsl_matrix_set(J, i, j, 0);
-//     }
-//   }
-//   for (size_t i = 0; i < params->hosts.size(); ++i) {
-//     bhost[i] = gsl_vector_get(x, i);
-//   }
-//   for (size_t j = 0; j < params->groups.size(); ++j) {
-//     pv[j] = gsl_vector_get(x, j+params->hosts.size());
-//   }
+  for (size_t i = 0; i < params->hosts.size() +
+         params->vectors.size() * params->groups.size() + params->vectors.size();
+       ++i) {
+    for (size_t j = 0; j < params->hosts.size() + 
+           params->vectors.size() * params->groups.size() + params->vectors.size();
+         ++j) {
+      gsl_matrix_set(J, i, j, 0);
+    }
+  }
+  for (size_t i = 0; i < params->hosts.size(); ++i) {
+    bhost[i] = gsl_vector_get(x, i);
+    std::cout << "bhost[" << i << "]: " << bhost[i] << std::endl;
+  }
+  if (params->global->estimateXi) {
+    for (size_t v = 0; v < params->vectors.size(); ++v) {
+      bvector[v] = params->vectors[v]->b.first;
+      xi[v] = gsl_vector_get(x, v + params->hosts.size());
+      std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
+      std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
+    }
+  } else {
+    for (size_t v = 0; v < params->vectors.size(); ++v) {
+      bvector[v] = gsl_vector_get(x, v + params->hosts.size());
+      xi[v] = params->vectors[v]->xi.first;
+      std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
+      std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
+    }
+  }
+  for (size_t v = 0; v < params->vectors.size(); ++v) {
+    for (size_t j = 0; j < params->groups.size(); ++j) {
+      pv[j][v] =
+        gsl_vector_get(x, j + v * params->groups.size() +
+                       params->hosts.size() + params->vectors.size());
+      std::cout << "pv[" << j << "," << v << "]: " << pv[j][v] << std::endl;
+    }
+  }
 
-//   for (size_t j = 0; j < params->groups.size(); ++j) {
+  for (size_t j = 0; j < params->groups.size(); ++j) {
+  }
+  for (size_t j = 0; j < params->groups.size(); ++j) {
 
-//     double dgjda = .0;
+    double dgjda = .0;
 
-//     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
-//       size_t i = params->groups[j].members[k];
+    for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
+      size_t i = params->groups[j].members[k];
 
-//       double dfidbi = params->hosts[i]->f / params->hosts[i]->n *
-//         pv[j];
-//       gsl_matrix_set(J, i, i, dfidbi);
+      double dfidbi = params->hosts[i]->f / params->hosts[i]->n *
+        pv[j];
+      gsl_matrix_set(J, i, i, dfidbi);
       
-//       double dfidpj = bhost[i] * params->hosts[i]->f /
-//         params->hosts[i]->n;
-//       gsl_matrix_set(J, i, j + params->hosts.size(), dfidpj);
+      double dfidpj = bhost[i] * params->hosts[i]->f /
+        params->hosts[i]->n;
+      gsl_matrix_set(J, i, j + params->hosts.size(), dfidpj);
 
-//       double dgjdbi = -alpha * params->hosts[i]->f *
-//         params->hPrevalence[i] / params->groups[j].f;
-//       gsl_matrix_set(J, j + params->hosts.size(), i, dgjdbi);
+      double dgjdbi = -alpha * params->hosts[i]->f *
+        params->hPrevalence[i] / params->groups[j].f;
+      gsl_matrix_set(J, j + params->hosts.size(), i, dgjdbi);
 
-//       double dgjdpj = -(params->vectors[0]->mu + params->xi) /
-//         pow(1-pv[j], 2);
-//       gsl_matrix_set(J, j + params->hosts.size(), j + params->hosts.size(),
-//                      dgjdpj);
+      double dgjdpj = -(params->vectors[0]->mu + params->xi) /
+        pow(1-pv[j], 2);
+      gsl_matrix_set(J, j + params->hosts.size(), j + params->hosts.size(),
+                     dgjdpj);
       
-//       dgjda -= bhost[i] * params->hosts[i]->f * params->hPrevalence[i];
-//     }
-//     dgjda /= params->groups[j].f;
-//     gsl_matrix_set(J, j + params->hosts.size(), params->hosts.size() +
-//                    params->groups.size(), dgjda);
+      dgjda -= bhost[i] * params->hosts[i]->f * params->hPrevalence[i];
+    }
+    dgjda /= params->groups[j].f;
+    gsl_matrix_set(J, j + params->hosts.size(), params->hosts.size() +
+                   params->groups.size(), dgjda);
 
-//     double dhdpj = params->groups[j].f;
-//     gsl_matrix_set(J, params->hosts.size() + params->groups.size(),
-//                    j + params->hosts.size(), dhdpj);
-//   }      
+    double dhdpj = params->groups[j].f;
+    gsl_matrix_set(J, params->hosts.size() + params->groups.size(),
+                   j + params->hosts.size(), dhdpj);
+  }      
 
-//   // for (size_t i = 0; i < params->hosts.size() + params->groups.size() + 1; ++i) {
-//   //   for (size_t j = 0; j < params->hosts.size() + params->groups.size() + 1; ++j) {
-//   //     std::cout << "J(" << i << "," << j << ") = " << gsl_matrix_get(J, i, j)
-//   //               << std::endl;
-//   //   }
-//   // }
+  // for (size_t i = 0; i < params->hosts.size() + params->groups.size() + 1; ++i) {
+  //   for (size_t j = 0; j < params->hosts.size() + params->groups.size() + 1; ++j) {
+  //     std::cout << "J(" << i << "," << j << ") = " << gsl_matrix_get(J, i, j)
+  //               << std::endl;
+  //   }
+  // }
   
-//   return GSL_SUCCESS;
-// }
+  return GSL_SUCCESS;
+}
 
-// // function to find root of and derivative
-// int betafunc_fdf(const gsl_vector * x, void * p, gsl_vector* f, gsl_matrix * J)
-// {
-//   betafunc_f(x, p, f);
-//   betafunc_df(x, p, J);
+// function to find root of and derivative
+int betafunc_fdf(const gsl_vector * x, void * p, gsl_vector* f, gsl_matrix * J)
+{
+  betafunc_f(x, p, f);
+  betafunc_df(x, p, J);
 
-//   return GSL_SUCCESS;
-// }
+  return GSL_SUCCESS;
+}
 
 // find beta (and alpha and p^v_i) from forces of infection
 int betaffoiv(void *p, std::vector<double> &vars,
