@@ -228,6 +228,12 @@ void ParamContainer::ReadParams(po::variables_map const &vm) {
   }
 }
 
+/*! \brief Normalise habitat contributions
+   
+Normalises all habitat contributions to be 
+  
+\param[in] vm The map of command line parameters
+*/
 void HabitatContainer::Normalise()
 {
   double habitatSum = .0; //!< sum of all habitat contributions (for
