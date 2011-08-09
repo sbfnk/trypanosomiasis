@@ -81,7 +81,7 @@ public:
   //! Destructor
   ~HabitatContainer() {;}
 
-  void Normalise();
+  void NormaliseHabitats();
   void ReadTable(std::vector<std::string> const &data,
                  std::vector<std::string> const &header);
   void ReadParams(po::variables_map const &vm);
@@ -235,7 +235,7 @@ Normalises all habitat contributions to be
   
 \param[in] vm The map of command line parameters
 */
-void HabitatContainer::Normalise()
+void HabitatContainer::NormaliseHabitats()
 {
   double habitatSum = .0; //!< sum of all habitat contributions (for
                           //!normalisation) 
@@ -274,8 +274,6 @@ void HabitatContainer::ReadTable(std::vector<std::string> const &data,
       }
     }
   }
-
-  Normalise();
 }
 
 void HabitatContainer::ReadParams(po::variables_map const &vm) 
@@ -293,8 +291,6 @@ void HabitatContainer::ReadParams(po::variables_map const &vm)
       habitat[i].second.second = vm[name + "-X" + ss.str() + "_low"].as<double>();
     }
   }
-  
-  Normalise();
 }
 
 void GlobalParams::ReadParams(po::variables_map const &vm)
@@ -377,6 +373,13 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
     
   if (global->habType == "b" ||
       global->habType == "f") {
+    for (size_t j = 0; j < groups.size(); ++j) {
+      for (size_t k = 0; k < groups[j].members.size(); ++k) {
+        size_t i = groups[j].members[k];
+        hosts[i]->NormaliseHabitats();
+      }
+    }
+      
     std::vector<double> normaliseSum(hosts.size(), .0);
     for (size_t j = 0; j < groups.size(); ++j) {
       for (size_t m = j; m < groups.size(); ++m) {
@@ -391,33 +394,23 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
                   habitatOverlap[j][m] = 1;
                   habitatOverlap[m][j] = 1;
                 } else {
-                  double overlap =
-                    hosts[i]->habitat[o].first *
-                    hosts[l]->habitat[o].first;
-                  habitatOverlap[j][m] += overlap;
-                  habitatOverlap[m][j] += overlap;
+                  double diff =
+                    (hosts[i]->habitat[o].first -
+                     hosts[l]->habitat[o].first);
+                  habitatOverlap[j][m] += diff * hosts[i]->habitat[o].first /
+                    static_cast<double>(groups[j].members.size());
+                  habitatOverlap[m][j] += diff * hosts[i]->habitat[l].first /
+                    static_cast<double>(groups[m].members.size());
                 }
               }
             }
           }
         }
-        // normaliseSum[j] += habitatOverlap[j][m] * groups[m].f;
-        // normaliseSum[m] += habitatOverlap[m][j] * groups[j].f;
       }
     }
-    
-    // normalise
-    // for (size_t j = 0; j < groups.size(); ++j) {
-    //   for (size_t m = j; m < groups.size(); ++m) {
-    //     habitatOverlap[j][m] *= groups[j].f / normaliseSum[j];
-    //     habitatOverlap[m][j] *= groups[m].f / normaliseSum[m];
-    //   }
-    // }
   } else {
     for (size_t j = 0; j < groups.size(); ++j) {
       for (size_t m = j; m < groups.size(); ++m) {
-        // habitatOverlap[j][m] = groups[j].f;
-        // habitatOverlap[m][j] = groups[m].f;
         habitatOverlap[j][m] = 1;
         habitatOverlap[m][j] = 1;
       }
@@ -632,48 +625,91 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
   // }
 
   // for (size_t j = 0; j < params->groups.size(); ++j) {
-  // }
-  // for (size_t j = 0; j < params->groups.size(); ++j) {
-
-  //   double dgjda = .0;
-
   //   for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
   //     size_t i = params->groups[j].members[k];
-
-  //     double dfidbi = params->hosts[i]->f / params->hosts[i]->n.first *
-  //       pv[j];
+  //     double dfidbi = 0;
+  //     double dfidpvjv = 0;
+  //     for (size_t v = 0; v < params->vectors.size(); ++v) {
+  //       dfidbi -= params->vectors[v]->tau.first *
+  //         params->hosts[i]->f.first / params->groups[j].f /
+  //         params->hosts[i]->n.first * pv[j][v];
+  //       dfidpvjv = -bhost[i] * params->vectors[v]->tau.first *
+  //         params->hosts[i]->f.first / params->groups[j].f /
+  //         params->hosts[i]->n.first;
+  //       gsl_matrix_set(J, i, j + v * params->groups.size() +
+  //                      params->hosts.size() + params->vectors.size(),
+  //                      dfidpvjv);
+  //     }
   //     gsl_matrix_set(J, i, i, dfidbi);
-      
-  //     double dfidpj = bhost[i] * params->hosts[i]->f.first /
-  //       params->hosts[i]->n;
-  //     gsl_matrix_set(J, i, j + params->hosts.size(), dfidpj);
-
-  //     double dgjdbi = -alpha * params->hosts[i]->f *
-  //       params->hPrevalence[i] / params->groups[j].f;
-  //     gsl_matrix_set(J, j + params->hosts.size(), i, dgjdbi);
-
-  //     double dgjdpj = -(params->vectors[0]->mu + params->xi) /
-  //       pow(1-pv[j], 2);
-  //     gsl_matrix_set(J, j + params->hosts.size(), j + params->hosts.size(),
-  //                    dgjdpj);
-      
-  //     dgjda -= bhost[i] * params->hosts[i]->f * params->hPrevalence[i];
   //   }
-  //   dgjda /= params->groups[j].f;
-  //   gsl_matrix_set(J, j + params->hosts.size(), params->hosts.size() +
-  //                  params->groups.size(), dgjda);
+  // }
 
-  //   double dhdpj = params->groups[j].f;
-  //   gsl_matrix_set(J, params->hosts.size() + params->groups.size(),
-  //                  j + params->hosts.size(), dhdpj);
-  // }      
+  // for (size_t v = 0; v < params->vectors.size(); ++v) {
+  //   for (size_t j = 0; j < params->groups.size(); ++j) {
+  //     double enumerator = .0;
+  //     double denominator = .0;
+  //     for (size_t l = 0; l < params->groups.size(); ++l) {
+  //       enumerator += pv[l][v] * params->habitatOverlap[j][l] *
+  //         params->groups[l].f;
+  //       denominator += params->habitatOverlap[j][l] *
+  //         params->groups[l].f;
+  //     }
+  //     if (params->global->estimateXi) {
+  //       double dgjvdxiv = (pv[j][v] - enumerator/denominator) / (1 - pv[j][v]);
+  //       gsl_matrix_set(J, j + v * params->groups.size() + params->hosts.size(),
+  //                      v + params->hosts.size(),
+  //                      dgjvdxiv);
+  //     } else {
+  //       double dgjvdbv = 0;
+  //       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
+  //         size_t i = params->groups[j].members[k];
+  //         dgjvdbv -= params->vectors[v]->tau.first *
+  //           params->hosts[i]->f.first / params->groups[j].f *
+  //           params->hPrevalence[i];
+  //       }
+  //       gsl_matrix_set(J, j + v * params->groups.size() + params->hosts.size(),
+  //                      v + params->hosts.size(),
+  //                      dgjvdbv);
+  //     }
+  //     double dgjvdpvjv = 1 / pow(1-pv[j][v], 2) *
+  //       (params->vectors[v]->mu.first +
+  //        (xi[j] * (pv[j][v] - 1) * params->groups[j].f - enumerator) / denominator);
+  //     gsl_matrix_set(J, j + v * params->groups.size() + params->hosts.size(),
+  //                    j + v * params->groups.size() + params->hosts.size() +
+  //                    params->vectors.size(),
+  //                    dgjvdpvjv);
+  //     for (size_t l = 0; l < params->groups.size(); ++l) {
+  //       if (j != l) {
+  //         double dgjvdpvlv = -xi[v] / (1 - pv[j][v]) * params->habitatOverlap[j][l] /
+  //           denominator;
+  //         gsl_matrix_set(J, j + v * params->groups.size() + params->hosts.size(),
+  //                        l + v * params->groups.size() + params->hosts.size() +
+  //                        params->vectors.size(),
+  //                        dgjvdpvlv);
+  //       }
+  //     }
+  //   }
+  // }
 
-  // // for (size_t i = 0; i < params->hosts.size() + params->groups.size() + 1; ++i) {
-  // //   for (size_t j = 0; j < params->hosts.size() + params->groups.size() + 1; ++j) {
-  // //     std::cout << "J(" << i << "," << j << ") = " << gsl_matrix_get(J, i, j)
-  // //               << std::endl;
-  // //   }
-  // // }
+  // for (size_t v = 0; v < params->vectors.size(); ++v) {
+  //   for (size_t j = 0; j < params->groups.size(); ++j) {
+  //     double dhvdpjv = -params->groups[j].f;
+  //         gsl_matrix_set(J, j + v * params->groups.size() + params->hosts.size() +
+  //                        params->vectors.size(),
+  //                        j + v * params->groups.size() + params->hosts.size() +
+  //                        params->vectors.size(),
+  //                        dhvdpjv);
+  //   }
+  // }
+
+  // for (size_t i = 0; i < params->hosts.size() + params->vectors.size() +
+  //        params->groups.size()*params->vectors.size(); ++i) {
+  //   for (size_t j = 0; j < params->hosts.size() + params->vectors.size() +
+  //          params->groups.size()*params->vectors.size(); ++j) {
+  //     std::cout << "J(" << i << "," << j << ") = " << gsl_matrix_get(J, i, j)
+  //               << std::endl;
+  //   }
+  // }
   
   return GSL_SUCCESS;
 }
@@ -749,20 +785,18 @@ int betaffoiv(void *p, std::vector<double> &vars,
     params->hosts.size() + params->groups.size() * params->vectors.size() +
     params->vectors.size();
 
-  // beta + p_V + alpha
-  
-  // const gsl_multiroot_fdfsolver_type * Tdf;
-  // gsl_multiroot_fdfsolver * sdf;
-  // gsl_multiroot_function_fdf fdf;
-  // if (jac) {
-  //   Tdf = gsl_multiroot_fdfsolver_hybridsj;
-  //   sdf = gsl_multiroot_fdfsolver_alloc (Tdf, nvars);
-  //   fdf.f = &betafunc_f;
-  //   fdf.df = &betafunc_df;
-  //   fdf.fdf = &betafunc_fdf;
-  //   fdf.n = nvars;
-  //   fdf.params = p;
-  // }
+  const gsl_multiroot_fdfsolver_type * Tdf;
+  gsl_multiroot_fdfsolver * sdf;
+  gsl_multiroot_function_fdf fdf;
+  if (jac) {
+    Tdf = gsl_multiroot_fdfsolver_hybridsj;
+    sdf = gsl_multiroot_fdfsolver_alloc (Tdf, nvars);
+    fdf.f = &betafunc_f;
+    fdf.df = &betafunc_df;
+    fdf.fdf = &betafunc_fdf;
+    fdf.n = nvars;
+    fdf.params = p;
+  }
 
   const gsl_multiroot_fsolver_type * T =
     gsl_multiroot_fsolver_hybrids;
@@ -792,49 +826,50 @@ int betaffoiv(void *p, std::vector<double> &vars,
     for (size_t j = 0; j < params->groups.size(); ++j) {
       gsl_vector_set(x_init, j + v * params->groups.size() +
                      params->hosts.size() + params->vectors.size(),
-                     params->vPrevalence[v]);
+                     0.1);
+                     // params->vPrevalence[v]);
     }
   }
 
-  // if (jac) {
-  //   gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
-  // }
+  if (jac) {
+    gsl_multiroot_fdfsolver_set(sdf, &fdf, x_init);
+  }
   gsl_multiroot_fsolver_set(s, &f, x_init);
 
   size_t iter = 0;
   if (verbose > 0) {
-    // if (jac) {
-    //   print_state (iter, sdf, nvars);
-    // } else {
+    if (jac) {
+      print_state (iter, sdf, nvars);
+    } else {
       print_state (iter, s, nvars);
-    // }
+    }
   }
 
   int status;
   do {
     iter++;
-    // if (jac) {
-    //   status = gsl_multiroot_fdfsolver_iterate (sdf);
-    // } else {
+    if (jac) {
+      status = gsl_multiroot_fdfsolver_iterate (sdf);
+    } else {
       status = gsl_multiroot_fsolver_iterate (s);
-    // }
+    }
 
     if (verbose > 0) {
-      // if (jac) {
-      //   print_state (iter, sdf, nvars);
-      // } else {
+      if (jac) {
+        print_state (iter, sdf, nvars);
+      } else {
         print_state (iter, s, nvars);
-      // }
+      }
     }
 
     if (status)
       break;
 
-    // if (jac) {
-    //   status = gsl_multiroot_test_residual (sdf->f, 1e-7);
-    // } else {
+    if (jac) {
+      status = gsl_multiroot_test_residual (sdf->f, 1e-7);
+    } else {
       status = gsl_multiroot_test_residual (s->f, 1e-7);
-    // }
+    }
   } while (status == GSL_CONTINUE); // && iter < 10000);
 
   if (verbose > 0) {
@@ -844,11 +879,11 @@ int betaffoiv(void *p, std::vector<double> &vars,
   vars.resize(nvars);
   gsl_vector* sol;
 
-  // if (jac) {
-  //   sol = sdf->x;
-  // } else {
+  if (jac) {
+    sol = sdf->x;
+  } else {
     sol = s->x;
-  // }
+  }
 
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     vars[i] = gsl_vector_get(sol, i);
@@ -866,9 +901,9 @@ int betaffoiv(void *p, std::vector<double> &vars,
     }
   }
   
-  // if (jac) {
-  //   gsl_multiroot_fdfsolver_free (sdf);
-  // }
+  if (jac) {
+    gsl_multiroot_fdfsolver_free (sdf);
+  }
   gsl_multiroot_fsolver_free (s);
   gsl_vector_free (x_init);
 
