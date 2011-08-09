@@ -462,12 +462,16 @@ int main(int argc, char* argv[])
     arma::mat S;
     arma::mat T;
 
-    K.set_size(hosts.size() + groups.size() * vectors.size(),
-               hosts.size() + groups.size() * vectors.size());
-    S.set_size(hosts.size() + groups.size() * vectors.size(),
-               hosts.size() + groups.size() * vectors.size());
-    T.set_size(hosts.size() + groups.size() * vectors.size(),
-               hosts.size() + groups.size() * vectors.size());
+    size_t matrixSize = hosts.size() + groups.size() * vectors.size();
+    for (size_t v = 0; v < vectors.size(); ++v) {
+      if (vectors[v]->alpha.first > 0) {
+        ++matrixSize;
+      }
+    }
+    
+    K.set_size(matrixSize, matrixSize);
+    S.set_size(matrixSize, matrixSize);
+    T.set_size(matrixSize, matrixSize);
 
     std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
 
@@ -504,48 +508,79 @@ int main(int argc, char* argv[])
         // compose NGM
         S.zeros();
         T.zeros();
-          
+
+        size_t matrixCounter = 0;
         for (size_t v = 0; v < vectors.size(); ++v) {
+          size_t vectorStart = matrixCounter;
           for (size_t j = 0; j < groups.size(); ++j) {
             double denominator = .0;
             for (size_t l = 0; l < groups.size(); ++l) {
               denominator += p.habitatOverlap[j][l] *
                 groups[l].f;
             }
-            S(v*groups.size()+j,v*groups.size()+j) =
-              S(v*groups.size()+j,v*groups.size()+j) + vectors[v]->mu.first + xi[v];
+            S(matrixCounter, matrixCounter) =
+              S(matrixCounter, matrixCounter) -
+              vectors[v]->mu.first - xi[v];
+            if (vectors[v]->alpha.first > 0) {
+              S(matrixCounter, matrixCounter) =
+                S(matrixCounter, matrixCounter) -
+                vectors[v]->alpha.first;
+              S(matrixCounter + 1, matrixCounter) =
+                S(matrixCounter + 1, matrixCounter) +
+                vectors[v]->alpha.first;
+              S(matrixCounter + 1, matrixCounter + 1) =
+                S(matrixCounter + 1, matrixCounter + 1) -
+                vectors[v]->mu.first - xi[v];
+            }
+            size_t matrixCounter2 = vectorStart;
             for (size_t k = 0; k < groups.size(); ++k) {
-              S(v*groups.size()+j,v*groups.size()+k) =
-                S(v*groups.size()+j,v*groups.size()+k) - xi[v] * groups[j].f *
+              S(matrixCounter,matrixCounter2) =
+                S(matrixCounter,matrixCounter2) +
+                xi[v] * groups[j].f *
                 p.habitatOverlap[j][k] / denominator;
+              if (vectors[v]->alpha.first > 0) {
+                S(matrixCounter + 1, matrixCounter2 + 1) =
+                  S(matrixCounter + 1, matrixCounter2 + 1) +
+                  xi[v] * groups[j].f *
+                  p.habitatOverlap[j][k] / denominator;
+                ++matrixCounter2;
+              }
+              ++matrixCounter2;
             }
             for (size_t k = 0; k < groups[j].members.size(); ++k) {
               size_t i = groups[j].members[k];
-              T(v*groups.size() + j,i + vectors.size() * groups.size()) =
+              T(matrixCounter, matrixSize - hosts.size() + i) =
                 bvector[v] * vectors[v]->tau.first * hosts[i]->f.first /
                 hosts[i]->n.first;
-              T(i + vectors.size() * groups.size(),v*groups.size() + j) =
-                bhost[i] * vectors[v]->tau.first * hosts[i]->f.first /
+            }
+            if (vectors[v]->alpha.first > 0) {
+              ++matrixCounter;
+            }
+            for (size_t k = 0; k < groups[j].members.size(); ++k) {
+              size_t i = groups[j].members[k];
+              T(matrixSize - hosts.size() + i, matrixCounter) =
+                bhost[i] * vectors[v]->tau.first * pow(hosts[i]->f.first, 2) /
                 groups[j].f;
             }
+            ++matrixCounter;
           }
         }
         for (size_t i = 0; i < hosts.size(); ++i) {
-          S(i + vectors.size() * groups.size(),
-            i + vectors.size() * groups.size()) =
-            S(i + vectors.size() * groups.size(),
-              i + vectors.size() * groups.size()) +
-            hosts[i]->gamma.first + hosts[i]->mu.first;
+          S(matrixSize - hosts.size() + i,
+            matrixSize - hosts.size() + i) =
+            S(matrixSize - hosts.size() + i,
+              matrixSize - hosts.size() + i) -
+            hosts[i]->gamma.first - hosts[i]->mu.first;
         }
 
         if (verbose >= 2) {
           T.print("T:");
           S.print("S:");
-          arma::mat I = inv(S);
+          arma::mat I = -inv(S);
           I.print("inv(S):");
         }
 
-        K = T * inv(S);
+        K = - T * inv(S);
 
         if (verbose) {
           K.print("K:");

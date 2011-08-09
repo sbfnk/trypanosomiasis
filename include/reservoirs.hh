@@ -526,10 +526,9 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
         std::cout << v << ": " << params->vPrevalence[v] << std::endl;
         size_t i = params->groups[j].members[k];
-        yh[i] -= bhost[i] * params->vectors[v]->tau.first * params->hosts[i]->f.first /
-          params->hosts[i]->n.first / params->groups[j].f;
+        double i_av;
         if (params->vectors[v]->alpha.first > 0) {
-          yh[i] *= params->vectors[v]->alpha.first /
+          i_av = params->vectors[v]->alpha.first /
             (params->vectors[v]->alpha.first + params->hosts[i]->mu.first) *
             ((params->vectors[v]->alpha.first + params->hosts[i]->mu.first) /
              (params->vectors[v]->alpha.first + params->hosts[i]->mu.first + xi[v]) *
@@ -538,10 +537,14 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
              (params->vectors[v]->alpha.first + params->hosts[i]->mu.first + xi[v]) *
              params->vPrevalence[v]);
         } else {
-          yh[i] *= pv[j][v];
+          i_av = pv[j][v];
         }
+        yh[i] -= bhost[i] * params->vectors[v]->tau.first *
+          params->hosts[i]->f.first / params->hosts[i]->n.first * i_av;//  /
+          // params->groups[j].f;
         double contrib = bvector[v] * params->vectors[v]->tau.first *
-          params->hosts[i]->f.first * params->hPrevalence[i] / params->groups[j].f;
+          params->hosts[i]->f.first * params->hPrevalence[i] /
+          params->groups[j].f;
         std::cout << "c " << i << " " << contrib << std::endl;
         yv[j][v] -= contrib;
         // yv[j][v] -= bvector[v] * params->vectors[v]->tau.first *
