@@ -185,13 +185,10 @@ void ParamContainer::ReadTable(std::vector<std::string> const &data,
         if ((header[i] == it->option)) {
           std::istringstream s(data[i]);
           s >> it->param->first;
-        } else if (header[i].substr(0, it->option.length() + 1) ==
-                   (it->option + "_low")) {
+        } else if (header[i] == (it->option + "_low")) {
           std::istringstream s(data[i]);
-
           s >> it->param->second.first;
-        } else if (header[i].substr(0, it->option.length() + 1) ==
-                   (it->option + "_high")) {
+        } else if (header[i] == (it->option + "_high")) {
           std::istringstream s(data[i]);
           s >> it->param->second.second;
         }
