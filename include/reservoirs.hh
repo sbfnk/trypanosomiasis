@@ -15,7 +15,7 @@
 #include <gsl/gsl_multiroots.h>
 #include <gsl/gsl_linalg.h>
 
-typedef typename std::pair<double, std::pair<double, double> > Parameter;
+typedef std::pair<double, std::pair<double, double> > Parameter;
 
 namespace po = boost::program_options;
 
