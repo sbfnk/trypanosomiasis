@@ -509,7 +509,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     }
     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
       size_t i = params->groups[j].members[k];
-      yh[i] = params->hPrevalence[i] / (1 - params->hPrevalence[i]) *
+       yh[i] = params->hPrevalence[i] / (1 - params->hPrevalence[i]) *
         (params->hosts[i]->mu.first + params->hosts[i]->gamma.first);
     }
   }
@@ -522,32 +522,28 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
         double i_av;
         if (params->vectors[v]->alpha.first > 0) {
           i_av = params->vectors[v]->alpha.first /
-            (params->vectors[v]->alpha.first + params->hosts[i]->mu.first) *
-            ((params->vectors[v]->alpha.first + params->hosts[i]->mu.first) /
-             (params->vectors[v]->alpha.first + params->hosts[i]->mu.first + xi[v]) *
+            (params->vectors[v]->alpha.first + params->vectors[v]->mu.first) *
+            ((params->vectors[v]->alpha.first + params->vectors[v]->mu.first) /
+             (params->vectors[v]->alpha.first + params->vectors[v]->mu.first + xi[v]) *
              pv[j][v] +
              xi[v] /
-             (params->vectors[v]->alpha.first + params->hosts[i]->mu.first + xi[v]) *
+             (params->vectors[v]->alpha.first + params->vectors[v]->mu.first + xi[v]) *
              params->vPrevalence[v]);
         } else {
           i_av = pv[j][v];
         }
         yh[i] -= bhost[i] * params->vectors[v]->tau.first *
-          params->hosts[i]->f.first / params->hosts[i]->n.first * i_av;//  /
-          // params->groups[j].f;
-        double contrib = bvector[v] * params->vectors[v]->tau.first *
+          params->hosts[i]->f.first / params->hosts[i]->n.first * i_av;
+        yv[j][v] -= bvector[v] * params->vectors[v]->tau.first *
           params->hosts[i]->f.first * params->hPrevalence[i] /
           params->groups[j].f;
-        std::cout << "c " << i << " " << contrib << std::endl;
-        yv[j][v] -= contrib;
-        // yv[j][v] -= bvector[v] * params->vectors[v]->tau.first *
-        //   params->hosts[i]->f.first * params->hPrevalence[i] / params->groups[j].f;
         std::cout << k << " " << i << " " << j << " " << params->vectors[v]->tau.first
                   << " " << params->groups[j].f << " " << bvector[v]
                   << " " << bhost[i] << " " << params->hosts[i]->f.first
                   << " " << params->hPrevalence[i] << " " << pv[j][v]
                   << " " << params->vectors[v]->mu.first << " "
-                  << xi[v] << " " << yv[j][v] << std::endl;
+                  << xi[v] << " " << yv[j][v] << " " << yh[i]
+                  << " " << i_av << std::endl;
       }
     }
   }
