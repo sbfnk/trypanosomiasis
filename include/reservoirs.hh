@@ -24,6 +24,16 @@ class ParamContainer
 {
 public:
 
+  struct ParamInfo {
+    ParamInfo(std::string o, std::string d, Parameter* p) :
+      option(o), description(d), param(p) 
+    {;}
+    
+    std::string option;
+    std::string description;
+    Parameter* param;
+  };
+
   /*! \brief Constructor.
     
   This is where classes derived from Model define the parameters and command
@@ -47,17 +57,12 @@ public:
   //! Accessor for name
   const std::string getName() const
   { return name; }
+  
+  //! Accessor for params
+  const std::vector<ParamInfo>& getParams() const
+  { return params; }
 
 protected:
-  struct ParamInfo {
-    ParamInfo(std::string o, std::string d, Parameter* p) :
-      option(o), description(d), param(p) 
-    {;}
-    
-    std::string option;
-    std::string description;
-    Parameter* param;
-  };
     
   /*! \brief Parameters
     

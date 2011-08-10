@@ -368,15 +368,20 @@ int main(int argc, char* argv[])
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j]->getName() << "_prev\"";
       if (lhsSamples > 0) {
-        out << ",\"" << hosts[j]->getName() << "_abundance\"";
         out << ",\"" << hosts[j]->getName() << "_mu\"";
         out << ",\"" << hosts[j]->getName() << "_gamma\"";
+        out << ",\"" << hosts[j]->getName() << "_f\"";
+        out << ",\"" << hosts[j]->getName() << "_n\"";
       }
       out << ",\"" << hosts[j]->getName() << "_b\"";
     }
     for (size_t j = 0; j < vectors.size(); ++j) {
       out << ",\"" << vectors[j]->getName() << "_prev\"";
+      out << ",\"" << vectors[j]->getName() << "_mu\"";
+      out << ",\"" << vectors[j]->getName() << "_tau\"";
       out << ",\"" << vectors[j]->getName() << "_b\"";
+      out << ",\"" << vectors[j]->getName() << "_xi\"";
+      out << ",\"" << vectors[j]->getName() << "_alpha\"";
     }
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j]->getName() << "\"";
@@ -411,7 +416,9 @@ int main(int argc, char* argv[])
            hosts[j]->gamma.second.first) *
           x[i % lhsSamples * hosts.size() * 3 + j + 2] /
           static_cast<double>(lhsSamples);
+        // deal with f
       }
+      // deal with vector
     }
 
     if (samples > 0) {
@@ -750,15 +757,20 @@ int main(int argc, char* argv[])
     for (size_t j = 0; j < hosts.size(); ++j) {
       outLine << "," << p.hPrevalence[j];
       if (lhsSamples > 0) {
-        outLine << "," << hosts[j]->n.first;
         outLine << "," << hosts[j]->mu.first;
         outLine << "," << hosts[j]->gamma.first;
+        outLine << "," << hosts[j]->f.first;
+        outLine << "," << hosts[j]->n.first;
       }
       outLine << "," << vars[j];
     }
     for (size_t j = 0; j < vectors.size(); ++j) {
       outLine << "," << p.vPrevalence[j];
-      outLine << "," << vars[j + hosts.size() + vectors.size() * groups.size()];
+      outLine << "," << vectors[j]->mu.first;
+      outLine << "," << vectors[j]->tau.first;
+      outLine << "," << vectors[j]->b.first;
+      outLine << "," << vectors[j]->xi.first;
+      outLine << "," << vectors[j]->alpha.first;
     }
 
     if (status == GSL_SUCCESS) {
