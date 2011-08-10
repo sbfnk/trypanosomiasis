@@ -603,7 +603,7 @@ int main(int argc, char* argv[])
         P.copy_size(K);
         KP.copy_size(K);
         P.zeros();
-        for (size_t i = 0; i < vectors.size() * groups.size(); ++i) {
+        for (size_t i = 0; i < matrixSize - hosts.size(); ++i) {
           P(i,i) = 1;
         }
         arma::mat tempP;
@@ -611,8 +611,8 @@ int main(int argc, char* argv[])
 
         for (size_t i = 0; i < hosts.size(); ++i) {
           tempP = P;
-          tempP(i + vectors.size() * groups.size(),
-                i + vectors.size() * groups.size()) = 1;
+          tempP(i + matrixSize - hosts.size(),
+                i + matrixSize - hosts.size()) = 1;
           KP = tempP * K;
           if (verbose >= 2) {
             std::stringstream s;
@@ -626,8 +626,8 @@ int main(int argc, char* argv[])
 
         tempP = P;
         for (size_t i = 1; i < 4; ++i) {
-          tempP(i + vectors.size() * groups.size(),
-                i + vectors.size() * groups.size()) = 1;
+          tempP(i + matrixSize - hosts.size(),
+                i + matrixSize - hosts.size()) = 1;
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
@@ -636,8 +636,8 @@ int main(int argc, char* argv[])
       
         tempP = P;
         for (size_t i = 1; i < 12; ++i) {
-          tempP(i + vectors.size() * groups.size(),
-                i + vectors.size() * groups.size()) = 1;
+          tempP(i + matrixSize - hosts.size(),
+                i + matrixSize - hosts.size()) = 1;
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);
@@ -646,8 +646,8 @@ int main(int argc, char* argv[])
       
         tempP = P;
         for (size_t i = 4; i < 12; ++i) {
-          tempP(i + vectors.size() * groups.size(),
-                i + vectors.size() * groups.size()) = 1;
+          tempP(i + matrixSize - hosts.size(),
+                i + matrixSize - hosts.size()) = 1;
         }
         KP = tempP * K;
         arma::eig_gen(eigval, eigvec, KP);

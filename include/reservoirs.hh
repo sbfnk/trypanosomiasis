@@ -463,21 +463,21 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
 
   for (size_t i = 0; i < params->hosts.size(); ++i) {
     bhost[i] = gsl_vector_get(x, i);
-    std::cout << "bhost[" << i << "]: " << bhost[i] << std::endl;
+    // std::cout << "bhost[" << i << "]: " << bhost[i] << std::endl;
   }
   if (params->global->estimateXi) {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
       bvector[v] = params->vectors[v]->b.first;
       xi[v] = gsl_vector_get(x, v + params->hosts.size());
-      std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
-      std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
+      // std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
+      // std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
     }
   } else {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
       bvector[v] = gsl_vector_get(x, v + params->hosts.size());
       xi[v] = params->vectors[v]->xi.first;
-      std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
-      std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
+      // std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
+      // std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
     }
   }
   for (size_t v = 0; v < params->vectors.size(); ++v) {
@@ -485,7 +485,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       pv[j][v] =
         gsl_vector_get(x, j + v * params->groups.size() +
                        params->hosts.size() + params->vectors.size());
-      std::cout << "pv[" << j << "," << v << "]: " << pv[j][v] << std::endl;
+      // std::cout << "pv[" << j << "," << v << "]: " << pv[j][v] << std::endl;
     }
   }
 
@@ -505,7 +505,6 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
                     (pv[j][v] - params->vPrevalence[v])) /
           (1 - pv[j][v]);
       }
-      std::cout << "yv[" << j << "][" << v << "] = " << yv[j][v] << std::endl;
     }
     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
       size_t i = params->groups[j].members[k];
@@ -517,7 +516,6 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
   for (size_t v = 0; v < params->vectors.size(); ++v) {
     for (size_t j = 0; j < params->groups.size(); ++j) {
       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
-        std::cout << v << ": " << params->vPrevalence[v] << std::endl;
         size_t i = params->groups[j].members[k];
         double i_av;
         if (params->vectors[v]->alpha.first > 0) {
@@ -537,13 +535,13 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
         yv[j][v] -= bvector[v] * params->vectors[v]->tau.first *
           params->hosts[i]->f.first * params->hPrevalence[i] /
           params->groups[j].f;
-        std::cout << k << " " << i << " " << j << " " << params->vectors[v]->tau.first
-                  << " " << params->groups[j].f << " " << bvector[v]
-                  << " " << bhost[i] << " " << params->hosts[i]->f.first
-                  << " " << params->hPrevalence[i] << " " << pv[j][v]
-                  << " " << params->vectors[v]->mu.first << " "
-                  << xi[v] << " " << yv[j][v] << " " << yh[i]
-                  << " " << i_av << std::endl;
+        // std::cout << k << " " << i << " " << j << " " << params->vectors[v]->tau.first
+        //           << " " << params->groups[j].f << " " << bvector[v]
+        //           << " " << bhost[i] << " " << params->hosts[i]->f.first
+        //           << " " << params->hPrevalence[i] << " " << pv[j][v]
+        //           << " " << params->vectors[v]->mu.first << " "
+        //           << xi[v] << " " << yv[j][v] << " " << yh[i]
+        //           << " " << i_av << std::endl;
       }
     }
   }
@@ -553,19 +551,19 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
         size_t i = params->groups[j].members[k];
         gsl_vector_set(f, i, yh[i]);
-        std::cout << "yh[" << i << "]: " << yh[i] << std::endl;
+        // std::cout << "yh[" << i << "]: " << yh[i] << std::endl;
       }
       gsl_vector_set(f, j + v * params->groups.size() +
                      params->hosts.size(), yv[j][v]);
-      std::cout << "yv[" << j << "," << v << "]: " << yv[j][v] << std::endl;
+      // std::cout << "yv[" << j << "," << v << "]: " << yv[j][v] << std::endl;
       weightedVectorPrevSum[v] += pv[j][v] * params->groups[j].f;
     }
     gsl_vector_set(f, params->hosts.size() +
                    params->groups.size() * params->vectors.size() + v,
                    params->vPrevalence[v] - weightedVectorPrevSum[v]);
-    std::cout << "y[" << v << "]: "
-              << (params->vPrevalence[v] - weightedVectorPrevSum[v])
-              << std::endl;
+    // std::cout << "y[" << v << "]: "
+    //           << (params->vPrevalence[v] - weightedVectorPrevSum[v])
+    //           << std::endl;
   }
 
     
