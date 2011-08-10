@@ -27,7 +27,7 @@ public:
   struct ParamInfo {
     ParamInfo(std::string o, std::string d, Parameter* p) :
       option(o), description(d), param(p) 
-    {;}
+    { param->first = 0; param->second.first = -1; param->second.second = -1;}
     
     std::string option;
     std::string description;
@@ -100,7 +100,7 @@ class Host :
 {
 public:
   Host();
-  Parameter M, N, mu, gamma, f, n;
+  Parameter M, N, mu, gamma, b, f, n;
 };
 
 /*! Class for vector species and its data/parameters */
@@ -324,6 +324,7 @@ Host::Host() :
   params.push_back(ParamInfo("M", "Number infected", &M));
   params.push_back(ParamInfo("mu", "Mortality rate", &mu));
   params.push_back(ParamInfo("gamma", "Recovery rate", &gamma));
+  params.push_back(ParamInfo("b", "Susceptibility", &b));
   params.push_back(ParamInfo("n", "Abundance", &n));
   params.push_back(ParamInfo("f", "Biting preference", &f));
 }

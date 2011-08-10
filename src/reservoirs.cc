@@ -368,20 +368,20 @@ int main(int argc, char* argv[])
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j]->getName() << "_prev\"";
       if (lhsSamples > 0) {
-        out << ",\"" << hosts[j]->getName() << "_mu\"";
-        out << ",\"" << hosts[j]->getName() << "_gamma\"";
-        out << ",\"" << hosts[j]->getName() << "_f\"";
-        out << ",\"" << hosts[j]->getName() << "_n\"";
+        for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
+          out << ",\"" << hosts[j]->getName() << "_"
+              << hosts[j]->getParams()[k].option << "\"";
+        }
       }
-      out << ",\"" << hosts[j]->getName() << "_b\"";
     }
     for (size_t j = 0; j < vectors.size(); ++j) {
       out << ",\"" << vectors[j]->getName() << "_prev\"";
-      out << ",\"" << vectors[j]->getName() << "_mu\"";
-      out << ",\"" << vectors[j]->getName() << "_tau\"";
-      out << ",\"" << vectors[j]->getName() << "_b\"";
-      out << ",\"" << vectors[j]->getName() << "_xi\"";
-      out << ",\"" << vectors[j]->getName() << "_alpha\"";
+      if (lhsSamples > 0) {
+        for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
+          out << ",\"" << vectors[j]->getName() << "_"
+              << vectors[j]->getParams()[k].option << "\"";
+        }
+      }
     }
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j]->getName() << "\"";
@@ -393,32 +393,60 @@ int main(int argc, char* argv[])
   size_t i = 0;
   do {
 
+    size_t nParams = 0;
+    for (size_t j = 0; j < hosts.size(); ++j) {
+      for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
+        if (hosts[j]->getParams()[k].param->second.first >= 0 &&
+            hosts[j]->getParams()[k].param->second.second >= 0) {
+          ++nParams;
+        }
+      }
+    }
+    for (size_t j = 0; j < vectors.size(); ++j) {
+      for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
+        if (vectors[j]->getParams()[k].param->second.first >= 0 &&
+            vectors[j]->getParams()[k].param->second.second >= 0) {
+          ++nParams;
+        }
+      }
+    }
+    
     if (lhsSamples > 0) {
       if (i % lhsSamples == 0) {
         // generate latin hypercube samples
-        x = (int*) malloc (3 * hosts.size() * lhsSamples * sizeof(int));
-        ihs(3*hosts.size(), lhsSamples, 5, &seed, x);
+        x = (int*) malloc (nParams * lhsSamples * sizeof(int));
+        ihs(nParams, lhsSamples, 5, &seed, x);
       }
       
+      size_t sample = 0;
       for (size_t j = 0; j < hosts.size(); ++j) {
-        hosts[j]->n.first = hosts[j]->n.second.first +
-          (hosts[j]->n.second.second -
-           hosts[j]->n.second.first) *
-          x[i % lhsSamples * hosts.size() * 3 + j] /
-          static_cast<double>(lhsSamples);
-        hosts[j]->mu.first = hosts[j]->mu.second.first +
-          (hosts[j]->mu.second.second -
-           hosts[j]->mu.second.first) *
-          x[i % lhsSamples * hosts.size() * 3 + j + 1] /
-          static_cast<double>(lhsSamples);
-        hosts[j]->gamma.first = hosts[j]->gamma.second.first +
-          (hosts[j]->gamma.second.second -
-           hosts[j]->gamma.second.first) *
-          x[i % lhsSamples * hosts.size() * 3 + j + 2] /
-          static_cast<double>(lhsSamples);
-        // deal with f
+        for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
+          if (hosts[j]->getParams()[k].param->second.first >= 0 &&
+              hosts[j]->getParams()[k].param->second.second >= 0) {
+            hosts[j]->getParams()[k].param->first =
+              hosts[j]->getParams()[k].param->second.first +
+              (hosts[j]->getParams()[k].param->second.second -
+               hosts[j]->getParams()[k].param->second.first) *
+              x[sample] /
+              static_cast<double>(lhsSamples);
+            ++sample;
+          }
+        }
       }
-      // deal with vector
+      for (size_t j = 0; j < vectors.size(); ++j) {
+        for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
+          if (vectors[j]->getParams()[k].param->second.first >= 0 &&
+              vectors[j]->getParams()[k].param->second.second >= 0) {
+            vectors[j]->getParams()[k].param->first =
+              vectors[j]->getParams()[k].param->second.first +
+              (vectors[j]->getParams()[k].param->second.second -
+               vectors[j]->getParams()[k].param->second.first) *
+              x[sample] /
+              static_cast<double>(lhsSamples);
+            ++sample;
+          }
+        }
+      }
     }
 
     if (samples > 0) {
@@ -481,7 +509,7 @@ int main(int argc, char* argv[])
     T.set_size(matrixSize, matrixSize);
 
     std::vector<double> vars; // beta^*, p^v_i and alpha, the variables
-
+  
     if (calcBetas) { // estimate betas
 
       // find betas, p^v_is and alpha
@@ -493,22 +521,16 @@ int main(int argc, char* argv[])
 
       if (status == GSL_SUCCESS) {
 
-        double bhost[hosts.size()];
-        double bvector[vectors.size()];
-        double xi[vectors.size()];
-
         for (size_t i = 0; i < hosts.size(); ++i) {
-          bhost[i] = vars[i];
+          hosts[i]->b.first = vars[i];
         }
         if (global->estimateXi) {
           for (size_t v = 0; v < vectors.size(); ++v) {
-            bvector[v] = vectors[v]->b.first;
-            xi[v] = vars[v + hosts.size()];
+            vectors[v]->xi.first = vars[v + hosts.size()];
           }
         } else {
           for (size_t v = 0; v < vectors.size(); ++v) {
-            bvector[v] = vars[v + hosts.size()];
-            xi[v] = vectors[v]->xi.first;
+            vectors[v]->b.first = vars[v + hosts.size()];
           }
         }
 
@@ -527,7 +549,7 @@ int main(int argc, char* argv[])
             }
             S(matrixCounter, matrixCounter) =
               S(matrixCounter, matrixCounter) -
-              vectors[v]->mu.first - xi[v];
+              vectors[v]->mu.first - vectors[v]->xi.first;
             if (vectors[v]->alpha.first > 0) {
               S(matrixCounter, matrixCounter) =
                 S(matrixCounter, matrixCounter) -
@@ -537,18 +559,18 @@ int main(int argc, char* argv[])
                 vectors[v]->alpha.first;
               S(matrixCounter + 1, matrixCounter + 1) =
                 S(matrixCounter + 1, matrixCounter + 1) -
-                vectors[v]->mu.first - xi[v];
+                vectors[v]->mu.first - vectors[v]->xi.first;
             }
             size_t matrixCounter2 = vectorStart;
             for (size_t k = 0; k < groups.size(); ++k) {
               S(matrixCounter,matrixCounter2) =
                 S(matrixCounter,matrixCounter2) +
-                xi[v] * groups[j].f *
+                vectors[v]->xi.first * groups[j].f *
                 p.habitatOverlap[j][k] / denominator;
               if (vectors[v]->alpha.first > 0) {
                 S(matrixCounter + 1, matrixCounter2 + 1) =
                   S(matrixCounter + 1, matrixCounter2 + 1) +
-                  xi[v] * groups[j].f *
+                  vectors[v]->xi.first * groups[j].f *
                   p.habitatOverlap[j][k] / denominator;
                 ++matrixCounter2;
               }
@@ -557,7 +579,7 @@ int main(int argc, char* argv[])
             for (size_t k = 0; k < groups[j].members.size(); ++k) {
               size_t i = groups[j].members[k];
               T(matrixCounter, matrixSize - hosts.size() + i) =
-                bvector[v] * vectors[v]->tau.first * hosts[i]->f.first /
+                vectors[v]->b.first * vectors[v]->tau.first * hosts[i]->f.first /
                 hosts[i]->n.first;
             }
             if (vectors[v]->alpha.first > 0) {
@@ -566,7 +588,7 @@ int main(int argc, char* argv[])
             for (size_t k = 0; k < groups[j].members.size(); ++k) {
               size_t i = groups[j].members[k];
               T(matrixSize - hosts.size() + i, matrixCounter) =
-                bhost[i] * vectors[v]->tau.first * hosts[i]->f.first /
+                hosts[i]->b.first * vectors[v]->tau.first * hosts[i]->f.first /
                 groups[j].f;
             }
             ++matrixCounter;
@@ -662,7 +684,7 @@ int main(int argc, char* argv[])
         wildlife = arma::max(colwild);
       } else {
         std::cerr << "ERROR: Could not find solution" << std::endl;
-      } 
+      }
     } else {
 
       std::vector<double> hostContrib;
@@ -729,7 +751,7 @@ int main(int argc, char* argv[])
       domwild = sqrt(domwild);
       wildlife = sqrt(wildlife);
     }
-
+  
     // output
 
     if (verbose) {
@@ -757,22 +779,21 @@ int main(int argc, char* argv[])
     for (size_t j = 0; j < hosts.size(); ++j) {
       outLine << "," << p.hPrevalence[j];
       if (lhsSamples > 0) {
-        outLine << "," << hosts[j]->mu.first;
-        outLine << "," << hosts[j]->gamma.first;
-        outLine << "," << hosts[j]->f.first;
-        outLine << "," << hosts[j]->n.first;
+        for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
+          outLine << "," << hosts[j]->getParams()[k].param->first;
+        }
       }
-      outLine << "," << vars[j];
     }
+    
     for (size_t j = 0; j < vectors.size(); ++j) {
       outLine << "," << p.vPrevalence[j];
-      outLine << "," << vectors[j]->mu.first;
-      outLine << "," << vectors[j]->tau.first;
-      outLine << "," << vectors[j]->b.first;
-      outLine << "," << vectors[j]->xi.first;
-      outLine << "," << vectors[j]->alpha.first;
+      if (lhsSamples > 0) {
+        for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
+          outLine << "," << vectors[j]->getParams()[k].param->first;
+        }
+      }
     }
-
+    
     if (status == GSL_SUCCESS) {
       if (vm.count("print")) {
         std::cout << "\nNGM contributions:" << std::endl;
