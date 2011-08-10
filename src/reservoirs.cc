@@ -465,7 +465,7 @@ int main(int argc, char* argv[])
     size_t matrixSize = hosts.size() + groups.size() * vectors.size();
     for (size_t v = 0; v < vectors.size(); ++v) {
       if (vectors[v]->alpha.first > 0) {
-        ++matrixSize;
+        matrixSize += groups.size();
       }
     }
     
@@ -559,7 +559,7 @@ int main(int argc, char* argv[])
             for (size_t k = 0; k < groups[j].members.size(); ++k) {
               size_t i = groups[j].members[k];
               T(matrixSize - hosts.size() + i, matrixCounter) =
-                bhost[i] * vectors[v]->tau.first * pow(hosts[i]->f.first, 2) /
+                bhost[i] * vectors[v]->tau.first * hosts[i]->f.first /
                 groups[j].f;
             }
             ++matrixCounter;
