@@ -576,7 +576,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
 // function to find root of (derivative)
 int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
 {
-  betafunc_params* params = ((struct betafunc_params*) p);
+  // betafunc_params* params = ((struct betafunc_params*) p);
 
   // std::vector<double> bhost(params->hosts.size(), .0);
   // std::vector<double> bvector(params->vectors.size(), .0);
