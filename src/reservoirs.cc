@@ -53,12 +53,8 @@ int main(int argc, char* argv[])
 
   std::vector<Group> groups; //!< composition of groups
 
-  std::string firstColumn = "0"; //!< entry of first column in data output --
-                                 //!this can be controlled as a command line
-                                 //!parameter if samples = 0 (only one line of
-                                 //!data output)
-  std::string firstHeader = "n"; //!< header of first column (normally n for
-                                 //!sample number)
+  std::string addColumn; //!< entry of custom columns
+  std::string addHeader; //!< header of custom columns
   size_t attempts = 1; //!< number of attempts for solving equations
 
   // main options
@@ -97,10 +93,10 @@ int main(int argc, char* argv[])
      "do not print header")
     ("print,p", 
      "print results")
-    ("firstcolumn,c", po::value<std::string>(),
-     "entry of first column")
-    ("firstheader,C", po::value<std::string>(),
-     "header of first column")
+    ("addcolumn,c", po::value<std::string>(),
+     "custom column(s) to add")
+    ("addheader,C", po::value<std::string>(),
+     "header for custom columns")
     ("attempts,t", po::value<size_t>()->default_value(1),
      "number of solving attempts")
     ;
@@ -182,22 +178,12 @@ int main(int argc, char* argv[])
     calcBetas = false;
   }
 
-  if (vm.count("firstcolumn")) {
-    if (samples == 0) {
-      firstColumn = vm["firstcolumn"].as<std::string>();
-    } else {
-      std::cerr << "WARNING: --firstcolumn ignored because samples > 0"
-                << std::endl;
-    }
+  if (vm.count("addcolumn")) {
+    addColumn = vm["addcolumn"].as<std::string>();
   }
 
-  if (vm.count("firstheader")) {
-    if (samples == 0) {
-      firstHeader = vm["firstheader"].as<std::string>();
-    } else {
-      std::cerr << "WARNING: --firstheader ignored because samples > 0"
-                << std::endl;
-    }
+  if (vm.count("addheader")) {
+    addHeader = vm["addheader"].as<std::string>();
   }
 
   attempts = vm["attempts"].as<size_t>();
@@ -360,11 +346,16 @@ int main(int argc, char* argv[])
     randGen(gen, boost::uniform_real<> (0,1));
 
   if (!(vm.count("noheader") || (outFile == "-" && vm.count("print")))) {
-    if (samples == 0) {
-      out << firstHeader;
-    } else {
+    if (samples > 0) {
       out << "n";
+      if (addHeader.length() > 0) {
+        out << ",";
+      }
     }
+    if (addHeader.length() > 0) {
+      out << addHeader;
+    }
+
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j]->getName() << "_prev\"";
       if (lhsSamples > 0) {
@@ -479,10 +470,14 @@ int main(int argc, char* argv[])
     }
 
     std::stringstream outLine;
-    if (samples == 0) {
-      outLine << firstColumn;
-    } else {
+    if (samples > 0) {
       outLine << i;
+      if (addColumn.length() > 0) {
+        outLine << ",";
+      }
+    }
+    if (addColumn.length() > 0) {
+      outLine << addColumn;
     }
     
     std::vector<double> contrib (hosts.size());
