@@ -87,8 +87,6 @@ int main(int argc, char* argv[])
      "use jacobian")
     ("simple,i", 
      "use simple model")
-    ("random,r", 
-     "assume random mixing")
     ("noheader,d", 
      "do not print header")
     ("print,p", 
@@ -296,18 +294,12 @@ int main(int argc, char* argv[])
       groups.push_back(newGroup);
     }
   } else {
-    if (vm.count("random")) { // random mixing
-      groups.push_back(Group());
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        groups[0].members.push_back(i);
-      }
-    } else { // species-specific mixing
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        groups.push_back(Group(i));
-      }
+    groups.push_back(Group());
+    for (size_t i = 0; i < hosts.size(); ++i) {
+      groups[0].members.push_back(i);
     }
   }
-
+  
   // ********************* estimate betas *********************
 
   betafunc_params p (hosts, vectors, groups, global);
