@@ -64,8 +64,6 @@ int main(int argc, char* argv[])
   main_options.add_options()
     ("help,h",
      "produce help message")
-    ("longhelp,H",
-     "produce long help message")
     ("verbose,v",
      "produce verbose output")
     ("very-verbose,V",
@@ -121,18 +119,6 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  if (vm.count("longhelp")) {
-    Host *host = new Host();
-    Vector *vector = new Vector();
-    GlobalParams *global = new GlobalParams();
-    std::cout << main_options << *(global->getOptions())
-              << *(host->getOptions()) << *(vector->getOptions()) << std::endl;
-    delete host;
-    delete vector;
-    delete global;
-    return 0;
-  }
-  
   // verbose option
   if (vm.count("verbose")) {
     verbose = 1;
