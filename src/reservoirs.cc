@@ -348,6 +348,7 @@ int main(int argc, char* argv[])
   boost::math::normal_distribution<> stdNormal
     (0,1);
   size_t i = 0;
+  size_t sample = 0;
   do {
 
     size_t nParams = 0;
@@ -373,9 +374,9 @@ int main(int argc, char* argv[])
         // generate latin hypercube samples
         x = (int*) malloc (nParams * lhsSamples * sizeof(int));
         ihs(nParams, lhsSamples, 5, &seed, x);
+        sample = 0;
       }
       
-      size_t sample = 0;
       for (size_t j = 0; j < hosts.size(); ++j) {
         for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
           // std::cout << hosts[j]->getName() << " "
