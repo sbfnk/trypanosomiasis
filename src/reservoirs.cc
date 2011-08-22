@@ -80,9 +80,11 @@ int main(int argc, char* argv[])
     ("groups,g", po::value<std::string>(),
      "groups (semicolon-separated list of comma-separated hosts")
     ("lhs,l", po::value<size_t>()->default_value(0),
-     "number of samples for latin hypercube sampling")
-    ("samples,n", po::value<size_t>()->default_value(0),
+     "number of latin hypercube samples (0 for no sampling)")
+    ("samples,s", po::value<size_t>()->default_value(0),
      "number of samples (0 for no sampling)")
+    ("normal,r", 
+     "assume normally distributed parameters (as opposed to linear ones)")
     ("jacobian,j", 
      "use jacobian")
     ("simple,i", 
@@ -363,21 +365,21 @@ int main(int argc, char* argv[])
     size_t nParams = 0;
     for (size_t j = 0; j < hosts.size(); ++j) {
       for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
-        if (hosts[j]->getParams()[k].param->second.first >= 0 &&
-            hosts[j]->getParams()[k].param->second.second >= 0) {
+        if (hosts[j]->getParams()[k].param->limits.first >= 0 &&
+            hosts[j]->getParams()[k].param->limits.second >= 0) {
           ++nParams;
         }
       }
     }
     for (size_t j = 0; j < vectors.size(); ++j) {
       for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
-        if (vectors[j]->getParams()[k].param->second.first >= 0 &&
-            vectors[j]->getParams()[k].param->second.second >= 0) {
+        if (vectors[j]->getParams()[k].param->limits.first >= 0 &&
+            vectors[j]->getParams()[k].param->limits.second >= 0) {
           ++nParams;
         }
       }
     }
-    
+
     if (lhsSamples > 0) {
       if (i % lhsSamples == 0) {
         // generate latin hypercube samples
@@ -388,28 +390,66 @@ int main(int argc, char* argv[])
       size_t sample = 0;
       for (size_t j = 0; j < hosts.size(); ++j) {
         for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
-          if (hosts[j]->getParams()[k].param->second.first >= 0 &&
-              hosts[j]->getParams()[k].param->second.second >= 0) {
-            hosts[j]->getParams()[k].param->first =
-              hosts[j]->getParams()[k].param->second.first +
-              (hosts[j]->getParams()[k].param->second.second -
-               hosts[j]->getParams()[k].param->second.first) *
-              x[sample] /
-              static_cast<double>(lhsSamples);
+          if (hosts[j]->getParams()[k].param->limits.first >= 0 &&
+              hosts[j]->getParams()[k].param->limits.second >= 0) {
+            if (hosts[j]->getParams()[k].param->sampling == Linear) {
+              hosts[j]->getParams()[k].param->value =
+                hosts[j]->getParams()[k].param->limits.first +
+                (hosts[j]->getParams()[k].param->limits.second -
+                 hosts[j]->getParams()[k].param->limits.first) *
+                x[sample] / static_cast<double>(lhsSamples - 1);
+            } else if (hosts[j]->getParams()[k].param->sampling == Log) {
+              hosts[j]->getParams()[k].param->value =
+                hosts[j]->getParams()[k].param->limits.first +
+                (hosts[j]->getParams()[k].param->limits.second -
+                 hosts[j]->getParams()[k].param->limits.first) *
+                exp(x[sample] / static_cast<double>(lhsSamples - 1)) /
+                exp(1);
+            } else if (hosts[j]->getParams()[k].param->sampling == Normal) {
+              double sd = abs(hosts[j]->getParams()[k].param->limits.second -
+                              hosts[j]->getParams()[k].param->limits.first) / 2.;
+              boost::math::normal_distribution<> distribution
+                (hosts[j]->getParams()[k].param->mean, sd);
+              hosts[j]->getParams()[k].param->value =
+                hosts[j]->getParams()[k].param->mean +
+                sd * quantile(distribution,
+                              x[sample] / static_cast<double>(lhsSamples) +
+                              cdf(distribution, -hosts[j]->getParams()[k].param->mean / sd) *
+                              (1 - x[sample] / static_cast<double>(lhsSamples)));
+            }
             ++sample;
           }
         }
       }
       for (size_t j = 0; j < vectors.size(); ++j) {
         for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
-          if (vectors[j]->getParams()[k].param->second.first >= 0 &&
-              vectors[j]->getParams()[k].param->second.second >= 0) {
-            vectors[j]->getParams()[k].param->first =
-              vectors[j]->getParams()[k].param->second.first +
-              (vectors[j]->getParams()[k].param->second.second -
-               vectors[j]->getParams()[k].param->second.first) *
-              x[sample] /
-              static_cast<double>(lhsSamples);
+          if (vectors[j]->getParams()[k].param->limits.first >= 0 &&
+              vectors[j]->getParams()[k].param->limits.second >= 0) {
+            if (vectors[j]->getParams()[k].param->sampling == Linear) {
+              vectors[j]->getParams()[k].param->value =
+                vectors[j]->getParams()[k].param->limits.first +
+                (vectors[j]->getParams()[k].param->limits.second -
+                 vectors[j]->getParams()[k].param->limits.first) *
+                x[sample] / static_cast<double>(lhsSamples - 1);
+            } else if (vectors[j]->getParams()[k].param->sampling == Log) {
+              vectors[j]->getParams()[k].param->value =
+                vectors[j]->getParams()[k].param->limits.first +
+                (vectors[j]->getParams()[k].param->limits.second -
+                 vectors[j]->getParams()[k].param->limits.first) *
+                exp(x[sample] / static_cast<double>(lhsSamples - 1)) /
+                exp(1);
+            } else if (vectors[j]->getParams()[k].param->sampling == Normal) {
+              double sd = abs(vectors[j]->getParams()[k].param->limits.second -
+                              vectors[j]->getParams()[k].param->limits.first) / 2.;
+              boost::math::normal_distribution<> distribution
+                (vectors[j]->getParams()[k].param->mean, sd);
+              vectors[j]->getParams()[k].param->value =
+                vectors[j]->getParams()[k].param->mean +
+                sd * quantile(distribution,
+                              x[sample] / static_cast<double>(lhsSamples) +
+                              cdf(distribution, -vectors[j]->getParams()[k].param->mean / sd) *
+                              (1 - x[sample] / static_cast<double>(lhsSamples)));
+            }
             ++sample;
           }
         }
@@ -418,27 +458,17 @@ int main(int argc, char* argv[])
 
     betafunc_params p (hosts, vectors, groups, global);
   
-    std::vector<boost::math::beta_distribution<>*> distributions;
-    
     if (samples > 0) {
       // generate beta distributions of prevalence
       for (size_t j = 0; j < hosts.size(); ++j) {
-        distributions.push_back
-          (new boost::math::beta_distribution<>
-           (hosts[j]->M.first+1, hosts[j]->N.first-hosts[j]->M.first+1));
+        boost::math::beta_distribution<> distribution
+          (hosts[j]->M.value+1, hosts[j]->N.value-hosts[j]->M.value+1);
+        p.hPrevalence[j] = quantile(distribution, randGen());
       }
       for (size_t j = 0; j < vectors.size(); ++j) {
-        distributions.push_back
-          (new boost::math::beta_distribution<>
-           (vectors[j]->M.first+1, vectors[j]->N.first-vectors[j]->M.first+1));
-      }
-  
-      for (size_t j = 0; j < hosts.size(); ++j) {
-        p.hPrevalence[j] = quantile(*distributions[j], randGen());
-      }
-      for (size_t j = 0; j < vectors.size(); ++j) {
-        p.vPrevalence[j] = quantile(*distributions[j + hosts.size()],
-                                    randGen());
+        boost::math::beta_distribution<> distribution
+          (vectors[j]->M.value+1, vectors[j]->N.value-vectors[j]->M.value+1);
+        p.vPrevalence[j] = quantile(distribution, randGen());
       }
     }
 
@@ -446,18 +476,18 @@ int main(int argc, char* argv[])
     double bitingSum = .0;
     for (std::vector<Host*>::iterator it = hosts.begin();
          it != hosts.end(); it++) {
-      bitingSum += (*it)->f.first;
+      bitingSum += (*it)->f.value;
     }
     for (std::vector<Host*>::iterator it = hosts.begin();
          it != hosts.end(); it++) {
-      (*it)->f.first /= bitingSum;
+      (*it)->f.value /= bitingSum;
     }
     for (std::vector<Group>::iterator it = groups.begin();
          it != groups.end(); it++) {
       it->f = .0;
       for (std::vector<size_t>::iterator it2 = it->members.begin();
            it2 != it->members.end(); it2++) {
-        it->f += hosts[*it2]->f.first;
+        it->f += hosts[*it2]->f.value;
       }
     }
 
@@ -486,7 +516,7 @@ int main(int argc, char* argv[])
 
     size_t matrixSize = hosts.size() + groups.size() * vectors.size();
     for (size_t v = 0; v < vectors.size(); ++v) {
-      if (vectors[v]->alpha.first > 0) {
+      if (vectors[v]->alpha.value > 0) {
         matrixSize += groups.size();
       }
     }
@@ -509,15 +539,15 @@ int main(int argc, char* argv[])
       if (status == GSL_SUCCESS) {
 
         for (size_t i = 0; i < hosts.size(); ++i) {
-          hosts[i]->b.first = vars[i];
+          hosts[i]->b.value = vars[i];
         }
         if (global->estimateXi) {
           for (size_t v = 0; v < vectors.size(); ++v) {
-            vectors[v]->xi.first = vars[v + hosts.size()];
+            vectors[v]->xi.value = vars[v + hosts.size()];
           }
         } else {
           for (size_t v = 0; v < vectors.size(); ++v) {
-            vectors[v]->b.first = vars[v + hosts.size()];
+            vectors[v]->b.value = vars[v + hosts.size()];
           }
         }
 
@@ -536,28 +566,28 @@ int main(int argc, char* argv[])
             }
             S(matrixCounter, matrixCounter) =
               S(matrixCounter, matrixCounter) -
-              vectors[v]->mu.first - vectors[v]->xi.first;
-            if (vectors[v]->alpha.first > 0) {
+              vectors[v]->mu.value - vectors[v]->xi.value;
+            if (vectors[v]->alpha.value > 0) {
               S(matrixCounter, matrixCounter) =
                 S(matrixCounter, matrixCounter) -
-                vectors[v]->alpha.first;
+                vectors[v]->alpha.value;
               S(matrixCounter + 1, matrixCounter) =
                 S(matrixCounter + 1, matrixCounter) +
-                vectors[v]->alpha.first;
+                vectors[v]->alpha.value;
               S(matrixCounter + 1, matrixCounter + 1) =
                 S(matrixCounter + 1, matrixCounter + 1) -
-                vectors[v]->mu.first - vectors[v]->xi.first;
+                vectors[v]->mu.value - vectors[v]->xi.value;
             }
             size_t matrixCounter2 = vectorStart;
             for (size_t k = 0; k < groups.size(); ++k) {
               S(matrixCounter,matrixCounter2) =
                 S(matrixCounter,matrixCounter2) +
-                vectors[v]->xi.first * groups[j].f *
+                vectors[v]->xi.value * groups[j].f *
                 p.habitatOverlap[j][k] / denominator;
-              if (vectors[v]->alpha.first > 0) {
+              if (vectors[v]->alpha.value > 0) {
                 S(matrixCounter + 1, matrixCounter2 + 1) =
                   S(matrixCounter + 1, matrixCounter2 + 1) +
-                  vectors[v]->xi.first * groups[j].f *
+                  vectors[v]->xi.value * groups[j].f *
                   p.habitatOverlap[j][k] / denominator;
                 ++matrixCounter2;
               }
@@ -566,16 +596,16 @@ int main(int argc, char* argv[])
             for (size_t k = 0; k < groups[j].members.size(); ++k) {
               size_t i = groups[j].members[k];
               T(matrixCounter, matrixSize - hosts.size() + i) =
-                vectors[v]->b.first * vectors[v]->tau.first * hosts[i]->f.first /
-                hosts[i]->n.first;
+                vectors[v]->b.value * vectors[v]->tau.value * hosts[i]->f.value /
+                hosts[i]->n.value;
             }
-            if (vectors[v]->alpha.first > 0) {
+            if (vectors[v]->alpha.value > 0) {
               ++matrixCounter;
             }
             for (size_t k = 0; k < groups[j].members.size(); ++k) {
               size_t i = groups[j].members[k];
               T(matrixSize - hosts.size() + i, matrixCounter) =
-                hosts[i]->b.first * vectors[v]->tau.first * hosts[i]->f.first /
+                hosts[i]->b.value * vectors[v]->tau.value * hosts[i]->f.value /
                 groups[j].f;
             }
             ++matrixCounter;
@@ -586,7 +616,7 @@ int main(int argc, char* argv[])
             matrixSize - hosts.size() + i) =
             S(matrixSize - hosts.size() + i,
               matrixSize - hosts.size() + i) -
-            hosts[i]->gamma.first - hosts[i]->mu.first;
+            hosts[i]->gamma.value - hosts[i]->mu.value;
         }
 
         if (verbose >= 2) {
@@ -680,32 +710,32 @@ int main(int argc, char* argv[])
       double hostSum = .0;
       
       for (size_t i = 0; i < hosts.size(); ++i) {
-        hostSum += hosts[i]->f.first * p.hPrevalence[i];
+        hostSum += hosts[i]->f.value * p.hPrevalence[i];
       }
       
       for (size_t i = 0; i < hosts.size(); ++i) {
-        vars[i] = p.hPrevalence[i] / (1-p.hPrevalence[i]) * hosts[i]->n.first *
-          (hosts[i]->gamma.first + hosts[i]->mu.first) /
-          (vectors[0]->tau.first * hosts[i]->f.first * p.vPrevalence[0]);
+        vars[i] = p.hPrevalence[i] / (1-p.hPrevalence[i]) * hosts[i]->n.value *
+          (hosts[i]->gamma.value + hosts[i]->mu.value) /
+          (vectors[0]->tau.value * hosts[i]->f.value * p.vPrevalence[0]);
       }
 
       vars[hosts.size() + groups.size()] = p.vPrevalence[0];
 
       vars[hosts.size()] =
         p.vPrevalence[0] / (1-p.vPrevalence[0]) *
-        vectors[0]->mu.first / vectors[0]->tau.first / hostSum;
+        vectors[0]->mu.value / vectors[0]->tau.value / hostSum;
       
       double hostContribSum = 0;
       for (size_t i = 0; i < hosts.size(); ++i) {
         double newContrib =
           1 / ((1 - p.hPrevalence[i]) * (1 - p.vPrevalence[0])) *
-          p.hPrevalence[i] * hosts[i]->f.first / hostSum;
+          p.hPrevalence[i] * hosts[i]->f.value / hostSum;
         hostContrib.push_back(newContrib);
         hostContribSum += newContrib;
       }
       if (verbose) {
         std::cout << "Measured vector prevalence: " 
-                  << vectors[0]->M.first/static_cast<double>(vectors[0]->N.first)
+                  << vectors[0]->M.value/static_cast<double>(vectors[0]->N.value)
                   << std::endl;
       }
 
@@ -727,10 +757,10 @@ int main(int argc, char* argv[])
       
         contrib[i] = sqrt(hostContrib[i]);
         if (verbose) {
-          std::cout << "hosts[" << i << "].gamma=" << hosts[i]->gamma.first
-                    << ", hosts[" << i << "].mu=" << hosts[i]->mu.first
+          std::cout << "hosts[" << i << "].gamma=" << hosts[i]->gamma.value
+                    << ", hosts[" << i << "].mu=" << hosts[i]->mu.value
                     << ", hosts[" << i << "].n="
-                    << hosts[i]->n.first << std::endl;
+                    << hosts[i]->n.value << std::endl;
         }
       }
       R0 = sqrt(R0);
@@ -767,7 +797,7 @@ int main(int argc, char* argv[])
       outLine << "," << p.hPrevalence[j];
       if (lhsSamples > 0) {
         for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
-          outLine << "," << hosts[j]->getParams()[k].param->first;
+          outLine << "," << hosts[j]->getParams()[k].param->value;
         }
       }
     }
@@ -776,7 +806,7 @@ int main(int argc, char* argv[])
       outLine << "," << p.vPrevalence[j];
       if (lhsSamples > 0) {
         for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
-          outLine << "," << vectors[j]->getParams()[k].param->first;
+          outLine << "," << vectors[j]->getParams()[k].param->value;
         }
       }
     }

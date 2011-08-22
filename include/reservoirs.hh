@@ -1,3 +1,4 @@
+
 // -*- compile-command: "cd .. ; make -k; cd -"; -*-
 /*! \file reservoirs.hh
   \brief Header file for reservoir analysis based on prevalence data
@@ -15,7 +16,19 @@
 #include <gsl/gsl_multiroots.h>
 #include <gsl/gsl_linalg.h>
 
-typedef std::pair<double, std::pair<double, double> > Parameter;
+enum SamplingType {Normal, Linear, Log};
+
+struct Parameter
+{
+  Parameter() : sampling(Normal) {};
+  Parameter(double v, std::pair<double, double> l) :
+    mean(v), limits(l), sampling(Normal) {value = mean;};
+             
+  double mean;
+  std::pair<double, double> limits;
+  SamplingType sampling;
+  double value;
+};
 
 namespace po = boost::program_options;
 
@@ -27,7 +40,7 @@ public:
   struct ParamInfo {
     ParamInfo(std::string o, std::string d, Parameter* p) :
       option(o), description(d), param(p) 
-    { param->first = 0; param->second.first = -1; param->second.second = -1;}
+    { param->mean = 0; param->limits.first = -1; param->limits.second = -1;}
     
     std::string option;
     std::string description;
@@ -181,16 +194,28 @@ void ParamContainer::ReadTable(std::vector<std::string> const &data,
          it != params.end(); it++) {
       if (header[i] == "name") {
         name = data[i];
+        std::replace(name.begin(), name.end(), ' ', '.');
       } else {
         if ((header[i] == it->option)) {
           std::istringstream s(data[i]);
-          s >> it->param->first;
+          s >> it->param->mean;
         } else if (header[i] == (it->option + "_low")) {
           std::istringstream s(data[i]);
-          s >> it->param->second.first;
+          s >> it->param->limits.first;
         } else if (header[i] == (it->option + "_high")) {
           std::istringstream s(data[i]);
-          s >> it->param->second.second;
+          s >> it->param->limits.second;
+        } else if (header[i] == (it->option + "_sampling")) {
+          if (data[i] == "l") {
+            it->param->sampling = Linear;
+          } else if (data[i] == "o") {
+            it->param->sampling = Log;
+          } else if (data[i] == "p") {
+            it->param->sampling = Normal;
+          } else if (data[i] != "") {
+            std::cerr << "WARNING: Unknown sampling type for " << name << ": "
+                      << data[i] << std::endl;
+          };
         }
       }
     }
@@ -222,11 +247,11 @@ void ParamContainer::ReadParams(po::variables_map const &vm) {
        it != params.end(); it++) {
     if (vm.count(paramPrefix + it->option)) {
       // command line parameter has been specified, assign to model variable
-      it->param->first = vm[paramPrefix + it->option].as<double>();
+      it->param->mean = vm[paramPrefix + it->option].as<double>();
     } else if (vm.count(paramPrefix + it->option + "_low")){
-      it->param->second.first = vm[paramPrefix + it->option].as<double>();
+      it->param->limits.first = vm[paramPrefix + it->option].as<double>();
     } else if (vm.count(paramPrefix + it->option + "_high")){
-      it->param->second.second = vm[paramPrefix + it->option].as<double>();
+      it->param->limits.second = vm[paramPrefix + it->option].as<double>();
     }
   }
 }
@@ -242,13 +267,13 @@ void HabitatContainer::NormaliseHabitats()
   double habitatSum = .0; //!< sum of all habitat contributions (for
                           //!normalisation) 
   for (size_t i = 0; i < habitat.size(); ++i) {
-    habitatSum += habitat[i].first;
+    habitatSum += habitat[i].value;
   }
   for (std::vector<Parameter>::iterator it = habitat.begin();
        it != habitat.end(); it++) {
-    (*it).first /= habitatSum;
-    (*it).second.first /= habitatSum;
-    (*it).second.second /= habitatSum;
+    (*it).value /= habitatSum;
+    (*it).limits.first /= habitatSum;
+    (*it).limits.second /= habitatSum;
   }
 }
 
@@ -265,14 +290,14 @@ void HabitatContainer::ReadTable(std::vector<std::string> const &data,
       std::istringstream numStr(header[i].substr(numPos));
       numStr >> index;
       while (index > habitat.size()) {
-        habitat.push_back(std::make_pair(.0, std::make_pair(.0, .0)));
+        habitat.push_back(Parameter(.0, std::make_pair(.0, .0)));
       }
       if (header[i].find("_low_") != std::string::npos) {
-        s >> habitat[index-1].second.first;
+        s >> habitat[index-1].limits.first;
       } else if (header[i].find("_high_") != std::string::npos) {
-        s >> habitat[index-1].second.second;
+        s >> habitat[index-1].limits.second;
       } else if (numPos == 1) {
-        s >> habitat[index-1].first;
+        s >> habitat[index-1].mean;
       }
     }
   }
@@ -286,11 +311,11 @@ void HabitatContainer::ReadParams(po::variables_map const &vm)
     ss << i;
     if (vm.count(name + "-X" + ss.str())) {
       // command line parameter has been specified, assign to model variable
-      habitat[i].first = vm[name + "-X" + ss.str()].as<double>();
+      habitat[i].mean = vm[name + "-X" + ss.str()].as<double>();
     } else if (vm.count(name + "-X" + ss.str() + "_low")){
-      habitat[i].second.first = vm[name + "-X" + ss.str() + "_low"].as<double>();
+      habitat[i].limits.first = vm[name + "-X" + ss.str() + "_low"].as<double>();
     } else if (vm.count(name + "-X" + ss.str() + "_high")){
-      habitat[i].second.second = vm[name + "-X" + ss.str() + "_low"].as<double>();
+      habitat[i].limits.second = vm[name + "-X" + ss.str() + "_low"].as<double>();
     }
   }
 }
@@ -363,11 +388,11 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
   vPrevalence(std::vector<double>(vectors.size()))
 {
   for (size_t i = 0; i < hosts.size(); ++i) {
-    hPrevalence[i] = hosts[i]->M.first / hosts[i]->N.first;
+    hPrevalence[i] = hosts[i]->M.value / hosts[i]->N.value;
   }
     
   for (size_t v = 0; v < vectors.size(); ++v) {
-    vPrevalence[v] = vectors[v]->M.first / vectors[v]->N.first;
+    vPrevalence[v] = vectors[v]->M.value / vectors[v]->N.value;
   }
     
   //!< amount of overlap between host habitats
@@ -391,18 +416,18 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
           for (size_t n = 0; n < groups[m].members.size(); ++n) {
             size_t l = groups[m].members[n];
             for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
-              if (hosts[i]->habitat[o].first > 0 &&
-                  hosts[l]->habitat[o].first > 0) {
+              if (hosts[i]->habitat[o].value > 0 &&
+                  hosts[l]->habitat[o].value > 0) {
                 if (global->habType == "b") {
                   habitatOverlap[j][m] = 1;
                   habitatOverlap[m][j] = 1;
                 } else {
                   double diff =
-                    (hosts[i]->habitat[o].first -
-                     hosts[l]->habitat[o].first);
-                  habitatOverlap[j][m] += diff * hosts[i]->habitat[o].first /
+                    (hosts[i]->habitat[o].value -
+                     hosts[l]->habitat[o].value);
+                  habitatOverlap[j][m] += diff * hosts[i]->habitat[o].value /
                     static_cast<double>(groups[j].members.size());
-                  habitatOverlap[m][j] += diff * hosts[i]->habitat[l].first /
+                  habitatOverlap[m][j] += diff * hosts[i]->habitat[l].value /
                     static_cast<double>(groups[m].members.size());
                 }
               }
@@ -470,7 +495,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
   }
   if (params->global->estimateXi) {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
-      bvector[v] = params->vectors[v]->b.first;
+      bvector[v] = params->vectors[v]->b.value;
       xi[v] = gsl_vector_get(x, v + params->hosts.size());
       // std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
       // std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
@@ -478,7 +503,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
   } else {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
       bvector[v] = gsl_vector_get(x, v + params->hosts.size());
-      xi[v] = params->vectors[v]->xi.first;
+      xi[v] = params->vectors[v]->xi.value;
       // std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
       // std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
     }
@@ -499,12 +524,12 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
   for (size_t j = 0; j < params->groups.size(); ++j) {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
       if (params->global->teneralOnly) {
-        yv[j][v] = (params->vectors[v]->mu.first +
-                    params->vectors[v]->tau.first) *
-          (pv[j][v] + xi[v] / params->vectors[v]->mu.first *
+        yv[j][v] = (params->vectors[v]->mu.value +
+                    params->vectors[v]->tau.value) *
+          (pv[j][v] + xi[v] / params->vectors[v]->mu.value *
            (pv[j][v] - params->vPrevalence[v]));
       } else {
-        yv[j][v] = (pv[j][v] * params->vectors[v]->mu.first + xi[v] *
+        yv[j][v] = (pv[j][v] * params->vectors[v]->mu.value + xi[v] *
                     (pv[j][v] - params->vPrevalence[v])) /
           (1 - pv[j][v]);
       }
@@ -512,7 +537,7 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
     for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
       size_t i = params->groups[j].members[k];
        yh[i] = params->hPrevalence[i] / (1 - params->hPrevalence[i]) *
-        (params->hosts[i]->mu.first + params->hosts[i]->gamma.first);
+        (params->hosts[i]->mu.value + params->hosts[i]->gamma.value);
     }
   }
   
@@ -521,28 +546,28 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
         size_t i = params->groups[j].members[k];
         double i_av;
-        if (params->vectors[v]->alpha.first > 0) {
-          i_av = params->vectors[v]->alpha.first /
-            (params->vectors[v]->alpha.first + params->vectors[v]->mu.first) *
-            ((params->vectors[v]->alpha.first + params->vectors[v]->mu.first) /
-             (params->vectors[v]->alpha.first + params->vectors[v]->mu.first + xi[v]) *
+        if (params->vectors[v]->alpha.value > 0) {
+          i_av = params->vectors[v]->alpha.value /
+            (params->vectors[v]->alpha.value + params->vectors[v]->mu.value) *
+            ((params->vectors[v]->alpha.value + params->vectors[v]->mu.value) /
+             (params->vectors[v]->alpha.value + params->vectors[v]->mu.value + xi[v]) *
              pv[j][v] +
              xi[v] /
-             (params->vectors[v]->alpha.first + params->vectors[v]->mu.first + xi[v]) *
+             (params->vectors[v]->alpha.value + params->vectors[v]->mu.value + xi[v]) *
              params->vPrevalence[v]);
         } else {
           i_av = pv[j][v];
         }
-        yh[i] -= bhost[i] * params->vectors[v]->tau.first *
-          params->hosts[i]->f.first / params->hosts[i]->n.first * i_av;
-        yv[j][v] -= bvector[v] * params->vectors[v]->tau.first *
-          params->hosts[i]->f.first * params->hPrevalence[i] /
+        yh[i] -= bhost[i] * params->vectors[v]->tau.value *
+          params->hosts[i]->f.value / params->hosts[i]->n.value * i_av;
+        yv[j][v] -= bvector[v] * params->vectors[v]->tau.value *
+          params->hosts[i]->f.value * params->hPrevalence[i] /
           params->groups[j].f;
-        // std::cout << k << " " << i << " " << j << " " << params->vectors[v]->tau.first
+        // std::cout << k << " " << i << " " << j << " " << params->vectors[v]->tau.value
         //           << " " << params->groups[j].f << " " << bvector[v]
-        //           << " " << bhost[i] << " " << params->hosts[i]->f.first
+        //           << " " << bhost[i] << " " << params->hosts[i]->f.value
         //           << " " << params->hPrevalence[i] << " " << pv[j][v]
-        //           << " " << params->vectors[v]->mu.first << " "
+        //           << " " << params->vectors[v]->mu.value << " "
         //           << xi[v] << " " << yv[j][v] << " " << yh[i]
         //           << " " << i_av << std::endl;
       }
@@ -599,7 +624,7 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
   // }
   // if (params->global->estimateXi) {
   //   for (size_t v = 0; v < params->vectors.size(); ++v) {
-  //     bvector[v] = params->vectors[v]->b.first;
+  //     bvector[v] = params->vectors[v]->b.value;
   //     xi[v] = gsl_vector_get(x, v + params->hosts.size());
   //     std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
   //     std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
@@ -607,7 +632,7 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
   // } else {
   //   for (size_t v = 0; v < params->vectors.size(); ++v) {
   //     bvector[v] = gsl_vector_get(x, v + params->hosts.size());
-  //     xi[v] = params->vectors[v]->xi.first;
+  //     xi[v] = params->vectors[v]->xi.value;
   //     std::cout << "bvector[" << v << "]: " << bvector[v] << std::endl;
   //     std::cout << "xi[" << v << "]: " << xi[v] << std::endl;
   //   }
@@ -627,12 +652,12 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
   //     double dfidbi = 0;
   //     double dfidpvjv = 0;
   //     for (size_t v = 0; v < params->vectors.size(); ++v) {
-  //       dfidbi -= params->vectors[v]->tau.first *
-  //         params->hosts[i]->f.first / params->groups[j].f /
-  //         params->hosts[i]->n.first * pv[j][v];
-  //       dfidpvjv = -bhost[i] * params->vectors[v]->tau.first *
-  //         params->hosts[i]->f.first / params->groups[j].f /
-  //         params->hosts[i]->n.first;
+  //       dfidbi -= params->vectors[v]->tau.value *
+  //         params->hosts[i]->f.value / params->groups[j].f /
+  //         params->hosts[i]->n.value * pv[j][v];
+  //       dfidpvjv = -bhost[i] * params->vectors[v]->tau.value *
+  //         params->hosts[i]->f.value / params->groups[j].f /
+  //         params->hosts[i]->n.value;
   //       gsl_matrix_set(J, i, j + v * params->groups.size() +
   //                      params->hosts.size() + params->vectors.size(),
   //                      dfidpvjv);
@@ -660,8 +685,8 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
   //       double dgjvdbv = 0;
   //       for (size_t k = 0; k < params->groups[j].members.size(); ++k) {
   //         size_t i = params->groups[j].members[k];
-  //         dgjvdbv -= params->vectors[v]->tau.first *
-  //           params->hosts[i]->f.first / params->groups[j].f *
+  //         dgjvdbv -= params->vectors[v]->tau.value *
+  //           params->hosts[i]->f.value / params->groups[j].f *
   //           params->hPrevalence[i];
   //       }
   //       gsl_matrix_set(J, j + v * params->groups.size() + params->hosts.size(),
@@ -669,7 +694,7 @@ int betafunc_df(const gsl_vector * x, void * p, gsl_matrix * J)
   //                      dgjvdbv);
   //     }
   //     double dgjvdpvjv = 1 / pow(1-pv[j][v], 2) *
-  //       (params->vectors[v]->mu.first +
+  //       (params->vectors[v]->mu.value +
   //        (xi[j] * (pv[j][v] - 1) * params->groups[j].f - enumerator) / denominator);
   //     gsl_matrix_set(J, j + v * params->groups.size() + params->hosts.size(),
   //                    j + v * params->groups.size() + params->hosts.size() +
@@ -729,19 +754,19 @@ int betaffoiv(void *p, std::vector<double> &vars,
   if (verbose) {
     std::cout << "rabundance:";
     for (size_t i = 0; i < params->hosts.size(); ++i) {
-      std::cout << " " << params->hosts[i]->n.first;
+      std::cout << " " << params->hosts[i]->n.value;
     }
     std::cout << std::endl;
   
     std::cout << "biting:";
     for (size_t i = 0; i < params->hosts.size(); ++i) {
-      std::cout << " " << params->hosts[i]->f.first;
+      std::cout << " " << params->hosts[i]->f.value;
     }
     std::cout << std::endl;
   
     std::cout << "biting_rate:";
     for (size_t i = 0; i < params->vectors.size(); ++i) {
-      std::cout << " " << params->vectors[i]->tau.first;
+      std::cout << " " << params->vectors[i]->tau.value;
     }
     std::cout << std::endl;
 
@@ -759,20 +784,20 @@ int betaffoiv(void *p, std::vector<double> &vars,
   
     std::cout << "vmu:";
     for (size_t i = 0; i < params->vectors.size(); ++i) {
-      std::cout << " " << params->vectors[i]->mu.first;
+      std::cout << " " << params->vectors[i]->mu.value;
     }
     std::cout << std::endl;
 
     if (params->global->estimateXi) {
       std::cout << "bvector:";
       for (size_t i = 0; i < params->vectors.size(); ++i) {
-        std::cout << " " << params->vectors[i]->b.first;
+        std::cout << " " << params->vectors[i]->b.value;
       }
       std::cout << std::endl;
     } else {  
       std::cout << "xi:";
       for (size_t i = 0; i < params->vectors.size(); ++i) {
-        std::cout << " " << params->vectors[i]->xi.first;
+        std::cout << " " << params->vectors[i]->xi.value;
       }
       std::cout << std::endl;
     }
