@@ -20,14 +20,23 @@ enum SamplingType {Normal, Linear, Log};
 
 struct Parameter
 {
-  Parameter() : sampling(Normal) {};
+  Parameter() :
+    sampling(Normal), limits(std::make_pair(-1.,-1.)) {setMean(0);}
+  Parameter(double v) :
+    sampling(Normal), limits(std::make_pair(-1.,-1.)) {setMean(v);}
   Parameter(double v, std::pair<double, double> l) :
-    mean(v), limits(l), sampling(Normal) {value = mean;};
+    sampling(Normal), limits(l) {setMean(v);}
              
-  double mean;
-  std::pair<double, double> limits;
   SamplingType sampling;
+  std::pair<double, double> limits;
   double value;
+
+  void setMean(double m) { mean = m; value = mean;}
+  double getMean() const { return mean; }
+
+private:
+  
+  double mean;
 };
 
 namespace po = boost::program_options;
@@ -39,8 +48,7 @@ public:
 
   struct ParamInfo {
     ParamInfo(std::string o, std::string d, Parameter* p) :
-      option(o), description(d), param(p) 
-    { param->mean = 0; param->limits.first = -1; param->limits.second = -1;}
+      option(o), description(d), param(p) {;}
     
     std::string option;
     std::string description;
@@ -197,25 +205,35 @@ void ParamContainer::ReadTable(std::vector<std::string> const &data,
         std::replace(name.begin(), name.end(), ' ', '.');
       } else {
         if ((header[i] == it->option)) {
-          std::istringstream s(data[i]);
-          s >> it->param->mean;
+          if (data[i].length() > 0) {
+            std::istringstream s(data[i]);
+            double m;
+            s >> m;
+            it->param->setMean(m);
+          }
         } else if (header[i] == (it->option + "_low")) {
-          std::istringstream s(data[i]);
-          s >> it->param->limits.first;
+          if (data[i].length() > 0) {
+            std::istringstream s(data[i]);
+            s >> it->param->limits.first;
+          }
         } else if (header[i] == (it->option + "_high")) {
-          std::istringstream s(data[i]);
-          s >> it->param->limits.second;
+          if (data[i].length() > 0) {
+            std::istringstream s(data[i]);
+            s >> it->param->limits.second;
+          }
         } else if (header[i] == (it->option + "_sampling")) {
-          if (data[i] == "l") {
-            it->param->sampling = Linear;
-          } else if (data[i] == "o") {
-            it->param->sampling = Log;
-          } else if (data[i] == "p") {
-            it->param->sampling = Normal;
-          } else if (data[i] != "") {
-            std::cerr << "WARNING: Unknown sampling type for " << name << ": "
-                      << data[i] << std::endl;
-          };
+          if (data[i].length() > 0) {
+            if (data[i] == "l") {
+              it->param->sampling = Linear;
+            } else if (data[i] == "o") {
+              it->param->sampling = Log;
+            } else if (data[i] == "p") {
+              it->param->sampling = Normal;
+            } else if (data[i] != "") {
+              std::cerr << "WARNING: Unknown sampling type for " << name << ": "
+                        << data[i] << std::endl;
+            }
+          }
         }
       }
     }
@@ -247,7 +265,7 @@ void ParamContainer::ReadParams(po::variables_map const &vm) {
        it != params.end(); it++) {
     if (vm.count(paramPrefix + it->option)) {
       // command line parameter has been specified, assign to model variable
-      it->param->mean = vm[paramPrefix + it->option].as<double>();
+      it->param->setMean(vm[paramPrefix + it->option].as<double>());
     } else if (vm.count(paramPrefix + it->option + "_low")){
       it->param->limits.first = vm[paramPrefix + it->option].as<double>();
     } else if (vm.count(paramPrefix + it->option + "_high")){
@@ -297,7 +315,9 @@ void HabitatContainer::ReadTable(std::vector<std::string> const &data,
       } else if (header[i].find("_high_") != std::string::npos) {
         s >> habitat[index-1].limits.second;
       } else if (numPos == 1) {
-        s >> habitat[index-1].mean;
+        double m;
+        s >> m;
+        habitat[index-1].setMean(m);
       }
     }
   }
@@ -311,7 +331,7 @@ void HabitatContainer::ReadParams(po::variables_map const &vm)
     ss << i;
     if (vm.count(name + "-X" + ss.str())) {
       // command line parameter has been specified, assign to model variable
-      habitat[i].mean = vm[name + "-X" + ss.str()].as<double>();
+      habitat[i].setMean(vm[name + "-X" + ss.str()].as<double>());
     } else if (vm.count(name + "-X" + ss.str() + "_low")){
       habitat[i].limits.first = vm[name + "-X" + ss.str() + "_low"].as<double>();
     } else if (vm.count(name + "-X" + ss.str() + "_high")){
@@ -752,6 +772,18 @@ int betaffoiv(void *p, std::vector<double> &vars,
   betafunc_params* params = ((struct betafunc_params*) p);
 
   if (verbose) {
+    std::cout << "N:";
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      std::cout << " " << params->hosts[i]->N.value;
+    }
+    std::cout << std::endl;
+
+    std::cout << "M:";
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      std::cout << " " << params->hosts[i]->M.value;
+    }
+    std::cout << std::endl;
+
     std::cout << "rabundance:";
     for (size_t i = 0; i < params->hosts.size(); ++i) {
       std::cout << " " << params->hosts[i]->n.value;

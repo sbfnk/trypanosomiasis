@@ -345,6 +345,8 @@ int main(int argc, char* argv[])
     out << std::endl;
   }
 
+  boost::math::normal_distribution<> stdNormal
+    (0,1);
   size_t i = 0;
   do {
 
@@ -376,6 +378,13 @@ int main(int argc, char* argv[])
       size_t sample = 0;
       for (size_t j = 0; j < hosts.size(); ++j) {
         for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
+          // std::cout << hosts[j]->getName() << " "
+          //           << hosts[j]->getParams()[k].option << " " 
+          //           << hosts[j]->getParams()[k].param->getMean() << " "
+          //           << hosts[j]->getParams()[k].param->value << " "
+          //           << hosts[j]->getParams()[k].param->limits.first << " " 
+          //           << hosts[j]->getParams()[k].param->limits.second
+          //           << std::endl;
           if (hosts[j]->getParams()[k].param->limits.first >= 0 &&
               hosts[j]->getParams()[k].param->limits.second >= 0) {
             if (hosts[j]->getParams()[k].param->sampling == Linear) {
@@ -394,16 +403,28 @@ int main(int argc, char* argv[])
             } else if (hosts[j]->getParams()[k].param->sampling == Normal) {
               double sd = fabs(hosts[j]->getParams()[k].param->limits.second -
                               hosts[j]->getParams()[k].param->limits.first) / 2.;
-              boost::math::normal_distribution<> distribution
-                (hosts[j]->getParams()[k].param->mean, sd);
               hosts[j]->getParams()[k].param->value =
-                hosts[j]->getParams()[k].param->mean +
-                sd * quantile(distribution,
+                hosts[j]->getParams()[k].param->getMean() +
+                sd * quantile(stdNormal,
                               x[sample] / static_cast<double>(lhsSamples + 1) +
-                              cdf(distribution,
-                                  -hosts[j]->getParams()[k].param->mean / sd) *
+                              cdf(stdNormal,
+                                  -hosts[j]->getParams()[k].param->getMean() /
+                                  sd) *
                               (1 - x[sample] /
                                static_cast<double>(lhsSamples + 1)));
+              // std::cout << (x[sample] / static_cast<double>(lhsSamples + 1)) << " "
+              //           << cdf(stdNormal,
+              //                     -hosts[j]->getParams()[k].param->getMean() /
+              //                  sd) << " "
+              //           << quantile(stdNormal,
+              //                 x[sample] / static_cast<double>(lhsSamples + 1) +
+              //                 cdf(stdNormal,
+              //                     -hosts[j]->getParams()[k].param->getMean() /
+              //                     sd) *
+              //                 (1 - x[sample] /
+              //                  static_cast<double>(lhsSamples + 1))) << " "
+              //           << hosts[j]->getParams()[k].param->value << " "
+              //           <<std::endl;
             }
             ++sample;
           }
@@ -411,6 +432,13 @@ int main(int argc, char* argv[])
       }
       for (size_t j = 0; j < vectors.size(); ++j) {
         for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
+          // std::cout << vectors[j]->getName() << " "
+          //           << vectors[j]->getParams()[k].option << " " 
+          //           << vectors[j]->getParams()[k].param->getMean() << " "
+          //           << vectors[j]->getParams()[k].param->value << " "
+          //           << vectors[j]->getParams()[k].param->limits.first << " " 
+          //           << vectors[j]->getParams()[k].param->limits.second
+          //           << std::endl;
           if (vectors[j]->getParams()[k].param->limits.first >= 0 &&
               vectors[j]->getParams()[k].param->limits.second >= 0) {
             if (vectors[j]->getParams()[k].param->sampling == Linear) {
@@ -428,15 +456,17 @@ int main(int argc, char* argv[])
                 exp(1);
             } else if (vectors[j]->getParams()[k].param->sampling == Normal) {
               double sd = fabs(vectors[j]->getParams()[k].param->limits.second -
-                              vectors[j]->getParams()[k].param->limits.first) / 2.;
-              boost::math::normal_distribution<> distribution
-                (vectors[j]->getParams()[k].param->mean, sd);
+                               vectors[j]->getParams()[k].param->limits.first) /
+                2.;
               vectors[j]->getParams()[k].param->value =
-                vectors[j]->getParams()[k].param->mean +
-                sd * quantile(distribution,
+                vectors[j]->getParams()[k].param->getMean() +
+                sd * quantile(stdNormal,
                               x[sample] / static_cast<double>(lhsSamples + 1) +
-                              cdf(distribution, -vectors[j]->getParams()[k].param->mean / sd) *
-                              (1 - x[sample] / static_cast<double>(lhsSamples + 1)));
+                              cdf(stdNormal,
+                                  -vectors[j]->getParams()[k].param->getMean() /
+                                  sd) *
+                              (1 - x[sample] /
+                               static_cast<double>(lhsSamples + 1)));
             }
             ++sample;
           }
