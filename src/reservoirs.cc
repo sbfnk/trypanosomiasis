@@ -302,8 +302,6 @@ int main(int argc, char* argv[])
   
   // ********************* estimate betas *********************
 
-  betafunc_params p (hosts, vectors, groups, global);
-  
   std::streambuf * buf;
   std::ofstream of;
   if (outFile == "-") {
@@ -317,20 +315,6 @@ int main(int argc, char* argv[])
 
   int seed = get_seed();
   int *x = 0;
-  
-  std::vector<boost::math::beta_distribution<>*> distributions;
-  
-  // generate beta distributions of prevalence
-  for (size_t j = 0; j < hosts.size(); ++j) {
-    distributions.push_back
-      (new boost::math::beta_distribution<>
-       (hosts[j]->M.first+1, hosts[j]->N.first-hosts[j]->M.first+1));
-  }
-  for (size_t j = 0; j < vectors.size(); ++j) {
-    distributions.push_back
-      (new boost::math::beta_distribution<>
-       (vectors[j]->M.first+1, vectors[j]->N.first-vectors[j]->M.first+1));
-  }
   
   boost::mt19937 gen(seed);
   
@@ -432,7 +416,23 @@ int main(int argc, char* argv[])
       }
     }
 
+    betafunc_params p (hosts, vectors, groups, global);
+  
+    std::vector<boost::math::beta_distribution<>*> distributions;
+    
     if (samples > 0) {
+      // generate beta distributions of prevalence
+      for (size_t j = 0; j < hosts.size(); ++j) {
+        distributions.push_back
+          (new boost::math::beta_distribution<>
+           (hosts[j]->M.first+1, hosts[j]->N.first-hosts[j]->M.first+1));
+      }
+      for (size_t j = 0; j < vectors.size(); ++j) {
+        distributions.push_back
+          (new boost::math::beta_distribution<>
+           (vectors[j]->M.first+1, vectors[j]->N.first-vectors[j]->M.first+1));
+      }
+  
       for (size_t j = 0; j < hosts.size(); ++j) {
         p.hPrevalence[j] = quantile(*distributions[j], randGen());
       }
