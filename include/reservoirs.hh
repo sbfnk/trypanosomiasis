@@ -443,12 +443,21 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
                   habitatOverlap[m][j] = 1;
                 } else {
                   double diff =
-                    (hosts[i]->habitat[o].value -
-                     hosts[l]->habitat[o].value);
+                    fabs(hosts[i]->habitat[o].value -
+                         hosts[l]->habitat[o].value);
                   habitatOverlap[j][m] += diff * hosts[i]->habitat[o].value /
                     static_cast<double>(groups[j].members.size());
-                  habitatOverlap[m][j] += diff * hosts[i]->habitat[l].value /
+                  habitatOverlap[m][j] += diff * hosts[l]->habitat[o].value /
                     static_cast<double>(groups[m].members.size());
+                  // std::cout << o << " " << i << " " << l << " "
+                  //           << hosts[i]->habitat[o].value << " "
+                  //           << hosts[l]->habitat[o].value << " "
+                  //           << diff << " " << groups[j].members.size()
+                  //           << " " << groups[m].members.size() << std::endl;
+                  // std::cout << j << " " << m << " " << habitatOverlap[j][m] 
+                  //           << std::endl;
+                  // std::cout << m << " " << j << " " << habitatOverlap[m][j]
+                  //           << std::endl;
                 }
               }
             }
