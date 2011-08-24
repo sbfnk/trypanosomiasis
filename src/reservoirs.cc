@@ -399,7 +399,7 @@ int main(int argc, char* argv[])
                 hosts[j]->getParams()[k].param->limits.first +
                 (hosts[j]->getParams()[k].param->limits.second -
                  hosts[j]->getParams()[k].param->limits.first) *
-                (exp(10* x[sample] / static_cast<double>(lhsSamples - 1)) - 1) /
+                (exp(10* (x[sample] - 1) / static_cast<double>(lhsSamples - 1)) - 1) /
                 (exp(10) - 1);
             } else if (hosts[j]->getParams()[k].param->sampling == Normal) {
               double sd = fabs(hosts[j]->getParams()[k].param->limits.second -
@@ -453,7 +453,7 @@ int main(int argc, char* argv[])
                 vectors[j]->getParams()[k].param->limits.first +
                 (vectors[j]->getParams()[k].param->limits.second -
                  vectors[j]->getParams()[k].param->limits.first) *
-                (exp(10* x[sample] / static_cast<double>(lhsSamples - 1)) - 1) /
+                (exp(10* (x[sample] - 1) / static_cast<double>(lhsSamples - 1)) - 1) /
                 (exp(10) - 1);
             } else if (vectors[j]->getParams()[k].param->sampling == Normal) {
               double sd = fabs(vectors[j]->getParams()[k].param->limits.second -
