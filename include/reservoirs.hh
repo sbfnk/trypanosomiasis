@@ -1,4 +1,3 @@
-
 // -*- compile-command: "cd .. ; make -k; cd -"; -*-
 /*! \file reservoirs.hh
   \brief Header file for reservoir analysis based on prevalence data
