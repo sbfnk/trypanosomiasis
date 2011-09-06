@@ -475,22 +475,6 @@ int main(int argc, char* argv[])
       }
     }
 
-    betafunc_params p (hosts, vectors, groups, global);
-  
-    if (samples > 0) {
-      // generate beta distributions of prevalence
-      for (size_t j = 0; j < hosts.size(); ++j) {
-        boost::math::beta_distribution<> distribution
-          (hosts[j]->M.value+1, hosts[j]->N.value-hosts[j]->M.value+1);
-        p.hPrevalence[j] = quantile(distribution, randGen());
-      }
-      for (size_t j = 0; j < vectors.size(); ++j) {
-        boost::math::beta_distribution<> distribution
-          (vectors[j]->M.value+1, vectors[j]->N.value-vectors[j]->M.value+1);
-        p.vPrevalence[j] = quantile(distribution, randGen());
-      }
-    }
-
     // normalise biting
     double bitingSum = .0;
     for (std::vector<Host*>::iterator it = hosts.begin();
@@ -507,6 +491,22 @@ int main(int argc, char* argv[])
       for (std::vector<size_t>::iterator it2 = it->members.begin();
            it2 != it->members.end(); it2++) {
         it->f += hosts[*it2]->f.value;
+      }
+    }
+
+    betafunc_params p (hosts, vectors, groups, global);
+  
+    if (samples > 0) {
+      // generate beta distributions of prevalence
+      for (size_t j = 0; j < hosts.size(); ++j) {
+        boost::math::beta_distribution<> distribution
+          (hosts[j]->M.value+1, hosts[j]->N.value-hosts[j]->M.value+1);
+        p.hPrevalence[j] = quantile(distribution, randGen());
+      }
+      for (size_t j = 0; j < vectors.size(); ++j) {
+        boost::math::beta_distribution<> distribution
+          (vectors[j]->M.value+1, vectors[j]->N.value-vectors[j]->M.value+1);
+        p.vPrevalence[j] = quantile(distribution, randGen());
       }
     }
 
