@@ -287,6 +287,15 @@ int main(int argc, char* argv[])
       groups[0].members.push_back(i);
     }
   }
+  std::cout << "Number of groups: " << groups.size() << std::endl;
+  for (size_t i = 0; i < groups.size(); ++i) {
+    std::cout << "  group #" << i << ":";
+    for (size_t j = 0; j < groups[i].members.size(); ++j) {
+      std::cout << " " << groups[i].members[j];
+    }
+    std::cout << std::endl;
+  }
+    
   
   // ********************* estimate betas *********************
 
@@ -393,7 +402,7 @@ int main(int argc, char* argv[])
                 hosts[j]->getParams()[k].param->limits.first +
                 (hosts[j]->getParams()[k].param->limits.second -
                  hosts[j]->getParams()[k].param->limits.first) *
-                x[sample] / static_cast<double>(lhsSamples - 1);
+                (x[sample] - 1) / static_cast<double>(lhsSamples - 1);
             } else if (hosts[j]->getParams()[k].param->sampling == Log) {
               hosts[j]->getParams()[k].param->value =
                 hosts[j]->getParams()[k].param->limits.first +
@@ -447,7 +456,7 @@ int main(int argc, char* argv[])
                 vectors[j]->getParams()[k].param->limits.first +
                 (vectors[j]->getParams()[k].param->limits.second -
                  vectors[j]->getParams()[k].param->limits.first) *
-                x[sample] / static_cast<double>(lhsSamples - 1);
+                (x[sample] - 1) / static_cast<double>(lhsSamples - 1);
             } else if (vectors[j]->getParams()[k].param->sampling == Log) {
               vectors[j]->getParams()[k].param->value =
                 vectors[j]->getParams()[k].param->limits.first +
@@ -678,6 +687,7 @@ int main(int argc, char* argv[])
           tempP = P;
           tempP(i + matrixSize - hosts.size(),
                 i + matrixSize - hosts.size()) = 1;
+          tempP.print();
           KP = tempP * K;
           if (verbose >= 2) {
             std::stringstream s;
