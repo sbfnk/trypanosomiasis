@@ -350,7 +350,8 @@ int main(int argc, char* argv[])
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j]->getName() << "\"";
     }
-    out << ",\"domestic\",\"wildlife\",\"domestic+wildlife\",\"R0\"";
+    out << ",\"domestic\",\"wildlife\",\"domestic+wildlife\","
+        << "\"human+domestic\",\"human+wildlife\",\"R0\"";
     out << std::endl;
   }
 
@@ -534,6 +535,8 @@ int main(int argc, char* argv[])
     double domestic;
     double domwild;
     double wildlife;
+    double humdom;
+    double humwild;
     double R0;
 
     int status = GSL_SUCCESS;
@@ -728,6 +731,30 @@ int main(int argc, char* argv[])
         arma::eig_gen(eigval, eigvec, KP);
         arma::colvec colwild = arma::real(eigval);
         wildlife = arma::max(colwild);
+
+        tempP = P;
+        for (size_t i = 0; i < 4; ++i) {
+          tempP(i + matrixSize - hosts.size(),
+                i + matrixSize - hosts.size()) = 1;
+        }
+        KP = tempP * K;
+        arma::eig_gen(eigval, eigvec, KP);
+        arma::colvec colhumdom = arma::real(eigval);
+        humdom = arma::max(colhumdom);
+        
+        tempP = P;
+        for (size_t i = 0; i < 1; ++i) {
+          tempP(i + matrixSize - hosts.size(),
+                i + matrixSize - hosts.size()) = 1;
+        }
+        for (size_t i = 4; i < 12; ++i) {
+          tempP(i + matrixSize - hosts.size(),
+                i + matrixSize - hosts.size()) = 1;
+        }
+        KP = tempP * K;
+        arma::eig_gen(eigval, eigvec, KP);
+        arma::colvec colhumwild = arma::real(eigval);
+        humwild = arma::max(colhumwild);
       } else {
         std::cerr << "ERROR: Could not find solution" << std::endl;
       }
@@ -771,17 +798,23 @@ int main(int argc, char* argv[])
       domestic = .0;
       domwild = .0;
       wildlife = .0;
+      humdom = .0;
+      humwild = .0;
       R0 = .0;
 
       for (size_t i = 0; i < hosts.size(); ++i) {
         R0 += hostContrib[i];
         if (i == 0) {
+          humdom += hostContrib[i];
+          humwild += hostContrib[i];
         } else if (i < 4) {
           domestic += hostContrib[i];
           domwild += hostContrib[i];
+          humdom += hostContrib[i];
         } else {
           wildlife += hostContrib[i];
           domwild += hostContrib[i];
+          humwild += hostContrib[i];
         }
       
         contrib[i] = sqrt(hostContrib[i]);
@@ -796,6 +829,8 @@ int main(int argc, char* argv[])
       domestic = sqrt(domestic);
       domwild = sqrt(domwild);
       wildlife = sqrt(wildlife);
+      humdom = sqrt(humdom);
+      humwild = sqrt(humwild);
     }
   
     // output
@@ -861,8 +896,11 @@ int main(int argc, char* argv[])
         std::cout << "\nDomestic cycle: " << domestic << std::endl;
         std::cout << "Wildlife cycle: " << wildlife << std::endl;
         std::cout << "Domestic+wildlife: " << domwild << std::endl;
+        std::cout << "Human+domestic: " << humdom << std::endl;
+        std::cout << "Human+wildlife: " << humwild << std::endl;
       }
-      outLine << "," << domestic << "," << wildlife << "," << domwild << "," << R0;
+      outLine << "," << domestic << "," << wildlife << "," << domwild << ","
+              << humdom << "," << humwild << "," << R0;
       if (!(outFile == "-" && vm.count("print"))) {
         out << outLine.str() << std::endl;
       }
