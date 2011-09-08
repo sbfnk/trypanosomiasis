@@ -287,13 +287,15 @@ int main(int argc, char* argv[])
       groups[0].members.push_back(i);
     }
   }
-  std::cout << "Number of groups: " << groups.size() << std::endl;
-  for (size_t i = 0; i < groups.size(); ++i) {
-    std::cout << "  group #" << i << ":";
-    for (size_t j = 0; j < groups[i].members.size(); ++j) {
-      std::cout << " " << groups[i].members[j];
+  if (verbose) {
+    std::cout << "Number of groups: " << groups.size() << std::endl;
+    for (size_t i = 0; i < groups.size(); ++i) {
+      std::cout << "  group #" << i << ":";
+      for (size_t j = 0; j < groups[i].members.size(); ++j) {
+        std::cout << " " << groups[i].members[j];
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
   }
     
   
