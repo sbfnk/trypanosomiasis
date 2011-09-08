@@ -692,7 +692,6 @@ int main(int argc, char* argv[])
           tempP = P;
           tempP(i + matrixSize - hosts.size(),
                 i + matrixSize - hosts.size()) = 1;
-          tempP.print();
           KP = tempP * K;
           if (verbose >= 2) {
             std::stringstream s;
