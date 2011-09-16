@@ -14,7 +14,7 @@ quantiles$species <- factor(quantiles$species, levels=hosts)
 (CIR0 <- quantile(quantiles$R0, probs=c(0.025, 0.975)))
 pdf("species_contributions.pdf")
 ggplot(quantiles, aes(species,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(quantiles$species),labels=species_labels)
 dev.off()
@@ -25,7 +25,7 @@ group_quantiles <- melt(subset(species_data, groups=="random" & N>3000),
 (CIHuman <- quantile(group_quantiles$Human, probs=c(0.025, 0.975)))
 pdf("group_contributions.pdf")
 ggplot(group_quantiles, aes(grouped,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(group_quantiles$grouped),labels=domain_labels)
 dev.off()
@@ -38,7 +38,7 @@ quantiles$species <- factor(quantiles$species, levels=hosts)
 
 pdf("species_contributions_humdom_wild.pdf")
 ggplot(quantiles, aes(species,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(quantiles$species),labels=species_labels)
 dev.off()
@@ -49,7 +49,7 @@ group_quantiles <- melt(subset(species_data, groups=="humdom_wild" & N>3000 &
   variable_name="grouped")
 pdf("group_contributions_humdom_wild.pdf")
 ggplot(group_quantiles, aes(grouped,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(group_quantiles$grouped),labels=domain_labels)
 dev.off()
@@ -62,7 +62,7 @@ quantiles$species <- factor(quantiles$species, levels=hosts)
 
 pdf("species_contributions_hum_dom_wild.pdf")
 ggplot(quantiles, aes(species,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(quantiles$species),labels=species_labels)
 dev.off()
@@ -73,7 +73,7 @@ group_quantiles <- melt(subset(species_data, groups=="hum_dom_wild" & N>3000 &
   variable_name="grouped")
 pdf("group_contributions_hum_dom_wild.pdf")
 ggplot(group_quantiles, aes(grouped,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(group_quantiles$grouped),labels=domain_labels)
 dev.off()
@@ -86,7 +86,7 @@ quantiles$species <- factor(quantiles$species, levels=hosts)
 
 pdf("species_contributions_binary.pdf")
 ggplot(quantiles, aes(species,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(quantiles$species),labels=species_labels)
 dev.off()
@@ -98,7 +98,7 @@ group_quantiles <- melt(subset(species_data, groups=="hum_dom_wild" & N>3000 &
 
 pdf("group_contributions_binary.pdf")
 ggplot(group_quantiles, aes(grouped,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(group_quantiles$grouped),labels=domain_labels)
 dev.off()
@@ -111,7 +111,7 @@ quantiles$species <- factor(quantiles$species, levels=hosts)
 
 pdf("species_contributions_fractional.pdf")
 ggplot(quantiles, aes(species,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(quantiles$species),labels=species_labels)
 dev.off()
@@ -123,7 +123,7 @@ group_quantiles <- melt(subset(species_data, groups=="hum_dom_wild" & N>3000 &
 
 pdf("group_contributions_fractional.pdf")
 ggplot(group_quantiles, aes(grouped,
-  value))+geom_boxplot()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
+  value))+geom_boxplot()+theme_bw()+opts(axis.text.x=theme_text(angle=45,hjust=1,vjust=1),
   axis.title.x=theme_blank())+scale_y_continuous(title="contribution")+geom_hline(yintercept=1)+
   scale_x_discrete(breaks=levels(group_quantiles$grouped),labels=domain_labels)
 dev.off()
