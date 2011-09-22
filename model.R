@@ -109,20 +109,55 @@ for (i in seq(n_groups)) {
 
 a <- NULL
 
+column <- 1
 for (i in seq(n_groups)) {
   for (k in groups[[i]]) {
-    infstring <- paste("b", k, "/n", k, " * (")
+    infstring <- paste("b", k, "/ n", k, " * (")
     for (j in seq(n_vectors)) {
-      infstring <- paste(infstring, "+tau", j, "*f", k, "/fg", i, "*nv", j,
-                         "*Iv", ((j-1) * n_groups + k))
+      infstring <- paste(infstring, "+ tau", j, "* f", k, "/ fg", i, "* nv", j,
+                         "* Iv", ((j-1) * n_groups + k))
     }
-    infstring <- paste(infstring, ")")
-    a[k] <- infstring
+    infstring <- paste(infstring, ") * (1 - I", k, ")")
+    a[column] <- infstring
+    column <- column + 1
+    a[column] <- paste("mu", i, "+ gamma", i)
+    column <- column + 1
   }
 }
 
 for (j in seq(n_vectors)) {
   for (i in seq(n_groups)) {
-    infstring <- paste("bv", j, "*tau", j, 
+    lambdastring <- paste("bv", j, "* tau", j, "/ fg", i, "* (")
+    for (k in groups[[i]]) {
+      lambdastring <- paste(lambdastring, "+ f", k, "* I", k)
+    }
+    lambdastring <- paste(infstring, ")")
+    tstring <- paste("1",
+                     "- Cv", 3*(j-1)*n_groups+3*(i-1)+1,
+                     "- Iv", 3*(j-1)*n_groups+3*(i-1)+2,
+                     "- Gv", 3*(j-1)*n_groups+3*(i-1)+3,")")
+    
+    a[column] <- paste(lambdastring, "*", tstring)
+    column <- column + 1
+    a[column] <- paste("alpha", j, "* Cv", j)
+    column <- column + 1
+    a[column] <- paste("mu", j, "* Cv", j)
+    column <- column + 1
+    a[column] <- paste("mu", j, "* Iv", j)
+    column <- column + 1
+    a[column] <- paste("(tau", j, "-", lambdastring, ") *", tstring)
+    column <- column + 1
+    a[column] <- paste("mu", j, "* Gv", j)
+    column <- column + 1
+    for (l in seq(n_groups)) {
+      if (l != i) {
+        a[column] <- paste("xi", j, "* Cv", j)
+        column <- column + 1
+        a[column] <- paste("xi", j, "* Iv", j)
+        column <- column + 1
+        a[column] <- paste("xi", j, "* Gv", j)
+        column <- column + 1
+      }
+    }
   }
 }
