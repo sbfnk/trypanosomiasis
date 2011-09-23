@@ -34,7 +34,8 @@ xi <- 0
 
 parms <- c(b=b_hat, n=host_data$n, f=host_data$f, mu=host_data$mu,
            gamma=host_data$gamma, bv=bv, nv=vector_data$n, muv=vector_data$mu,
-           tau=vector_data$tau, alpha=vector_data$alpha, xi=xi, fg=fg)
+           tau=vector_data$tau, alpha=vector_data$alpha, xi=xi, fg=fg,
+           N=host_data$abundance)
 
 # construct initial state vector
 
@@ -127,9 +128,9 @@ for (i in seq(n_groups)) {
       }
       infstring <- paste(infstring, " + tau", jstring, " * f", kstring,
                          " / fg", istring, " * nv", jstring, 
-                         " * Iv", vstring, sep="")
+                         " * Iv", vstring, " / Nv", vstring, sep="")
     }
-    infstring <- paste(infstring, ") * (1 - I", kstring, ")", sep="")
+    infstring <- paste(infstring, ") * (N", kstring, " - I", kstring, ")", sep="")
     a[column] <- infstring
     column <- column + 1
     a[column] <- paste("mu", kstring, " + gamma", kstring, sep="")
@@ -163,11 +164,11 @@ for (j in seq(n_vectors)) {
         vstring <- ""
       }
       lambdastring <- paste(lambdastring, " + f", kstring, " * I", kstring,
-                            sep="")
+                            " / N", kstring, sep="")
     }
     lambdastring <- paste(lambdastring, ")", sep="")
-    tstring <- paste("(1", " - Cv", vstring, " - Iv", vstring, " - Gv",
-                     vstring,")", sep="") 
+    tstring <- paste("(Nv", vstring, " - Cv", vstring, " - Iv", vstring,
+                     " - Gv", vstring,")", sep="") 
     
     a[column] <- paste(lambdastring, " * ", tstring, sep="")
     column <- column + 1
