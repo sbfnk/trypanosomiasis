@@ -9,7 +9,8 @@ vector_data <- read.csv('~/Code/tryps/data/bipindi_vector.csv', header=T,
 
 n_hosts <- length(host_data$mu)
 
-groups <- list(1, seq(n_hosts-1)+1)
+#groups <- list(1, seq(n_hosts-1)+1)
+groups <- list(seq(n_hosts))
 
 n_groups <- length(groups)
 n_vectors <- length(vector_data$mu)
@@ -23,30 +24,24 @@ if (n_vectors == 1) {
   vector_data$n <- 1
 }
 
-b_hat <- ...
-bv <- ...
+b_hat <-
+  c(0.105686, 7.72722, 3.89085, 0.026204, 1.39793, 1.66512, 1.17079, 1.75079,
+    8.65013, 1.02053, 1.77992, 0.533177) 
+bv <-
+  c(0.308736)
 
-xi <- 1
+xi <- 0
 
-lambda <- ...
-lambda_v <- ...
-
-parms <- ...
-
-x0 <- ...
+parms <- c(b=b_hat, n=host_data$n, f=host_data$f, mu=host_data$mu,
+           gamma=host_data$gamma, bv=bv, nv=vector_data$n, muv=vector_data$mu,
+           tau=vector_data$tau, alpha=vector_data$alpha, xi=xi, fg=fg)
 
 # construct initial state vector
 
-x0
-
-for (i in seq(n_groups)) {
-  a_host <- c(paste("lambda*(1-I", i, "")...
-  for (j in seq(n_vectors)) {
-    for (k in seq(n_groups)) {
-      
-    }
-  }
-}
+x0 <- c(I=host_data$M/host_data$N,
+        Cv=vector_data$M/vector_data$N/3,
+        Iv=vector_data$M/vector_data$N/3,
+        Gv=vector_data$M/vector_data$N/3) 
 
 # construct state-change matrix
 
@@ -82,7 +77,6 @@ for (i in seq(n_groups)) {
     nu[n_hosts + 3 * (j - 1) * n_groups + 3 * (i - 1) + 2, column] <- -1
     column <- column + 1
     # non-infectious bite on host
-    nu[n_hosts + 3 * (j - 1) * n_groups + 3 * (i - 1) + 1, column] <- -1
     nu[n_hosts + 3 * (j - 1) * n_groups + 3 * (i - 1) + 3, column] <- +1
     column <- column + 1
     # non-infected vector death
@@ -111,51 +105,89 @@ a <- NULL
 
 column <- 1
 for (i in seq(n_groups)) {
+  if (n_groups > 1) {
+    istring <- i
+  } else {
+    istring <- ""
+  }
   for (k in groups[[i]]) {
-    infstring <- paste("b", k, "/ n", k, " * (")
-    for (j in seq(n_vectors)) {
-      infstring <- paste(infstring, "+ tau", j, "* f", k, "/ fg", i, "* nv", j,
-                         "* Iv", ((j-1) * n_groups + k))
+    if (n_hosts > 1) {
+      kstring <- k
+    } else {
+      kstring <- ""
     }
-    infstring <- paste(infstring, ") * (1 - I", k, ")")
+    infstring <- paste("b", kstring, " / n", kstring, " * (", sep="")
+    for (j in seq(n_vectors)) {
+      if (n_vectors > 1) {
+        jstring <- j
+        vstring <- ((j-1) * n_groups + k)
+      } else {
+        jstring <- ""
+        vstring <- ""
+      }
+      infstring <- paste(infstring, " + tau", jstring, " * f", kstring,
+                         " / fg", istring, " * nv", jstring, 
+                         " * Iv", vstring, sep="")
+    }
+    infstring <- paste(infstring, ") * (1 - I", kstring, ")", sep="")
     a[column] <- infstring
     column <- column + 1
-    a[column] <- paste("mu", i, "+ gamma", i)
+    a[column] <- paste("mu", kstring, " + gamma", kstring, sep="")
     column <- column + 1
   }
 }
 
 for (j in seq(n_vectors)) {
+  if (n_vectors > 1) {
+    jstring <- j
+  } else {
+    jstring <- ""
+  }
   for (i in seq(n_groups)) {
-    lambdastring <- paste("bv", j, "* tau", j, "/ fg", i, "* (")
-    for (k in groups[[i]]) {
-      lambdastring <- paste(lambdastring, "+ f", k, "* I", k)
+    if (n_groups > 1) {
+      istring <- i
+    } else {
+      istring <- ""
     }
-    lambdastring <- paste(infstring, ")")
-    tstring <- paste("1",
-                     "- Cv", 3*(j-1)*n_groups+3*(i-1)+1,
-                     "- Iv", 3*(j-1)*n_groups+3*(i-1)+2,
-                     "- Gv", 3*(j-1)*n_groups+3*(i-1)+3,")")
+    lambdastring <- paste("bv", jstring, " * tau", jstring, " / fg", istring,
+                          " * (", sep="") 
+    for (k in groups[[i]]) {
+      if (n_hosts > 1) {
+        kstring <- k
+      } else {
+        kstring <- ""
+      }
+      if (n_vectors > 1) {
+        vstring <- ((j-1) * n_groups + i)
+      } else {
+        vstring <- ""
+      }
+      lambdastring <- paste(lambdastring, " + f", kstring, " * I", kstring,
+                            sep="")
+    }
+    lambdastring <- paste(lambdastring, ")", sep="")
+    tstring <- paste("(1", " - Cv", vstring, " - Iv", vstring, " - Gv",
+                     vstring,")", sep="") 
     
-    a[column] <- paste(lambdastring, "*", tstring)
+    a[column] <- paste(lambdastring, " * ", tstring, sep="")
     column <- column + 1
-    a[column] <- paste("alpha", j, "* Cv", j)
+    a[column] <- paste("alpha", jstring, " * Cv", vstring, sep="")
     column <- column + 1
-    a[column] <- paste("mu", j, "* Cv", j)
+    a[column] <- paste("muv", jstring, " * Cv", vstring, sep="")
     column <- column + 1
-    a[column] <- paste("mu", j, "* Iv", j)
+    a[column] <- paste("muv", jstring, " * Iv", vstring, sep="")
     column <- column + 1
-    a[column] <- paste("(tau", j, "-", lambdastring, ") *", tstring)
+    a[column] <- paste("(tau", jstring, " - ", lambdastring, ") *", tstring, sep="")
     column <- column + 1
-    a[column] <- paste("mu", j, "* Gv", j)
+    a[column] <- paste("muv", jstring, " * Gv", vstring, sep="")
     column <- column + 1
     for (l in seq(n_groups)) {
       if (l != i) {
-        a[column] <- paste("xi", j, "* Cv", j)
+        a[column] <- paste("xi", jstring, " * fg ", l, " * Cv", vstring, sep="")
         column <- column + 1
-        a[column] <- paste("xi", j, "* Iv", j)
+        a[column] <- paste("xi", jstring, " * fg ", l, " * Iv", vstring, sep="")
         column <- column + 1
-        a[column] <- paste("xi", j, "* Gv", j)
+        a[column] <- paste("xi", jstring, " * fg ", l, " * Gv", vstring, sep="")
         column <- column + 1
       }
     }
