@@ -35,14 +35,14 @@ xi <- 0
 parms <- c(b=b_hat, n=host_data$n, f=host_data$f, mu=host_data$mu,
            gamma=host_data$gamma, bv=bv, nv=vector_data$n, muv=vector_data$mu,
            tau=vector_data$tau, alpha=vector_data$alpha, xi=xi, fg=fg,
-           N=host_data$abundance)
+           N=round(host_data$n*3540/7), Nv=1000)
 
 # construct initial state vector
 
-x0 <- c(I=host_data$M/host_data$N,
-        Cv=vector_data$M/vector_data$N/3,
-        Iv=vector_data$M/vector_data$N/3,
-        Gv=vector_data$M/vector_data$N/3) 
+x0 <- round(c(I=host_data$M/host_data$N*host_data$n*3540/7,
+              Cv=vector_data$M/vector_data$N/4*1000,
+              Iv=vector_data$M/vector_data$N/4*1000,
+              Gv=vector_data$M/vector_data$N/4*1000))
 
 # construct state-change matrix
 
@@ -133,7 +133,7 @@ for (i in seq(n_groups)) {
     infstring <- paste(infstring, ") * (N", kstring, " - I", kstring, ")", sep="")
     a[column] <- infstring
     column <- column + 1
-    a[column] <- paste("mu", kstring, " + gamma", kstring, sep="")
+    a[column] <- paste("(mu", kstring, " + gamma", kstring, ") * I", kstring, sep="")
     column <- column + 1
   }
 }
