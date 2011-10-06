@@ -35,7 +35,7 @@ xi <- 0
 parms <- c(b=b_hat, n=host_data$n, f=host_data$f, mu=host_data$mu,
            gamma=host_data$gamma, bv=bv, nv=vector_data$n, muv=vector_data$mu,
            tau=vector_data$tau, alpha=vector_data$alpha, xi=xi, fg=fg,
-           N=round(host_data$n*3540/7), Nv=1000)
+           N=round(host_data$n*3540/7), Nv=10000)
 
 # construct initial state vector
 
