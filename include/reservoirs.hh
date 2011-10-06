@@ -798,6 +798,18 @@ int betaffoiv(void *p, std::vector<double> &vars,
     }
     std::cout << std::endl;
   
+    std::cout << "mu:";
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      std::cout << " " << params->hosts[i]->mu.value;
+    }
+    std::cout << std::endl;
+  
+    std::cout << "gamma:";
+    for (size_t i = 0; i < params->hosts.size(); ++i) {
+      std::cout << " " << params->hosts[i]->gamma.value;
+    }
+    std::cout << std::endl;
+  
     std::cout << "biting:";
     for (size_t i = 0; i < params->hosts.size(); ++i) {
       std::cout << " " << params->hosts[i]->f.value;

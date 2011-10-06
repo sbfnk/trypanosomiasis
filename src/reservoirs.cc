@@ -333,6 +333,7 @@ int main(int argc, char* argv[])
 
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j]->getName() << "_prev\"";
+      out << ",\"" << hosts[j]->getName() << "_b\"";
       if (lhsSamples > 0) {
         for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
           out << ",\"" << hosts[j]->getName() << "_"
@@ -340,12 +341,18 @@ int main(int argc, char* argv[])
         }
       }
     }
-    for (size_t j = 0; j < vectors.size(); ++j) {
-      out << ",\"" << vectors[j]->getName() << "_prev\"";
+    for (size_t v = 0; v < vectors.size(); ++v) {
+      out << ",\"" << vectors[v]->getName() << "_prev\"";
+      out << ",\"" << vectors[v]->getName() << "_b\"";
+      if (groups.size() > 1) {
+        for (size_t i = 0; i < groups.size(); ++i) {
+          out << ",\"" << vectors[v]->getName() << "_" << i+1 << "_prev\"";
+        }
+      }
       if (lhsSamples > 0) {
-        for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
-          out << ",\"" << vectors[j]->getName() << "_"
-              << vectors[j]->getParams()[k].option << "\"";
+        for (size_t k = 0; k < vectors[v]->getParams().size(); ++k) {
+          out << ",\"" << vectors[v]->getName() << "_"
+              << vectors[v]->getParams()[k].option << "\"";
         }
       }
     }
@@ -840,6 +847,12 @@ int main(int argc, char* argv[])
       for (size_t i = 0; i < hosts.size(); ++i) {
         std::cout << "\\hat{b^h_" << i << "}=" << vars[i] << std::endl;
       }
+      std::cout << "b_hat <-" << std::endl;
+      std::cout << "  c(" << vars[0];
+      for (size_t i = 1; i < hosts.size(); ++i) {
+        std::cout << ", " << vars[i];
+      }
+      std::cout << ")" << std::endl;
       std::cout << std::endl;
       for (size_t v = 0; v < vectors.size(); ++v) {
         if (global->estimateXi) {
@@ -849,6 +862,18 @@ int main(int argc, char* argv[])
         }
         std::cout << "=" << vars[v + hosts.size()] << std::endl;
       }
+      if (global->estimateXi) {
+        std::cout << "xi <- " << std::endl;
+      } else {
+        std::cout << "bv <- " << std::endl;
+      }
+      std::cout << "  c(" << vars[hosts.size()];
+      for (size_t v = 1; v < vectors.size(); ++v) {
+        std::cout << ", " << vars[v + hosts.size()];
+      }
+      std::cout << ")" << std::endl;
+      std::cout << std::endl;
+      
       for (size_t v = 0; v < vectors.size(); ++v) {
         for (size_t j = 0; j < groups.size(); ++j) {
           std::cout << "p_{" << j << "," << v << "}="
@@ -856,10 +881,24 @@ int main(int argc, char* argv[])
                     << std::endl;
         }
       }
+      std::cout << "pv <- " << std::endl;
+      std::cout << "  c(" << vars[hosts.size() + vectors.size()];
+      bool first = true;
+      for (size_t v = 0; v < vectors.size(); ++v) {
+        for (size_t j = 0; j < groups.size(); ++j) {
+          if (first) {
+            first = false;
+          } else {
+            std::cout << ", " << vars[j+v * groups.size() + hosts.size() + vectors.size()];
+          }
+        }
+      }
+      std::cout << ")" << std::endl;
     }
     
     for (size_t j = 0; j < hosts.size(); ++j) {
       outLine << "," << p.hPrevalence[j];
+      outLine << "," << vars[j];
       if (lhsSamples > 0) {
         for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
           outLine << "," << hosts[j]->getParams()[k].param->value;
@@ -867,11 +906,17 @@ int main(int argc, char* argv[])
       }
     }
     
-    for (size_t j = 0; j < vectors.size(); ++j) {
-      outLine << "," << p.vPrevalence[j];
+    for (size_t v = 0; v < vectors.size(); ++v) {
+      outLine << "," << p.vPrevalence[v];
+      outLine << "," << vars[v + hosts.size()];
+      if (groups.size() > 1) {
+        for (size_t i = 0; i < groups.size(); ++i) {
+          outLine << "," << vars[i+v*groups.size() + hosts.size() + vectors.size()];
+        }
+      }
       if (lhsSamples > 0) {
-        for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
-          outLine << "," << vectors[j]->getParams()[k].param->value;
+        for (size_t k = 0; k < vectors[v]->getParams().size(); ++k) {
+          outLine << "," << vectors[v]->getParams()[k].param->value;
         }
       }
     }
