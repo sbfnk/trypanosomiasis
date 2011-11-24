@@ -9,8 +9,8 @@ vector_data <- read.csv('~/Code/tryps/data/bipindi_vector.csv', header=T,
 
 n_hosts <- length(host_data$mu)
 
-#groups <- list(1, seq(n_hosts-1)+1)
-groups <- list(1, seq(3)+1, seq(8)+4)
+groups <- list(1, seq(n_hosts-1)+1)
+#groups <- list(1, seq(3)+1, seq(8)+4)
 #groups <- list(seq(n_hosts))
 
 n_groups <- length(groups)
@@ -32,8 +32,8 @@ bv <-
   c(0.308736)
 ph <-
   host_data$M/host_data$N
-pv <-
-  rep(vector_data$M/vector_data$N/2, n_groups)
+pv <- 
+  c(0.0269921, 0.0412645)
 ptotv <-
   0.0355556
 xi <-
