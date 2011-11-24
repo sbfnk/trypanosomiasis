@@ -11,8 +11,6 @@
   for African Trypanosomiasis, but this can be easily generalised.
 */
 
-
-
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -57,6 +55,8 @@ int main(int argc, char* argv[])
   std::string addHeader; //!< header of custom columns
   size_t attempts = 1; //!< number of attempts for solving equations
 
+  bool sim = false; // simulate?
+
   // main options
   po::options_description main_options
     ("Usage: reservoirs [options]... \n\nOptions");
@@ -85,8 +85,8 @@ int main(int argc, char* argv[])
      "assume normally distributed parameters (as opposed to linear ones)")
     ("jacobian,j", 
      "use jacobian")
-    ("simple,i", 
-     "use simple model")
+    ("calculate,u", 
+     "calulate parameters, don't estimate")
     ("noheader,d", 
      "do not print header")
     ("print,p", 
@@ -97,6 +97,8 @@ int main(int argc, char* argv[])
      "header for custom columns")
     ("attempts,t", po::value<size_t>()->default_value(1),
      "number of solving attempts")
+    ("sim", 
+     "simulate")
     ;
 
   // read options
@@ -160,8 +162,12 @@ int main(int argc, char* argv[])
     lhsSamples = vm["lhs"].as<size_t>();
   }
 
-  if (vm.count("simple")) {
+  if (vm.count("calculate")) {
     calcBetas = false;
+  }
+
+  if (vm.count("sim")) {
+    sim = true;
   }
 
   if (vm.count("addcolumn")) {
@@ -320,7 +326,10 @@ int main(int argc, char* argv[])
   boost::variate_generator<boost::mt19937, boost::uniform_real<> >
     randGen(gen, boost::uniform_real<> (0,1));
 
-  if (!(vm.count("noheader") || (outFile == "-" && vm.count("print")))) {
+  if (!(vm.count("noheader") ||
+        (outFile == "-" && vm.count("print")) ||
+        sim
+      )) {
     if (samples > 0) {
       out << "n";
       if (addHeader.length() > 0) {
@@ -528,7 +537,7 @@ int main(int argc, char* argv[])
         p.vPrevalence[j] = quantile(distribution, randGen());
       }
     }
-
+    
     std::stringstream outLine;
     if (samples > 0) {
       outLine << i;
@@ -947,7 +956,7 @@ int main(int argc, char* argv[])
       }
       outLine << "," << domestic << "," << wildlife << "," << domwild << ","
               << humdom << "," << humwild << "," << R0;
-      if (!(outFile == "-" && vm.count("print"))) {
+      if (!((outFile == "-" && vm.count("print")) || sim)) {
         out << outLine.str() << std::endl;
       }
     }
@@ -957,6 +966,43 @@ int main(int argc, char* argv[])
       free(x);
     }
   } while (i < samples);
+
+  if (sim) {
+    double t = 0;  // Current time
+    double tn = 0; // Next time point at which the state of the system will be
+                   // recorded
+
+    size_t nvars = hosts.size();
+    for (size_t v = 0; v < vectors.size(); ++v) {
+      nvars += groups.size() * (1 + 
+                                (vectors[v]->alpha.value > 0 ? 1 : 0) +
+                                (global->teneralOnly ? 1 : 0));
+    }
+                                
+    std::vector<double> data(0., 1 + nvars);
+
+    size_t index = 0;
+
+    if (!(vm.count("noheader"))) {
+      out << "time";
+    }
+    
+    // initialise values    
+    for (size_t h = 0; h < hosts.size(); ++h) {
+      ++index;
+      data[index] = (hosts[h]->x0.value >= 0 ?
+                     hosts[h]->x0.value :
+                     hosts[h]->M.value);
+      if (!(vm.count("noheader"))) {
+        out << ",I" << h;
+      }
+    }
+
+    
+    // set up equations
+    // run gillespie
+  }
+  
   of.close();
 
   for (std::vector<Host*>::iterator it = hosts.begin();
