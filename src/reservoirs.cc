@@ -58,6 +58,8 @@ int main(int argc, char* argv[])
 
   bool sim = false; // simulate?
   double recordStep = 1.;
+  double tmax = 100.;
+  size_t humanmax = 0;
 
   // main options
   po::options_description main_options
@@ -103,6 +105,10 @@ int main(int argc, char* argv[])
      "simulate")
     ("timestep,t", po::value<double>()->default_value(1.),
      "timestep of recording data")
+    ("tmax", po::value<double>()->default_value(100),
+     "how long to run")
+    ("humanmax", po::value<size_t>(),
+     "human level to stop at")
     ;
 
   // read options
@@ -173,6 +179,10 @@ int main(int argc, char* argv[])
   if (vm.count("sim")) {
     sim = true;
     recordStep = vm["timestep"].as<double>();
+    tmax = vm["tmax"].as<double>();
+    if (vm.count("humanmax")) {
+      humanmax = vm["humanmax"].as<size_t>();
+    }
   }
 
   if (vm.count("addcolumn")) {
@@ -1320,7 +1330,12 @@ int main(int argc, char* argv[])
           }
           ++e;
         } while (r > 0);
-      } while (t < 100);
+      } while (t < tmax && (humanmax == 0 || data[0] < humanmax));
+      out << t;
+      for (size_t i = 0; i < data.size(); ++i) {
+        out << "," << data[i];
+      }
+      out << std::endl;
     }
   } while (i < samples);
   
