@@ -11,6 +11,8 @@
 #include <string>
 #include <sstream>
 
+#include <math.h>
+
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_multiroots.h>
 #include <gsl/gsl_linalg.h>
@@ -367,7 +369,8 @@ void GlobalParams::ReadParams(po::variables_map const &vm)
 }
 
 Host::Host() :
-  HabitatContainer("host")
+  HabitatContainer("host"),
+  x0(-1)
 {
   params.push_back(ParamInfo("N", "Population size", &N));
   params.push_back(ParamInfo("M", "Number infected", &M));

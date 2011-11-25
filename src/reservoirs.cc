@@ -291,7 +291,7 @@ int main(int argc, char* argv[])
     std::stringstream group_option;
     group_option << "g" << i << "-x0";
     group_options.add_options()
-      (group_option.str().c_str(), po::value<double>(),
+      (group_option.str().c_str(), po::value<double>()->default_value(-1),
        "Number of infected vectors in group "+i)
       ;
   }
@@ -1003,7 +1003,7 @@ int main(int argc, char* argv[])
       nvars += groups.size() * vectorTypes;
       // }
                                 
-      std::vector<double> data(0., 1 + nvars);
+      std::vector<double> data(nvars, 0.);
 
       size_t index = 0;
 
@@ -1013,12 +1013,12 @@ int main(int argc, char* argv[])
     
       // initialise values    
       for (size_t h = 0; h < hosts.size(); ++h) {
-        ++index;
         data[index] = (hosts[h]->x0.value >= 0 ?
                        hosts[h]->x0.value :
                        hosts[h]->M.value);
+        ++index;
         if (!(vm.count("noheader"))) {
-          out << ",I" << h;
+          out << ",I" << (h+1);
         }
       }
 
@@ -1026,47 +1026,52 @@ int main(int argc, char* argv[])
       for (size_t g = 0; g < groups.size(); ++g) {
         std::stringstream group_option;
         group_option << "g" << g << "-x0";
-        double prev = vars[g + hosts.size() + vectors.size()];
-        double x0 = prev * groups[g].f * vectors[0]->N.value;
-        if (vm.count(group_option.str().c_str())) {
-          x0 = vm[group_option.str().c_str()].as<double>();
-          prev = x0 / (groups[g].f * vectors[0]->N.value);
+        double x0 = vm[group_option.str().c_str()].as<double>();
+        if (x0 < 0) {
+          x0 = vars[g + hosts.size() + vectors.size()] * groups[g].f *
+            vectors[0]->N.value;
         }
 
         if (global->teneralOnly) {
-          ++index;
           data[index] = vectors[0]->mu.value / (vectors[0]->tau.value + vectors[0]->mu.value) *
             groups[g].f * vectors[0]->N.value;
+          ++index;
           if (!(vm.count("noheader"))) {
-            out << ",Tv" << g;
+            out << ",Tv" << (g + 1);
           }
         }
 
         if (vectors[0]->alpha.value > 0) {
           double inf =
-            vectors[0]->alpha.value/(vectors[0]->alpha.value + vectors[0]->mu.value) *
+            vectors[0]->alpha.value/(vectors[0]->alpha.value +
+                                     vectors[0]->mu.value) *
             ((vectors[0]->alpha.value + vectors[0]->mu.value) /
-             (vectors[0]->alpha.value + vectors[0]->mu.value + vectors[0]->xi.value) * prev +
+             (vectors[0]->alpha.value + vectors[0]->mu.value +
+              vectors[0]->xi.value) * vars[g + hosts.size() + vectors.size()] +
              (vectors[0]->xi.value) /
-             (vectors[0]->alpha.value + vectors[0]->mu.value + vectors[0]->xi.value) *
+             (vectors[0]->alpha.value + vectors[0]->mu.value +
+              vectors[0]->xi.value) *
              vectors[0]->M.value / vectors[0]->N.value);
+
+          double incub = ((vectors[0]->mu.value + vectors[0]->xi.value) * inf -
+                          vectors[0]->xi.value * vectors[0]->M.value /
+                          vectors[0]->N.value) / vectors[0]->alpha.value;
+
+          data[index] = round(x0 * incub / (inf + incub));
           ++index;
-          data[index] =
-            ((vectors[0]->mu.value + vectors[0]->xi.value) * inf - vectors[0]->xi.value *
-             vectors[0]->M.value / vectors[0]->N.value) / vectors[0]->alpha.value;
           if (!(vm.count("noheader"))) {
-            out << ",Cv" << g;
+            out << ",Cv" << (g + 1);
           }
+          data[index] = round(x0 * inf / (inf + incub));
           ++index;
-          data[index] = inf;
           if (!(vm.count("noheader"))) {
-            out << ",Iv" << g;
+            out << ",Iv" << (g + 1);
           }
         } else {
+          data[index] = round(x0);
           ++index;
-          data[index] = prev;
           if (!(vm.count("noheader"))) {
-            out << ",Iv" << g;
+            out << ",Iv" << (g + 1);
           }
         }
       }
@@ -1095,11 +1100,16 @@ int main(int argc, char* argv[])
           newEvent.add = h;
           newEvent.remove = -1;
           newEvent.rate = vars[h] / hosts[h]->n.value *
+            hosts[h]->f.value / groups[hostGroups[h]].f * 
             (vectors[0]->tau.value *
              data[hosts.size() + hostGroups[h] * vectorTypes +
                   vectorTypes - 1] /
              (vectors[0]->N.value)) * (hosts[h]->N.value - data[h]);
           events.push_back(newEvent);
+          if (verbose >= 2) {
+            std::cout << "Event added: infection; add " << newEvent.add << ", remove "
+                      << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+          }
           eventRateSum += newEvent.rate;
 
           // infected host losing infectiousness
@@ -1108,6 +1118,10 @@ int main(int argc, char* argv[])
           newEvent.rate = (hosts[h]->mu.value + hosts[h]->gamma.value) * data[h];
           events.push_back(newEvent);
           eventRateSum += newEvent.rate;
+          if (verbose >= 2) {
+            std::cout << "Event added: infectiousness loss; add " << newEvent.add << ", remove "
+                      << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+          }
         }
 
         for (size_t g = 0; g < groups.size(); ++g) {
@@ -1118,13 +1132,13 @@ int main(int argc, char* argv[])
             size_t h = groups[g].members[i];
             foi += hosts[h]->f.value * data[h] / hosts[h]->N.value;
           }
-          foi *= vectors[0]->tau.value;
+          foi *= vectors[0]->tau.value / groups[g].f;
           double susc;
           if (global->teneralOnly) {
             susc = data[hosts.size() + g * vectorTypes];
           } else {
-            susc = vectors[0]->N.value;
-            for (size_t i = 1; i < vectorTypes; ++i) {
+            susc = vectors[0]->N.value * groups[g].f;
+            for (size_t i = 0; i < vectorTypes; ++i) {
               susc -= data[hosts.size() + g * vectorTypes + i];
             }
           }
@@ -1138,9 +1152,13 @@ int main(int argc, char* argv[])
             newEvent.add = hosts.size() + g * vectorTypes;
             newEvent.remove = -1;
           }
-          newEvent.rate = vars[hosts.size()] * susc;
+          newEvent.rate = vars[hosts.size()] * foi;
           events.push_back(newEvent);
           eventRateSum += newEvent.rate;
+          if (verbose >= 2) {
+            std::cout << "Event added: vector infection; add " << newEvent.add << ", remove "
+                      << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+          }
 
           // infection maturing in incubating vector
           if (vectors[0]->alpha.value > 0) {
@@ -1151,6 +1169,10 @@ int main(int argc, char* argv[])
               data[hosts.size() + g * vectorTypes + vectorTypes - 2];
             events.push_back(newEvent);
             eventRateSum += newEvent.rate;
+          if (verbose >= 2) {
+            std::cout << "Event added: infection maturing; add " << newEvent.add << ", remove "
+                      << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+          }
           }
             
           // incubating vector death
@@ -1166,6 +1188,10 @@ int main(int argc, char* argv[])
               data[hosts.size() + g * vectorTypes + vectorTypes - 2];
             events.push_back(newEvent);
             eventRateSum += newEvent.rate;
+          if (verbose >= 2) {
+            std::cout << "Event added: incubating death; add " << newEvent.add << ", remove "
+                      << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+          }
           }
 
           // infected vector death
@@ -1177,9 +1203,13 @@ int main(int argc, char* argv[])
           newEvent.remove = hosts.size() + g * vectorTypes + vectorTypes - 1;
           newEvent.rate = 
             vectors[0]->mu.value *
-            data[hosts.size() + g * vectorTypes + vectorTypes];
+            data[hosts.size() + g * vectorTypes + vectorTypes - 1];
           events.push_back(newEvent);
           eventRateSum += newEvent.rate;
+          if (verbose >= 2) {
+            std::cout << "Event added: infected death; add " << newEvent.add << ", remove "
+                      << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+          }
 
           // non-infected vector death
           if (global->teneralOnly) {
@@ -1192,6 +1222,10 @@ int main(int argc, char* argv[])
             newEvent.rate *= vectors[0]->mu.value;
             events.push_back(newEvent);
             eventRateSum += newEvent.rate;
+            if (verbose >= 2) {
+              std::cout << "Event added: noninfectious death; add " << newEvent.add << ", remove "
+                        << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+            }
 
             // non-infectious bite on host
             newEvent.add = -1;
@@ -1199,6 +1233,10 @@ int main(int argc, char* argv[])
             newEvent.rate = (1 - vars[hosts.size()]) * susc;
             events.push_back(newEvent);
             eventRateSum += newEvent.rate;
+            if (verbose >= 2) {
+              std::cout << "Event added: noninfectious bite; add " << newEvent.add << ", remove "
+                        << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+            }
           }
 
           // host switches
@@ -1212,6 +1250,10 @@ int main(int argc, char* argv[])
                   data[hosts.size() + g * vectorTypes];
                 events.push_back(newEvent);
                 eventRateSum += newEvent.rate;
+                if (verbose >= 2) {
+                  std::cout << "Event added: host switch; add " << newEvent.add << ", remove "
+                            << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+                }
               }
 
               if (vectors[0]->alpha.value > 0) {
@@ -1222,6 +1264,10 @@ int main(int argc, char* argv[])
                   data[hosts.size() + g * vectorTypes + vectorTypes - 2];
                 events.push_back(newEvent);
                 eventRateSum += newEvent.rate;
+                if (verbose >= 2) {
+                  std::cout << "Event added: host switch; add " << newEvent.add << ", remove "
+                            << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+                }
               }
                 
               newEvent.add = hosts.size() + k * vectorTypes + vectorTypes - 1;
@@ -1231,10 +1277,50 @@ int main(int argc, char* argv[])
                 data[hosts.size() + g * vectorTypes + vectorTypes - 1];
               events.push_back(newEvent);
               eventRateSum += newEvent.rate;
+              if (verbose >= 2) {
+                std::cout << "Event added: host switch; add " << newEvent.add << ", remove "
+                          << newEvent.remove << ", rate " << newEvent.rate << std::endl;
+              }
             }
           }
         }
-      } while (1);
+
+        // determine timestep and update time
+        double r = -log(randGen())/eventRateSum;
+        t += r;
+
+        // determine event
+        r = randGen() * eventRateSum;
+        if (verbose >= 2) {
+          std::cout << "random: " << r << " out of " << eventRateSum << std::endl;
+        }
+
+        size_t e = 0;
+        do {
+          r -= events[e].rate;
+          if (verbose >= 2) {
+            std::cout << "Event: " << e << " step " << r << std::endl;
+          }
+          if (r <= 0) {
+            if (verbose >= 2) {
+              std::cout << "chosen" << std::endl;
+            }
+            if (events[e].add >= 0) {
+              ++data[events[e].add];
+              if (verbose >= 2) {
+                std::cout << "adding a " << events[e].add << std::endl;
+              }
+            }
+            if (events[e].remove >= 0) {
+              --data[events[e].remove];
+              if (verbose >= 2) {
+                std::cout << "removing a " << events[e].remove << std::endl;
+              }
+            }
+          }
+          ++e;
+        } while (r > 0);
+      } while (t < 100);
     }
   } while (i < samples);
   
