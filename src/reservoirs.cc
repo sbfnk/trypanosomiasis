@@ -50,12 +50,14 @@ int main(int argc, char* argv[])
   unsigned int verbose = 0; //!< be verbose
 
   std::vector<Group> groups; //!< composition of groups
+  std::vector<size_t> hostGroups; //!< per-host group membership
 
   std::string addColumn; //!< entry of custom columns
   std::string addHeader; //!< header of custom columns
   size_t attempts = 1; //!< number of attempts for solving equations
 
   bool sim = false; // simulate?
+  double recordStep = 1.;
 
   // main options
   po::options_description main_options
@@ -95,10 +97,12 @@ int main(int argc, char* argv[])
      "custom column(s) to add")
     ("addheader,C", po::value<std::string>(),
      "header for custom columns")
-    ("attempts,t", po::value<size_t>()->default_value(1),
+    ("attempts,a", po::value<size_t>()->default_value(1),
      "number of solving attempts")
-    ("sim", 
+    ("sim",
      "simulate")
+    ("timestep,t", po::value<double>()->default_value(1.),
+     "timestep of recording data")
     ;
 
   // read options
@@ -168,6 +172,7 @@ int main(int argc, char* argv[])
 
   if (vm.count("sim")) {
     sim = true;
+    recordStep = vm["timestep"].as<double>();
   }
 
   if (vm.count("addcolumn")) {
@@ -246,28 +251,8 @@ int main(int argc, char* argv[])
   }
   in.close();
 
-  // ************** read additional parameters ****************
-
-  try {
-    po::store(po::command_line_parser(argc, argv).
-              options(main_options).run(), vm);
-  }
-  catch (std::exception& e) {
-    std::cerr << "Error parsing command line parameters: " << e.what()
-              << std::cout << main_options << std::endl;
-    return 1;
-  }
-  po::notify(vm);
-
-  global->ReadParams(vm);
-  for (size_t i = 0; i < hosts.size(); ++i) {
-    hosts[i]->ReadParams(vm);
-  }
-  for (size_t i = 0; i < vectors.size(); ++i) {
-    vectors[i]->ReadParams(vm);
-  }
-
   // ************** read group composition option ****************
+  // for the moment, works only with one vector species
     
   if (vm.count("groups")) {
     std::string groupString = vm["groups"].as<std::string>();
@@ -293,6 +278,25 @@ int main(int argc, char* argv[])
       groups[0].members.push_back(i);
     }
   }
+
+  hostGroups.resize(hosts.size());
+  for (size_t i = 0; i < groups.size(); ++i) {
+    for (size_t j = 0; j < groups[i].members.size(); ++j) {
+      hostGroups[groups[i].members[j]] = i;
+    }
+  }
+
+  po::options_description group_options("\nInitial number of infected vectors");
+  for (size_t i = 0; i < groups.size(); ++i) {
+    std::stringstream group_option;
+    group_option << "g" << i << "-x0";
+    group_options.add_options()
+      (group_option.str().c_str(), po::value<double>(),
+       "Number of infected vectors in group "+i)
+      ;
+  }
+  main_options.add(group_options);
+  
   if (verbose) {
     std::cout << "Number of groups: " << groups.size() << std::endl;
     for (size_t i = 0; i < groups.size(); ++i) {
@@ -304,7 +308,27 @@ int main(int argc, char* argv[])
     }
   }
     
-  
+  // ************** read additional parameters ****************
+
+  try {
+    po::store(po::command_line_parser(argc, argv).
+              options(main_options).run(), vm);
+  }
+  catch (std::exception& e) {
+    std::cerr << "Error parsing command line parameters: " << e.what()
+              << std::cout << main_options << std::endl;
+    return 1;
+  }
+  po::notify(vm);
+
+  global->ReadParams(vm);
+  for (size_t i = 0; i < hosts.size(); ++i) {
+    hosts[i]->ReadParams(vm);
+  }
+  for (size_t i = 0; i < vectors.size(); ++i) {
+    vectors[i]->ReadParams(vm);
+  }
+
   // ********************* estimate betas *********************
 
   std::streambuf * buf;
@@ -965,43 +989,254 @@ int main(int argc, char* argv[])
     if (lhsSamples > 0 && (i % lhsSamples == 0)) {
       free(x);
     }
-  } while (i < samples);
 
-  if (sim) {
-    double t = 0;  // Current time
-    double tn = 0; // Next time point at which the state of the system will be
-                   // recorded
+    if (sim) {
+      double t = 0;  // Current time
+      double tn = 0; // Next time point at which the state of the system will be
+                     // recorded
 
-    size_t nvars = hosts.size();
-    for (size_t v = 0; v < vectors.size(); ++v) {
-      nvars += groups.size() * (1 + 
-                                (vectors[v]->alpha.value > 0 ? 1 : 0) +
-                                (global->teneralOnly ? 1 : 0));
-    }
+      size_t nvars = hosts.size();
+      // for (size_t v = 0; v < vectors.size(); ++v) {
+      size_t vectorTypes = 1 + 
+        (vectors[0]->alpha.value > 0 ? 1 : 0) +
+        (global->teneralOnly ? 1 : 0);
+      nvars += groups.size() * vectorTypes;
+      // }
                                 
-    std::vector<double> data(0., 1 + nvars);
+      std::vector<double> data(0., 1 + nvars);
 
-    size_t index = 0;
+      size_t index = 0;
 
-    if (!(vm.count("noheader"))) {
-      out << "time";
-    }
-    
-    // initialise values    
-    for (size_t h = 0; h < hosts.size(); ++h) {
-      ++index;
-      data[index] = (hosts[h]->x0.value >= 0 ?
-                     hosts[h]->x0.value :
-                     hosts[h]->M.value);
       if (!(vm.count("noheader"))) {
-        out << ",I" << h;
+        out << "time";
       }
-    }
-
     
-    // set up equations
-    // run gillespie
-  }
+      // initialise values    
+      for (size_t h = 0; h < hosts.size(); ++h) {
+        ++index;
+        data[index] = (hosts[h]->x0.value >= 0 ?
+                       hosts[h]->x0.value :
+                       hosts[h]->M.value);
+        if (!(vm.count("noheader"))) {
+          out << ",I" << h;
+        }
+      }
+
+      // for the moment, only work with one vector
+      for (size_t g = 0; g < groups.size(); ++g) {
+        std::stringstream group_option;
+        group_option << "g" << g << "-x0";
+        double prev = vars[g + hosts.size() + vectors.size()];
+        double x0 = prev * groups[g].f * vectors[0]->N.value;
+        if (vm.count(group_option.str().c_str())) {
+          x0 = vm[group_option.str().c_str()].as<double>();
+          prev = x0 / (groups[g].f * vectors[0]->N.value);
+        }
+
+        if (global->teneralOnly) {
+          ++index;
+          data[index] = vectors[0]->mu.value / (vectors[0]->tau.value + vectors[0]->mu.value) *
+            groups[g].f * vectors[0]->N.value;
+          if (!(vm.count("noheader"))) {
+            out << ",Tv" << g;
+          }
+        }
+
+        if (vectors[0]->alpha.value > 0) {
+          double inf =
+            vectors[0]->alpha.value/(vectors[0]->alpha.value + vectors[0]->mu.value) *
+            ((vectors[0]->alpha.value + vectors[0]->mu.value) /
+             (vectors[0]->alpha.value + vectors[0]->mu.value + vectors[0]->xi.value) * prev +
+             (vectors[0]->xi.value) /
+             (vectors[0]->alpha.value + vectors[0]->mu.value + vectors[0]->xi.value) *
+             vectors[0]->M.value / vectors[0]->N.value);
+          ++index;
+          data[index] =
+            ((vectors[0]->mu.value + vectors[0]->xi.value) * inf - vectors[0]->xi.value *
+             vectors[0]->M.value / vectors[0]->N.value) / vectors[0]->alpha.value;
+          if (!(vm.count("noheader"))) {
+            out << ",Cv" << g;
+          }
+          ++index;
+          data[index] = inf;
+          if (!(vm.count("noheader"))) {
+            out << ",Iv" << g;
+          }
+        } else {
+          ++index;
+          data[index] = prev;
+          if (!(vm.count("noheader"))) {
+            out << ",Iv" << g;
+          }
+        }
+      }
+      if (!(vm.count("noheader"))) {
+        out << std::endl;
+      }
+      
+      // run gillespie
+      do {
+        if (t >= tn) {
+          out << t;
+          for (size_t i = 0; i < data.size(); ++i) {
+            out << "," << data[i];
+          }
+          out << std::endl;
+          tn += recordStep;
+        }
+
+        double eventRateSum = .0;
+        std::vector<Event> events;
+
+        for (size_t h = 0; h < hosts.size(); ++h) {
+          Event newEvent;
+
+          // susceptible host infected by vector
+          newEvent.add = h;
+          newEvent.remove = -1;
+          newEvent.rate = vars[h] / hosts[h]->n.value *
+            (vectors[0]->tau.value *
+             data[hosts.size() + hostGroups[h] * vectorTypes +
+                  vectorTypes - 1] /
+             (vectors[0]->N.value)) * (hosts[h]->N.value - data[h]);
+          events.push_back(newEvent);
+          eventRateSum += newEvent.rate;
+
+          // infected host losing infectiousness
+          newEvent.add = -1;
+          newEvent.remove = h;
+          newEvent.rate = (hosts[h]->mu.value + hosts[h]->gamma.value) * data[h];
+          events.push_back(newEvent);
+          eventRateSum += newEvent.rate;
+        }
+
+        for (size_t g = 0; g < groups.size(); ++g) {
+          Event newEvent;
+
+          double foi = 0;
+          for (size_t i = 0; i < groups[g].members.size(); ++i) {
+            size_t h = groups[g].members[i];
+            foi += hosts[h]->f.value * data[h] / hosts[h]->N.value;
+          }
+          foi *= vectors[0]->tau.value;
+          double susc;
+          if (global->teneralOnly) {
+            susc = data[hosts.size() + g * vectorTypes];
+          } else {
+            susc = vectors[0]->N.value;
+            for (size_t i = 1; i < vectorTypes; ++i) {
+              susc -= data[hosts.size() + g * vectorTypes + i];
+            }
+          }
+          foi *= susc;
+
+          // vector infected by host
+          if (global->teneralOnly) {
+            newEvent.add = hosts.size() + g * vectorTypes + 1;
+            newEvent.remove = hosts.size() + g * vectorTypes;
+          } else {
+            newEvent.add = hosts.size() + g * vectorTypes;
+            newEvent.remove = -1;
+          }
+          newEvent.rate = vars[hosts.size()] * susc;
+          events.push_back(newEvent);
+          eventRateSum += newEvent.rate;
+
+          // infection maturing in incubating vector
+          if (vectors[0]->alpha.value > 0) {
+            newEvent.add = hosts.size() + g * vectorTypes + vectorTypes - 1;
+            newEvent.remove = hosts.size() + g * vectorTypes + vectorTypes - 2;
+            newEvent.rate =
+              vectors[0]->alpha.value *
+              data[hosts.size() + g * vectorTypes + vectorTypes - 2];
+            events.push_back(newEvent);
+            eventRateSum += newEvent.rate;
+          }
+            
+          // incubating vector death
+          if (vectors[0]->alpha.value > 0) {
+            if (global->teneralOnly) {
+              newEvent.add = hosts.size() + g * vectorTypes;
+            } else {
+              newEvent.add = -1;
+            }
+            newEvent.remove = hosts.size() + g * vectorTypes + vectorTypes - 2;
+            newEvent.rate =
+              vectors[0]->mu.value *
+              data[hosts.size() + g * vectorTypes + vectorTypes - 2];
+            events.push_back(newEvent);
+            eventRateSum += newEvent.rate;
+          }
+
+          // infected vector death
+          if (global->teneralOnly) {
+            newEvent.add = hosts.size() + g * vectorTypes;
+          } else {
+            newEvent.add = -1;
+          }
+          newEvent.remove = hosts.size() + g * vectorTypes + vectorTypes - 1;
+          newEvent.rate = 
+            vectors[0]->mu.value *
+            data[hosts.size() + g * vectorTypes + vectorTypes];
+          events.push_back(newEvent);
+          eventRateSum += newEvent.rate;
+
+          // non-infected vector death
+          if (global->teneralOnly) {
+            newEvent.add = hosts.size() + g * vectorTypes;
+            newEvent.remove = -1;
+            newEvent.rate = vectors[0]->N.value;
+            for (size_t i = 1; i < vectorTypes; ++i) {
+              newEvent.rate -= data[hosts.size() + g * vectorTypes + i];
+            }
+            newEvent.rate *= vectors[0]->mu.value;
+            events.push_back(newEvent);
+            eventRateSum += newEvent.rate;
+
+            // non-infectious bite on host
+            newEvent.add = -1;
+            newEvent.remove = hosts.size() + g * vectorTypes;
+            newEvent.rate = (1 - vars[hosts.size()]) * susc;
+            events.push_back(newEvent);
+            eventRateSum += newEvent.rate;
+          }
+
+          // host switches
+          for (size_t k = 0; k < groups.size(); ++k) {
+            if (k != g) {
+              if (global->teneralOnly) {
+                newEvent.add = hosts.size() + k * vectorTypes;
+                newEvent.remove = hosts.size() + g * vectorTypes;
+                newEvent.rate =
+                  vectors[0]->xi.value * groups[k].f *
+                  data[hosts.size() + g * vectorTypes];
+                events.push_back(newEvent);
+                eventRateSum += newEvent.rate;
+              }
+
+              if (vectors[0]->alpha.value > 0) {
+                newEvent.add = hosts.size() + k * vectorTypes + vectorTypes - 2;
+                newEvent.remove = hosts.size() + g * vectorTypes + vectorTypes - 2;
+                newEvent.rate =
+                  vectors[0]->xi.value * groups[k].f *
+                  data[hosts.size() + g * vectorTypes + vectorTypes - 2];
+                events.push_back(newEvent);
+                eventRateSum += newEvent.rate;
+              }
+                
+              newEvent.add = hosts.size() + k * vectorTypes + vectorTypes - 1;
+              newEvent.remove = hosts.size() + g * vectorTypes + vectorTypes - 1;
+              newEvent.rate =
+                vectors[0]->xi.value * groups[k].f *
+                data[hosts.size() + g * vectorTypes + vectorTypes - 1];
+              events.push_back(newEvent);
+              eventRateSum += newEvent.rate;
+            }
+          }
+        }
+      } while (1);
+    }
+  } while (i < samples);
   
   of.close();
 

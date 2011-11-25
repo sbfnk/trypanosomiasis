@@ -121,6 +121,7 @@ class Host :
 public:
   Host();
   Parameter M, N, mu, gamma, b, f, n;
+  Parameter x0; // initial number of infected hosts
 };
 
 /*! Class for vector species and its data/parameters */
@@ -150,6 +151,7 @@ struct Group
   
   double f;
   std::vector<size_t> members;
+  int x0; // initial number of infected vectors in group
 };
 
 /*! Class for system-wide data/parameters */
@@ -186,6 +188,12 @@ struct betafunc_params
                                    //!prevalence in vectors does not have to be
                                    //!calculated every time 
   std::vector<std::vector<double> > habitatOverlap;
+};
+
+struct Event {
+  int add;
+  int remove;
+  double rate;
 };
 
 /*! \brief Read data from table.
@@ -368,6 +376,7 @@ Host::Host() :
   params.push_back(ParamInfo("b", "Susceptibility", &b));
   params.push_back(ParamInfo("n", "Abundance", &n));
   params.push_back(ParamInfo("f", "Biting preference", &f));
+  params.push_back(ParamInfo("x0", "Initial number of infected", &x0));
 }
   
 Vector::Vector() :
