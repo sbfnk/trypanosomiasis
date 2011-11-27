@@ -1040,6 +1040,10 @@ int main(int argc, char* argv[])
         if (x0 < 0) {
           x0 = vars[g + hosts.size() + vectors.size()] * groups[g].f *
             vectors[0]->N.value;
+        } else {
+          for (size_t i = 0; i < groups[g].members.size(); ++i) {
+            data[groups[g].members[i]] = x0;
+          }
         }
 
         if (global->teneralOnly) {
