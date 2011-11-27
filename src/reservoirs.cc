@@ -352,7 +352,7 @@ int main(int argc, char* argv[])
   
   std::ostream out(buf);
 
-  int seed = get_seed();
+  int seed = getSeed();
   int *x = 0;
   
   boost::mt19937 gen(seed);
@@ -1299,41 +1299,47 @@ int main(int argc, char* argv[])
           }
         }
 
-        // determine timestep and update time
-        double r = -log(randGen())/eventRateSum;
-        t += r;
+        if (eventRateSum > 0) {
 
-        // determine event
-        r = randGen() * eventRateSum;
-        if (verbose >= 2) {
-          std::cout << "random: " << r << " out of " << eventRateSum << std::endl;
-        }
+          // determine timestep and update time
+          double r = -log(randGen())/eventRateSum;
+          t += r;
 
-        size_t e = 0;
-        do {
-          r -= events[e].rate;
+          // determine event
+          r = randGen() * eventRateSum;
           if (verbose >= 2) {
-            std::cout << "Event: " << e << " step " << r << std::endl;
+            std::cout << "random: " << r << " out of " << eventRateSum
+                      << std::endl;
           }
-          if (r <= 0) {
+
+          size_t e = 0;
+          do {
+            r -= events[e].rate;
             if (verbose >= 2) {
-              std::cout << "chosen" << std::endl;
+              std::cout << "Event: " << e << " step " << r << std::endl;
             }
-            if (events[e].add >= 0) {
-              ++data[events[e].add];
+            if (r <= 0) {
               if (verbose >= 2) {
-                std::cout << "adding a " << events[e].add << std::endl;
+                std::cout << "chosen" << std::endl;
+              }
+              if (events[e].add >= 0) {
+                ++data[events[e].add];
+                if (verbose >= 2) {
+                  std::cout << "adding a " << events[e].add << std::endl;
+                }
+              }
+              if (events[e].remove >= 0) {
+                --data[events[e].remove];
+                if (verbose >= 2) {
+                  std::cout << "removing a " << events[e].remove << std::endl;
+                }
               }
             }
-            if (events[e].remove >= 0) {
-              --data[events[e].remove];
-              if (verbose >= 2) {
-                std::cout << "removing a " << events[e].remove << std::endl;
-              }
-            }
-          }
-          ++e;
-        } while (r > 0);
+            ++e;
+          } while (r > 0);
+        } else {
+          t = INFINITY;
+        }
       } while (t < tmax && (humanmax == 0 || data[0] < humanmax));
       out << t;
       for (size_t i = 0; i < data.size(); ++i) {

@@ -198,6 +198,8 @@ struct Event {
   double rate;
 };
 
+int getSeed();
+
 /*! \brief Read data from table.
    
 Reads parameters and measured data from table
@@ -994,6 +996,16 @@ int betaffoiv(void *p, std::vector<double> &vars,
   gsl_vector_free (x_init);
 
   return status;
+}
+
+int getSeed()
+{
+  std::ifstream rand("/dev/urandom");
+  char tmp[sizeof(int)];
+  rand.read(tmp,sizeof(int));
+  rand.close();
+  int* number = reinterpret_cast<int*>(tmp);
+  return (*number);
 }
 
 #endif
