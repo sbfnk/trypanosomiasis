@@ -19,3 +19,11 @@ ggplot(rtimes,
   labels=c("0.1","1","10","50","100"))+theme_bw()+opts(panel.grid.major=theme_blank(),
   panel.grid.minor=theme_blank(), title)
 dev.off()
+
+pdf('reintroduction_times2.pdf')
+ggplot(rtimes,
+  aes(x=years,color=xi))+geom_density(size=2)+scale_x_log10(limits=c(0.01,100),
+  breaks=c(0.1,1,10,50,100),
+  labels=c("0.1","1","10","50","100"))+theme_bw()+opts(panel.grid.major=theme_blank(),
+  panel.grid.minor=theme_blank(), title)
+dev.off()
