@@ -4,6 +4,7 @@
 //------------------------------------------------------------
 
 #include <iostream>
+#include <math.h>
 #include <gsl/gsl_errno.h>
 
 #include <boost/program_options.hpp>
@@ -30,6 +31,7 @@ namespace tryps
     // parameters
     double b[12], f[12], mu[12], gamma[12], n[12];
     double bv, tau, muv;
+    double scaling;
     std::string hname[12];
     std::string vname;
     
@@ -79,7 +81,7 @@ namespace tryps
 
       for (unsigned int i = 0; i < 12; ++i) {
         double lambda = p.b[i] * p.tau * p.f[i] / p.n[i] * y[12];
-        rhs[i] = lambda * (1 - y[i]) - (p.mu[i] + p.gamma[i]) * y[i];
+        rhs[i] = p.scaling * lambda * (1 - y[i]) - (p.mu[i] + p.gamma[i]) * y[i];
       }
       double vlambda = 0;
       for (unsigned int i = 0; i < 12; ++i) {
@@ -131,6 +133,8 @@ namespace tryps
        "biting rate")
       ("muv", po::value<double>(),
        "vector mortality/birth rate")
+      ("scaling", po::value<double>(),
+       "scaling ")
       ;
     return opt;
     
@@ -219,7 +223,27 @@ namespace tryps
       std::cerr << "setting to 0" << std::endl;
       model_params->tau=0;
     }
+    if (vm.count("scaling")) {
+      model_params->scaling=vm["scaling"].as<double>();
+    } else {
+      std::cerr << "WARNING: no scaling given" << std::endl;
+      std::cerr << "setting to 1" << std::endl;
+      model_params->scaling=1;
+    }
 
+    double R0 = 0;
+    for (size_t i = 0; i < 12; ++i) {
+      R0 +=
+        (model_params->scaling * model_params->bv * model_params->b[i] *
+         model_params->tau * model_params->tau * model_params->f[i] *
+         model_params->f[i]) /
+        (model_params->muv * (model_params->mu[i] + model_params->gamma[i]) *
+         model_params->n[i]);
+    }
+
+    R0 = sqrt(R0);
+    std::cout << R0 << std::endl;
+    
     return 0;
   }
   

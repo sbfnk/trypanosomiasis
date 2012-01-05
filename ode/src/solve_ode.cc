@@ -101,7 +101,9 @@ int solve_ode_system(int argc, char* argv[])
   init_model_params(vm, ode_sys);
   
   // print ode_system
-  std::cout << ode_sys << std::endl;
+  if (vm.count("verbose")) {
+    std::cout << ode_sys << std::endl;
+  }
   
   // init rhs
   ode_sys.init_rhs();
