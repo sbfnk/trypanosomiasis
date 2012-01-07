@@ -435,14 +435,6 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
   if (global->habType == "b" ||
       global->habType == "f") {
     for (size_t j = 0; j < groups.size(); ++j) {
-      for (size_t k = 0; k < groups[j].members.size(); ++k) {
-        size_t i = groups[j].members[k];
-        hosts[i]->NormaliseHabitats();
-      }
-    }
-      
-    std::vector<double> normaliseSum(hosts.size(), .0);
-    for (size_t j = 0; j < groups.size(); ++j) {
       for (size_t m = j; m < groups.size(); ++m) {
         for (size_t k = 0; k < groups[j].members.size(); ++k) {
           size_t i = groups[j].members[k];
@@ -476,6 +468,12 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
             }
           }
         }
+      }
+    }
+    for (size_t j = 0; j < groups.size(); ++j) {
+      for (size_t k = 0; k < groups[j].members.size(); ++k) {
+        size_t i = groups[j].members[k];
+        hosts[i]->NormaliseHabitats();
       }
     }
   } else {
