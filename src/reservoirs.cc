@@ -937,37 +937,6 @@ int main(int argc, char* argv[])
         }
       }
       std::cout << ")" << std::endl;
-
-      double vtfoi = 0;
-      std::vector<double> vfoi(hosts.size(), .0);
-      std::vector<double> hfoi(hosts.size(), .0);
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        hfoi[i] = vars[i] / hosts[i]->n.value *
-          vectors[0]->tau.value * hosts[i]->f.value *
-          p.vPrevalence[0];
-        vfoi[i] = vars[hosts.size()] * vectors[0]->tau.value *
-          hosts[i]->f.value * p.hPrevalence[i];
-        vtfoi += vfoi[i];
-      }
-      double threshold = 0;
-      double Rzero = 0;
-      for (size_t i = 0; i < hosts.size(); ++i) {
-        threshold +=
-          (vars[i] * vectors[0]->tau.value * hosts[i]->f.value /
-           hosts[i]->n.value - hfoi[i]) *
-          (vars[hosts.size()] * vectors[0]->tau.value * hosts[i]->f.value -
-           vfoi[i]) /
-          (-hosts[i]->mu.value - hosts[i]->gamma.value - hfoi[i]) /
-          (-vectors[0]->mu.value - vtfoi);
-        Rzero +=
-          (vars[i] * vectors[0]->tau.value * hosts[i]->f.value /
-           hosts[i]->n.value) *
-          (vars[hosts.size()] * vectors[0]->tau.value * hosts[i]->f.value) /
-          (-hosts[i]->mu.value - hosts[i]->gamma.value) /
-          (-vectors[0]->mu.value);
-      }
-      std::cout << "Treshold: " << sqrt(threshold) << std::endl;
-      std::cout << "Rzero: " << sqrt(Rzero) << std::endl;
     }
     
     for (size_t j = 0; j < hosts.size(); ++j) {
