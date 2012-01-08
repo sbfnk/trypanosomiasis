@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
      "custom column(s) to add")
     ("addheader,C", po::value<std::string>(),
      "header for custom columns")
-    ("attempts,a", po::value<size_t>()->default_value(1),
+    ("attempts,m", po::value<size_t>()->default_value(1),
      "number of solving attempts")
     ("sim",
      "simulate")
