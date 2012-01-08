@@ -376,7 +376,6 @@ int main(int argc, char* argv[])
 
     for (size_t j = 0; j < hosts.size(); ++j) {
       out << ",\"" << hosts[j]->getName() << "_prev\"";
-      out << ",\"" << hosts[j]->getName() << "_b\"";
       if (lhsSamples > 0) {
         for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
           out << ",\"" << hosts[j]->getName() << "_"
@@ -386,7 +385,6 @@ int main(int argc, char* argv[])
     }
     for (size_t v = 0; v < vectors.size(); ++v) {
       out << ",\"" << vectors[v]->getName() << "_prev\"";
-      out << ",\"" << vectors[v]->getName() << "_b\"";
       if (groups.size() > 1) {
         for (size_t i = 0; i < groups.size(); ++i) {
           out << ",\"" << vectors[v]->getName() << "_" << i+1 << "_prev\"";
@@ -812,23 +810,21 @@ int main(int argc, char* argv[])
     } else {
 
       std::vector<double> hostContrib;
-      vars.resize(hosts.size() + groups.size() + 1);
 
       double hostSum = .0;
       
       for (size_t i = 0; i < hosts.size(); ++i) {
         hostSum += hosts[i]->f.value * p.hPrevalence[i];
       }
-      
+
       for (size_t i = 0; i < hosts.size(); ++i) {
-        vars[i] = p.hPrevalence[i] / (1-p.hPrevalence[i]) * hosts[i]->n.value *
+        hosts[i]->b.value = p.hPrevalence[i] / (1-p.hPrevalence[i]) *
+          hosts[i]->n.value *
           (hosts[i]->gamma.value + hosts[i]->mu.value) /
           (vectors[0]->tau.value * hosts[i]->f.value * p.vPrevalence[0]);
       }
 
-      vars[hosts.size() + groups.size()] = p.vPrevalence[0];
-
-      vars[hosts.size()] =
+      vectors[0]->b.value = 
         p.vPrevalence[0] / (1-p.vPrevalence[0]) *
         vectors[0]->mu.value / vectors[0]->tau.value / hostSum;
       
@@ -888,34 +884,38 @@ int main(int argc, char* argv[])
 
     if (verbose) {
       for (size_t i = 0; i < hosts.size(); ++i) {
-        std::cout << "\\hat{b^h_" << i << "}=" << vars[i] << std::endl;
+        std::cout << "\\hat{b^h_" << i << "}=" << hosts[i]->b.value
+                  << std::endl;
       }
       std::cout << "b_hat <-" << std::endl;
-      std::cout << "  c(" << vars[0];
+      std::cout << "  c(" << hosts[0]->b.value;
       for (size_t i = 1; i < hosts.size(); ++i) {
-        std::cout << ", " << vars[i];
+        std::cout << ", " << hosts[i]->b.value;
       }
       std::cout << ")" << std::endl;
       std::cout << std::endl;
       for (size_t v = 0; v < vectors.size(); ++v) {
         if (global->estimateXi) {
-          std::cout << "xi[" << v << "]";
+          std::cout << "xi[" << v << "]" << "=" << vectors[v]->xi.value
+                    << std::endl;;
         } else {
-          std::cout << "b^v_" << v;
+          std::cout << "b^v_" << v << "=" << vectors[v]->b.value
+                    << std::endl;
         }
-        std::cout << "=" << vars[v + hosts.size()] << std::endl;
       }
       if (global->estimateXi) {
-        std::cout << "xi <- " << std::endl;
+        std::cout << "xi <- c(" << vectors[0]->xi.value;
+        for (size_t v = 1; v < vectors.size(); ++v) {
+          std::cout << ", " << vectors[i]->xi.value;
+        }
+        std::cout << ")" << std::endl;
       } else {
-        std::cout << "bv <- " << std::endl;
-      }
-      std::cout << "  c(" << vars[hosts.size()];
-      for (size_t v = 1; v < vectors.size(); ++v) {
-        std::cout << ", " << vars[v + hosts.size()];
+        std::cout << "bv <- c(" << vectors[0]->b.value;
+        for (size_t v = 1; v < vectors.size(); ++v) {
+          std::cout << ", " << vectors[v]->b.value;
+        }
       }
       std::cout << ")" << std::endl;
-      std::cout << std::endl;
       
       for (size_t v = 0; v < vectors.size(); ++v) {
         for (size_t j = 0; j < groups.size(); ++j) {
@@ -941,7 +941,6 @@ int main(int argc, char* argv[])
     
     for (size_t j = 0; j < hosts.size(); ++j) {
       outLine << "," << p.hPrevalence[j];
-      outLine << "," << vars[j];
       if (lhsSamples > 0) {
         for (size_t k = 0; k < hosts[j]->getParams().size(); ++k) {
           outLine << "," << hosts[j]->getParams()[k].param->value;
@@ -951,7 +950,6 @@ int main(int argc, char* argv[])
     
     for (size_t v = 0; v < vectors.size(); ++v) {
       outLine << "," << p.vPrevalence[v];
-      outLine << "," << vars[v + hosts.size()];
       if (groups.size() > 1) {
         for (size_t i = 0; i < groups.size(); ++i) {
           outLine << "," << vars[i+v*groups.size() + hosts.size() + vectors.size()];
