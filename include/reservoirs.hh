@@ -138,12 +138,13 @@ public:
   }
     
   Parameter M, N, mu, tau, b, xi, alpha;
+  std::vector<double> groupPrev;
 };
 
 struct Group
 {
   Group() :
-    f(.0)
+    f(.0), prev(.0)
   {}
   
   Group(size_t initMember) :

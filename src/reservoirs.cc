@@ -234,33 +234,6 @@ int main(int argc, char* argv[])
   }
   in.close();
 
-  // ********************** read vector file ********************
-  
-  in.open(vectorFile.c_str());
-  firstLine = true;
-  
-  if (!in.is_open()) {
-    std::cerr << "Could not open " << vectorFile << std::endl;
-    return 1;
-  }
-
-  while (std::getline(in,line))  {
-    std::vector<std::string> lineVector;
-    Tokenizer tok(line, sep);
-    lineVector.assign(tok.begin(), tok.end());
-
-    if (firstLine) {
-      headings = lineVector;
-      firstLine = false;
-    } else {
-      Vector* newVector = new Vector();
-      newVector->ReadTable(lineVector, headings);
-      main_options.add(*(newVector->getOptions()));
-      vectors.push_back(newVector);
-    }
-  }
-  in.close();
-
   // ************** read group composition option ****************
   // for the moment, works only with one vector species
     
@@ -318,6 +291,34 @@ int main(int argc, char* argv[])
     }
   }
     
+  // ********************** read vector file ********************
+  
+  in.open(vectorFile.c_str());
+  firstLine = true;
+  
+  if (!in.is_open()) {
+    std::cerr << "Could not open " << vectorFile << std::endl;
+    return 1;
+  }
+
+  while (std::getline(in,line))  {
+    std::vector<std::string> lineVector;
+    Tokenizer tok(line, sep);
+    lineVector.assign(tok.begin(), tok.end());
+
+    if (firstLine) {
+      headings = lineVector;
+      firstLine = false;
+    } else {
+      Vector* newVector = new Vector();
+      newVector->ReadTable(lineVector, headings);
+      main_options.add(*(newVector->getOptions()));
+      newVector->groupPrev.resize(groups.size(), .0);
+      vectors.push_back(newVector);
+    }
+  }
+  in.close();
+
   // ************** read additional parameters ****************
 
   try {
@@ -631,6 +632,13 @@ int main(int argc, char* argv[])
             vectors[v]->b.value = vars[v + hosts.size()];
           }
         }
+        for (size_t v = 0; v < vectors.size(); ++v) {
+          vectors[v]->groupPrev.resize(groups.size(), .0);
+          for (size_t g = 0; g < groups.size(); ++g) {
+            vectors[v]->groupPrev[g] =
+              vars[g+v * groups.size() + hosts.size() + vectors.size()];
+          }
+        }
 
         // compose NGM
         S.zeros();
@@ -918,9 +926,9 @@ int main(int argc, char* argv[])
       std::cout << ")" << std::endl;
       
       for (size_t v = 0; v < vectors.size(); ++v) {
-        for (size_t j = 0; j < groups.size(); ++j) {
-          std::cout << "p_{" << j << "," << v << "}="
-                    << vars[j+v * groups.size() + hosts.size() + vectors.size()]
+        for (size_t g = 0; g < groups.size(); ++g) {
+          std::cout << "p_{" << g << "," << v << "}="
+                    << vectors[v]->groupPrev[g]
                     << std::endl;
         }
       }
@@ -932,7 +940,7 @@ int main(int argc, char* argv[])
           if (first) {
             first = false;
           } else {
-            std::cout << ", " << vars[j+v * groups.size() + hosts.size() + vectors.size()];
+            std::cout << ", " << ;
           }
         }
       }
@@ -951,8 +959,8 @@ int main(int argc, char* argv[])
     for (size_t v = 0; v < vectors.size(); ++v) {
       outLine << "," << p.vPrevalence[v];
       if (groups.size() > 1) {
-        for (size_t i = 0; i < groups.size(); ++i) {
-          outLine << "," << vars[i+v*groups.size() + hosts.size() + vectors.size()];
+        for (size_t g = 0; g < groups.size(); ++g) {
+          outLine << "," << vectors[v]->groupPrev[g];
         }
       }
       if (lhsSamples > 0) {
