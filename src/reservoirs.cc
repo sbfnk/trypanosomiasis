@@ -914,7 +914,7 @@ int main(int argc, char* argv[])
       if (global->estimateXi) {
         std::cout << "xi <- c(" << vectors[0]->xi.value;
         for (size_t v = 1; v < vectors.size(); ++v) {
-          std::cout << ", " << vectors[i]->xi.value;
+          std::cout << ", " << vectors[v]->xi.value;
         }
         std::cout << ")" << std::endl;
       } else {
