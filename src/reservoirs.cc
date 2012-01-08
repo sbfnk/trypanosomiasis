@@ -936,7 +936,7 @@ int main(int argc, char* argv[])
       std::cout << "  c(" << vars[hosts.size() + vectors.size()];
       bool first = true;
       for (size_t v = 0; v < vectors.size(); ++v) {
-        for (size_t j = 0; j < groups.size(); ++j) {
+        for (size_t g = 0; g < groups.size(); ++g) {
           if (first) {
             first = false;
           } else {
