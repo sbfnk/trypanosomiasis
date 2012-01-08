@@ -940,7 +940,7 @@ int main(int argc, char* argv[])
           if (first) {
             first = false;
           } else {
-            std::cout << ", " << ;
+            std::cout << ", " << vectors[v]->groupPrev[g];
           }
         }
       }
