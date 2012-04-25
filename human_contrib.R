@@ -35,7 +35,6 @@ ggplot(human_animal_random, aes(x=N/3540,y=value, linetype=contrib,
 dev.off()
 
 
-
 pdf('human_contrib_hum_domwild.pdf')
 ggplot(subset(species_data, groups=="hum_domwild" & N>3000 &
   habitat=="none"), aes(x=xi,y=Human))+
@@ -44,6 +43,24 @@ ggplot(subset(species_data, groups=="hum_domwild" & N>3000 &
   scale_x_continuous("Rate of host switching between humans and animals", limits=c(0,10))+
   scale_y_continuous(substitute(R[0]*" in system of humans and vector"))+
   geom_abline(intercept=1,slope=0) 
+dev.off()
+
+human_animal_single <-
+  melt(subset(species_data_single, N>3000),
+  measure.vars=c("Human", "domestic.wildlife"), id.vars=c("xi"),
+  variable_name="contrib")
+pdf('human_contrib_single_animal.pdf')
+ggplot(human_animal_single, aes(x=xi,y=value, linetype=contrib,
+                                     color=contrib))+ 
+  stat_summary(fun.data="confint", geom="smooth", alpha=0.4, lwd=2)+
+  theme_bw(20)+
+  scale_x_log10("Rate of host switching between species animals")+
+  scale_y_continuous(substitute(R[0]*" in system of humans/animals and vector"),
+                     limits=c(0,1.2))+
+  geom_abline(intercept=1,slope=0, lwd=1.25)+
+  opts(legend.position="none", axis.title.x = theme_text(size=20,vjust = -0.5),
+       axis.title.y = theme_text(size=20,angle=90, vjust = 0.3))+
+  scale_color_brewer(palette="Set1")
 dev.off()
 
 human_animal_hum_domwild <-
