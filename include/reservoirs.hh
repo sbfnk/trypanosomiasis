@@ -144,7 +144,7 @@ public:
 struct Group
 {
   Group() :
-    f(.0), prev(.0)
+    f(.0)
   {}
   
   Group(size_t initMember) :
