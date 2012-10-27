@@ -4,7 +4,8 @@ CC         = g++
 CPPFLAGS     = -Wall -Iinclude -g # -O3
 
 LINKER      = g++
-LDFLAGS     = -lboost_program_options -lgsl -llapack -lblas -g
+LDFLAGS     = -lboost_program_options -lgsl -llapack -lblas \
+              -lgslcblas -larmadillo -g
 
 #--------------------------------------------------------------------
 
