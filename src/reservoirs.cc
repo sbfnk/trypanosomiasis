@@ -386,11 +386,11 @@ int main(int argc, char* argv[])
     }
     for (size_t v = 0; v < vectors.size(); ++v) {
       out << ",\"" << vectors[v]->getName() << "_prev\"";
-      if (groups.size() > 1) {
-        for (size_t i = 0; i < groups.size(); ++i) {
-          out << ",\"" << vectors[v]->getName() << "_" << i+1 << "_prev\"";
-        }
-      }
+      // if (groups.size() > 1) {
+      //   for (size_t i = 0; i < groups.size(); ++i) {
+      //     out << ",\"" << vectors[v]->getName() << "_" << i+1 << "_prev\"";
+      //   }
+      // }
       if (lhsSamples > 0) {
         for (size_t k = 0; k < vectors[v]->getParams().size(); ++k) {
           out << ",\"" << vectors[v]->getName() << "_"
@@ -958,11 +958,11 @@ int main(int argc, char* argv[])
     
     for (size_t v = 0; v < vectors.size(); ++v) {
       outLine << "," << p.vPrevalence[v];
-      if (groups.size() > 1) {
-        for (size_t g = 0; g < groups.size(); ++g) {
-          outLine << "," << vectors[v]->groupPrev[g];
-        }
-      }
+      // if (groups.size() > 1) {
+      //   for (size_t g = 0; g < groups.size(); ++g) {
+      //     outLine << "," << vectors[v]->groupPrev[g];
+      //   }
+      // }
       if (lhsSamples > 0) {
         for (size_t k = 0; k < vectors[v]->getParams().size(); ++k) {
           outLine << "," << vectors[v]->getParams()[k].param->value;
