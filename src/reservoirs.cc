@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
   std::string addHeader; //!< header of custom columns
   size_t attempts = 1; //!< number of attempts for solving equations
 
-  bool sim = false; // simulate?
+  size_t sim = 0; //!< number of simulations
   double recordStep = 1.;
   double tmax = 100.;
   size_t humanmax = 0;
@@ -103,6 +103,8 @@ int main(int argc, char* argv[])
      "number of solving attempts")
     ("sim",
      "simulate")
+    ("nsim", po::value<size_t>()->default_value(1), 
+     "number of simulations")
     ("timestep,t", po::value<double>()->default_value(1.),
      "timestep of recording data")
     ("tmax", po::value<double>()->default_value(100),
@@ -177,7 +179,7 @@ int main(int argc, char* argv[])
   }
 
   if (vm.count("sim")) {
-    sim = true;
+    sim = vm["nsim"].as<size_t>();
     recordStep = vm["timestep"].as<double>();
     tmax = vm["tmax"].as<double>();
     if (vm.count("humanmax")) {
@@ -1006,7 +1008,7 @@ int main(int argc, char* argv[])
       free(x);
     }
 
-    if (sim) {
+    for (size_t current_sim = 0; current_sim < sim; ++current_sim) {
       double t = 0;  // Current time
       double tn = 0; // Next time point at which the state of the system will be
                      // recorded
@@ -1024,6 +1026,9 @@ int main(int argc, char* argv[])
       size_t index = 0;
 
       if (!(vm.count("noheader"))) {
+        if (sim > 1) {
+          out << current_sim << ",";
+        }
         out << "time";
       }
     
@@ -1098,10 +1103,10 @@ int main(int argc, char* argv[])
       if (!(vm.count("noheader"))) {
         out << std::endl;
       }
-      
+
       // run gillespie
       do {
-        if (t >= tn) {
+        if (t >= tn && recordStep >= 0) {
           out << t;
           for (size_t i = 0; i < data.size(); ++i) {
             out << "," << data[i];
