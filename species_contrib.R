@@ -1,6 +1,7 @@
 library(ggplot2)
 library(reshape)
 library(data.table)
+library(grid)
 
 species_labels=c("Human", "Goat", "Pig", "Sheep", "Blackstriped duiker",
   "Blue duiker", "Brush-tailed porcupine", "Giant rat",
@@ -184,11 +185,108 @@ group_quantiles <- melt(subset(species_data, groups=="single" & N>3000 &
   id=c("N","xi","groups","habitat",hosts[-1]),
   variable_name="grouped")
 (CIwild <- quantile(subset(group_quantiles, grouped=="domestic.wildlife")$value, probs=c(0.025, 0.31)))
-svg("stage2_group_contributions_single_fractional.svg")
-ggplot(group_quantiles, aes(grouped,
-  value))+geom_boxplot()+theme_bw(20)+theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1,size=16),
-  axis.title.x=element_blank())+scale_y_continuous(substitute("          Contribution to "*R[0]),
-  limits=c(0,4))+geom_hline(yintercept=1)+
-  scale_x_discrete(breaks=levels(group_quantiles$grouped),labels=domain_labels)
+postscript(
+    "group_contributions_fractional.eps", onefile=F, horizontal=F, paper="special",
+    width=3.27, height=3.27,
+    family = c("arial.afm.gz", "arialbd.afm.gz", "ariali.afm.gz",
+    "arialbi.afm.gz") 
+    )
+## pdf("stage2_group_contributions_single_fractional.pdf",
+##     width=2.72,height=4.54,pointsize=8,
+##     family = c("arial.afm", "arialbd.afm", "ariali.afm", "arialbi.afm"))
+ggplot(group_quantiles, aes(grouped, value))+
+  geom_boxplot(size=0.5, outlier.size=1)+
+  theme_bw(12)+
+  theme(
+        axis.text.x=element_text(angle=45,hjust=1,vjust=1, size=10),
+        axis.title.x=element_blank(),
+        axis.text.y=element_text(size=10),
+        axis.title.y=element_text(size=10),
+        plot.title=element_text(size=12),
+        plot.margin=unit(c(2,2,2,2), "points")
+        )+
+  scale_y_continuous(substitute("   Contribution to "*R[0]),
+                     limits=c(0,3.5))+
+  geom_hline(yintercept=1)+
+  scale_x_discrete(breaks=levels(group_quantiles$grouped),
+                   labels=domain_labels) 
 dev.off()
 rm(group_quantiles)
+
+group_quantiles <- melt(subset(species_data, groups=="single" & N>3000 & 
+  habitat=="fractional" & xi > 10),
+  id=c("N","xi","groups","habitat",hosts),
+  variable_name="grouped")
+quantiles <- melt(subset(species_data, groups=="random" & N>3000 & xi > 10), 
+  id=c("N","xi","groups","habitat",domains[-1]),
+  variable_name="species")
+quantiles <- quantiles[!is.nan(quantiles$value),]
+table(quantiles[quantiles$value>2,]$species) /
+  table(quantiles$species)
+group_plot <- ggplot(group_quantiles, aes(grouped, value))+
+  geom_boxplot(size=0.2, outlier.size=1)+
+  theme_bw(12)+
+  theme(
+        axis.text.x=element_text(angle=45,hjust=1,vjust=1,size=10),
+        axis.title.x=element_blank(),
+        axis.text.y=element_text(size=10),
+        axis.title.y=element_blank(),
+#        axis.ticks.y=element_blank(),
+        plot.title=element_text(size=12),
+        plot.margin=unit(c(0,0,0,0), "cm")
+        )+
+  ggtitle("Groups of species")+
+  scale_y_continuous(substitute("Contribution to "*R[0]),
+                     limits=c(0,3.5))+
+  geom_hline(yintercept=1)+
+  scale_x_discrete(breaks=levels(group_quantiles$grouped),
+                   labels=domain_labels[-1])
+single_plot <- ggplot(quantiles, aes(species, value))+
+  geom_boxplot(size=0.5, outlier.size=1)+
+  theme_bw(12)+
+  scale_y_continuous(substitute("Contribution to "*R[0]),
+                     limits=c(0,2))+
+  theme(
+        axis.text.x=element_text(angle=45,hjust=1,vjust=1,size=10),
+        axis.title.x=element_blank(),
+        axis.text.y=element_text(size=10),
+        plot.title=element_text(size=12),
+        plot.margin=unit(c(0,0,0,0), "cm")
+        )+
+  ggtitle("Individual species")+
+  geom_hline(yintercept=1)+
+  scale_x_discrete(breaks=levels(quantiles$species),
+                   labels=species_labels)
+vp1 <- viewport(
+                width=(unit(0.59, "npc")-unit(2, "points")),
+                height=(unit(1, "npc")-unit(4, "points")),
+                x=(unit(0.295, "npc") + unit(1, "points")),
+                y=0.5
+                )
+vp2 <- viewport(
+                width=(unit(0.39, "npc")-unit(2, "points")),
+                height=(unit(0.91, "npc")-unit(4, "points")),
+                x=(unit(0.805, "npc") - unit(1, "points")),
+                y=(unit(0.545, "npc"))
+                )
+
+postscript(
+    "contributions_random_mixing.eps", onefile=F, horizontal=F,
+    paper="special", 
+    width=6.83, height=3.27,
+    family = c("arial.afm.gz", "arialbd.afm.gz", "ariali.afm.gz",
+    "arialbi.afm.gz") 
+    )
+print(single_plot, vp = vp1)
+print(group_plot, vp = vp2)
+grid.text("A", vp = vp1, x = 0,
+          y = (unit(1, "npc") - unit(2, "points")),
+          just=c("left", "top"),
+          gp=gpar(fontface="bold", fontsize=12))
+grid.text("B", vp = vp2, x = 0,
+          y = (unit(1, "npc") - unit(2, "points")),
+          just=c("left", "top"),
+          gp=gpar(fontface="bold", fontsize=12))
+dev.off()
+rm(group_quantiles)
+rm(quantiles)
