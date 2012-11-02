@@ -1025,9 +1025,12 @@ int main(int argc, char* argv[])
 
       size_t index = 0;
 
-      if (!(vm.count("noheader"))) {
+      if (!(vm.count("noheader") || current_sim > 0)) {
         if (sim > 1) {
-          out << current_sim << ",";
+          if (addHeader.length() > 0) {
+            out << addHeader << ",";
+          }
+          out << "run,";
         }
         out << "time";
       }
@@ -1038,7 +1041,7 @@ int main(int argc, char* argv[])
                        hosts[h]->x0.value :
                        hosts[h]->M.value);
         ++index;
-        if (!(vm.count("noheader"))) {
+        if (!(vm.count("noheader") || current_sim > 0)) {
           out << ",I" << (h+1);
         }
       }
@@ -1051,20 +1054,20 @@ int main(int argc, char* argv[])
         if (x0 < 0) {
           x0 = vars[g + hosts.size() + vectors.size()] * groups[g].f *
             vectors[0]->N.value;
-        } else {
-          for (size_t i = 0; i < groups[g].members.size(); ++i) {
-            data[groups[g].members[i]] = x0;
-          }
-        }
+        }// else {
+//          for (size_t i = 0; i < groups[g].members.size(); ++i) {
+//data[g + hosts.size() + vectors.size() + groups[g].members[i]] = x0;
+//          }
+//        }
 
-        if (global->teneralOnly) {
-          data[index] = vectors[0]->mu.value / (vectors[0]->tau.value + vectors[0]->mu.value) *
-            groups[g].f * vectors[0]->N.value;
-          ++index;
-          if (!(vm.count("noheader"))) {
-            out << ",Tv" << (g + 1);
-          }
-        }
+//        if (global->teneralOnly) {
+//          data[index] = vectors[0]->mu.value / (vectors[0]->tau.value + vectors[0]->mu.value) *
+//            groups[g].f * vectors[0]->N.value;
+//          ++index;
+//          if (!(vm.count("noheader") || current_sim > 0)) {
+//            out << ",Tv" << (g + 1);
+//          }
+//        }
 
         if (vectors[0]->alpha.value > 0) {
           double inf =
@@ -1084,29 +1087,35 @@ int main(int argc, char* argv[])
 
           data[index] = round(x0 * incub / (inf + incub));
           ++index;
-          if (!(vm.count("noheader"))) {
+          if (!(vm.count("noheader") || current_sim > 0)) {
             out << ",Cv" << (g + 1);
           }
           data[index] = round(x0 * inf / (inf + incub));
           ++index;
-          if (!(vm.count("noheader"))) {
+          if (!(vm.count("noheader") || current_sim > 0)) {
             out << ",Iv" << (g + 1);
           }
         } else {
           data[index] = round(x0);
           ++index;
-          if (!(vm.count("noheader"))) {
+          if (!(vm.count("noheader") || current_sim > 0)) {
             out << ",Iv" << (g + 1);
           }
         }
       }
-      if (!(vm.count("noheader"))) {
+      if (!(vm.count("noheader") || current_sim > 0)) {
         out << std::endl;
       }
 
       // run gillespie
       do {
         if (t >= tn && recordStep >= 0) {
+          if (addColumn.length() > 0) {
+            out << addColumn << ",";
+          }
+          if (sim > 1) {
+            out << current_sim << ",";
+          }
           out << t;
           for (size_t i = 0; i < data.size(); ++i) {
             out << "," << data[i];
@@ -1352,6 +1361,12 @@ int main(int argc, char* argv[])
           t = INFINITY;
         }
       } while (t < tmax && (humanmax == 0 || data[0] < humanmax));
+      if (addColumn.length() > 0) {
+        out << addColumn << ",";
+      }
+      if (sim > 1) {
+        out << current_sim << ",";
+      }
       out << t;
       for (size_t i = 0; i < data.size(); ++i) {
         out << "," << data[i];
