@@ -10,15 +10,16 @@ renv <- db2env(db)
 ## (domains <- ls(renv)[c(67,69,77,28,29,125,88)])
 (hosts <- ls(renv)[c(73,43,86,97,1,11,21,33,62,107,117,127)])
 (domains <- ls(renv)[c(73,75,83,31,32,137,96)])
+
 species_data <- data.frame(db[hosts], db[domains[-1]], N=renv$Human_N,
   xi=renv$G._palpalis_gambiense_xi, groups=renv$groups, habitat=renv$habitat)
 
-data <- read.csv("results_single.csv", header=T, sep=',')
-db <- dumpDF(data, dbName="single")
+data <- read.csv("results_human_N.csv", header=T, sep=',')
+db <- dumpDF(data, dbName="human_N")
 rm(data)
 
 renv <- db2env(db)
-species_data_single <- data.frame(db[hosts], db[domains[-1]], N=renv$Human_N,
+human_n_data <- data.frame(db[hosts], db[domains[-1]], N=renv$Human_N,
   xi=renv$G._palpalis_gambiense_xi, groups=renv$groups, habitat=renv$habitat)
 
 rm(renv)

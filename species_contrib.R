@@ -195,7 +195,7 @@ postscript(
 ##     width=2.72,height=4.54,pointsize=8,
 ##     family = c("arial.afm", "arialbd.afm", "ariali.afm", "arialbi.afm"))
 ggplot(group_quantiles, aes(grouped, value))+
-  geom_boxplot(size=0.5, outlier.size=1)+
+  geom_boxplot(size=0.2, outlier.size=0.75)+
   theme_bw(12)+
   theme(
         axis.text.x=element_text(angle=45,hjust=1,vjust=1, size=10),
@@ -224,7 +224,7 @@ quantiles <- quantiles[!is.nan(quantiles$value),]
 table(quantiles[quantiles$value>2,]$species) /
   table(quantiles$species)
 group_plot <- ggplot(group_quantiles, aes(grouped, value))+
-  geom_boxplot(size=0.2, outlier.size=1)+
+  geom_boxplot(size=0.2, outlier.size=0.75)+
   theme_bw(12)+
   theme(
         axis.text.x=element_text(angle=45,hjust=1,vjust=1,size=10),
@@ -242,7 +242,7 @@ group_plot <- ggplot(group_quantiles, aes(grouped, value))+
   scale_x_discrete(breaks=levels(group_quantiles$grouped),
                    labels=domain_labels[-1])
 single_plot <- ggplot(quantiles, aes(species, value))+
-  geom_boxplot(size=0.5, outlier.size=1)+
+  geom_boxplot(size=0.2, outlier.size=0.75)+
   theme_bw(12)+
   scale_y_continuous(substitute("Contribution to "*R[0]),
                      limits=c(0,2))+

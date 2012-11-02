@@ -1,5 +1,6 @@
 library(ggplot2)
 library(reshape)
+library(grid)
 
 confint <- function(x) {
   x <- na.omit(x)
@@ -70,7 +71,7 @@ ggplot(human_animal_single, aes(x=xi,y=value, linetype=contrib,
   scale_color_brewer(palette="Set1")
 dev.off()
 
-human_animal_random <- melt(subset(species_data, groups=="random"),
+human_animal_random <- melt(subset(human_n_data, groups=="random"),
   measure.vars=c("Human", "domestic.wildlife"), id.vars=c("N"),
   variable_name="contrib") 
 df1 <- expand.grid(N=levels(factor(human_animal_random$N)),
@@ -81,9 +82,9 @@ df1$max <- 0.
 df1$N <- as.numeric(as.character(df1$N))
 for (i in 1:nrow(df1)) {
   newconfints <-
-    confint(human_animal_rnadom
-            [human_animal_rnadom$N == df1[i,]$N &
-             human_animal_rnadom$contrib == df1[i,]$contrib,]$value)
+    confint(human_animal_random
+            [human_animal_random$N == df1[i,]$N &
+             human_animal_random$contrib == df1[i,]$contrib,]$value)
   df1[i,]$value <- newconfints$y
   df1[i,]$min <- newconfints$ymin
   df1[i,]$max <- newconfints$ymax
@@ -120,10 +121,10 @@ tf2$min <- as.vector(smooth(df2$min))
 tf2$max <- as.vector(smooth(df2$max))
 tf2$value <- as.vector(smooth(df2$value))
 
-human_pop <- ggplot(human_animal_random,
+human_pop <- ggplot(human_animal_random[human_animal_random$N>100,],
                     aes(x=N/3541, y=value, linetype=contrib, color=contrib))+ 
   geom_hline(yintercept=1, lwd=1)+
-  geom_smooth(aes(ymin=min, ymax=max), data=tf1, lwd=2,
+  geom_smooth(aes(ymin=min, ymax=max), data=tf1[tf1$N>100,], lwd=1.25,
               level=0.95, stat="identity")+
   theme_bw(12)+
   scale_x_continuous("Fraction of human population exposed")+
@@ -133,58 +134,62 @@ human_pop <- ggplot(human_animal_random,
         axis.title.x = element_text(vjust = -0.5, size=10),
 #        axis.title.y = element_text(angle=90, vjust = 0.3),
         axis.text.y=element_text(size=10),
-        axis.title.y = element_blank(),
+        axis.title.y = element_text(angle=90, vjust = 0.3, size=10),
         legend.justification=c(0,0),
-        legend.position=c(0,0),
+        legend.position=c(0.305,-0.05),
         legend.title=element_blank(),
+        legend.background=element_rect(fill=NA),
+        legend.key=element_rect(colour=0),
         plot.title=element_text(size=12),
-        plot.margin=unit(c(0,0,0.15,0.15), "cm")
+        plot.margin=unit(c(0,0,0.36,0), "cm")
         )+
   ggtitle(" ")+
   scale_color_brewer(palette="Set1",
                      labels=c("Humans", "Animals"))+
   scale_linetype(labels=c("Humans", "Animals"))+
-  geom_vline(xintercept=0.36061, lwd=1.25, linetype=2)+
-  geom_vline(xintercept=0.32455, lwd=1.25, linetype=3)
+  geom_vline(xintercept=0.36061, lwd=1, linetype=2)+
+  geom_vline(xintercept=0.32455, lwd=1, linetype=3)
 
 switching <- ggplot(human_animal_hum_domwild,
                     aes(x=xi, y=value, color=contrib, linetype=contrib))+
   geom_hline(yintercept=1, lwd=1)+
-  geom_smooth(aes(ymin=min, ymax=max), data=tf2, lwd=2,
+  geom_smooth(aes(ymin=min, ymax=max), data=tf2, lwd=1.25,
               level=0.95, stat="identity")+
   theme_bw(12)+
   scale_x_log10(
-                expression(paste("Switch rate between humans + animals (in ", yr^{-1}, ")", sep = "")),
+                expression(paste("Switch rate between humans+animals (in ", yr^{-1}, ")", sep = "")),
                 breaks=c(1e-2,1e-1,1,10,100,1000),
                 labels=expression(10^{-2},10^{-1},10^0,10^1,10^2,10^3)
                 )+
   scale_y_continuous(substitute("Contribution to "*R[0]),
-                     limits=c(0,1.45))+
+                     limits=c(0,1.5))+
   ggtitle(" ")+
   theme(
-        axis.title.x = element_text(vjust = -0.5, hjust=0.9, size=10),
-        axis.title.y = element_text(angle=90, vjust = 0.3, size=10),
+        axis.title.x = element_text(hjust=0.9, size=10),
         axis.text.x=element_text(size=10),
+        axis.title.y = element_blank(),
         axis.text.y=element_text(size=10),
         legend.justification=c(0,0),
-        legend.position=c(0,0),
+        legend.position=c(0,-0.05),
         legend.title=element_blank(),
+        legend.background=element_rect(fill=NA),
+        legend.key=element_rect(colour=0),
         plot.title=element_text(size=12),
-        plot.margin=unit(c(0,0,0.15,0.15), "cm")
+        plot.margin=unit(c(0,0,0,0), "cm")
         )+
   scale_color_brewer(palette="Set1",
                      labels=c("Humans", "Animals"))+
   scale_linetype(labels=c("Humans", "Animals"))
 vp1 <- viewport(
-                width=(unit(0.49, "npc")-unit(2, "points")),
+                width=(unit(0.48, "npc")-unit(2, "points")),
                 height=(unit(1, "npc")-unit(4, "points")),
-                x=(unit(0.255, "npc") + unit(1, "points")),
+                x=(unit(0.25, "npc") + unit(1, "points")),
                 y=0.5
                 )
 vp2 <- viewport(
-                width=(unit(0.49, "npc")-unit(2, "points")),
+                width=(unit(0.44, "npc")-unit(2, "points")),
                 height=(unit(1, "npc")-unit(4, "points")),
-                x=(unit(0.745, "npc") - unit(1, "points")),
+                x=(unit(0.77, "npc") - unit(1, "points")),
                 y=0.5
                 )
 cairo_ps(
@@ -205,7 +210,6 @@ grid.text("B", vp = vp2, x = 0,
           just=c("left", "top"),
           gp=gpar(fontface="bold", fontsize=12))
 dev.off()
-
 
 human_animal_contrib <- melt(subset(species_data, groups=="random"),
   measure.vars=c("Human", "domestic.wildlife"), id.vars=c("N"),
