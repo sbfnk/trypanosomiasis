@@ -317,20 +317,34 @@ void HabitatContainer::ReadTable(std::vector<std::string> const &data,
       std::istringstream s(data[i]);
       size_t index;
       size_t numPos = header[i].find_first_of("0123456789");
-      std::istringstream numStr(header[i].substr(numPos));
-      numStr >> index;
-      while (index > habitat.size()) {
-        habitat.push_back(Parameter(.0, std::make_pair(.0, .0)));
+      if (numPos == 1); {
+        std::istringstream numStr(header[i].substr(numPos));
+        numStr >> index;
+        std::stringstream paramStr;
+        paramStr << "X" << index;
+        while (index > habitat.size()) {
+          habitat.push_back(Parameter(.0, std::make_pair(.0, .0)));
+        }
+        if (header[i] == paramStr.str()) {
+          double m;
+          s >> m;
+          habitat[index-1].setMean(m);
+        } else if (header[i] == (paramStr.str() + "_low")) {
+          s >> habitat[index-1].limits.first;
+        } else if (header[i] == (paramStr.str() + "_high")) {
+          s >> habitat[index-1].limits.second;
+        }
       }
-      if (header[i].find("_low_") != std::string::npos) {
-        s >> habitat[index-1].limits.first;
-      } else if (header[i].find("_high_") != std::string::npos) {
-        s >> habitat[index-1].limits.second;
-      } else if (numPos == 1) {
-        double m;
-        s >> m;
-        habitat[index-1].setMean(m);
-      }
+    }
+  }
+
+  for (size_t i = 0; i < habitat.size(); ++i) {
+    if (habitat[i].value > 0) {
+      std::stringstream paramStr;
+      paramStr << "X" << i;
+      std::stringstream describStr;
+      describStr << "Density in habitat " << i;
+      params.push_back(ParamInfo(paramStr.str(), describStr.str(), &(habitat[i])));
     }
   }
 }
@@ -432,7 +446,27 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
   //!< amount of overlap between host habitats
   habitatOverlap = std::vector<std::vector<double> >
     (groups.size(), std::vector<double>(groups.size(), .0));
-    
+
+  size_t nSpecies = 0;
+  for (size_t j = 0; j < groups.size(); ++j) {
+    nSpecies += groups[j].members.size();
+  }
+
+  std::vector<double> habitat_densities(hosts[0]->habitat.size(), .0);
+  std::vector<double> host_densities(nSpecies, .0);
+
+  if (global->habType == "f") {
+    for (size_t j = 0; j < groups.size(); ++j) {
+      for (size_t k = 0; k < groups[j].members.size(); ++k) {
+        size_t i = groups[j].members[k];
+        for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
+          host_densities[i] += hosts[i]->habitat[o].value;
+          habitat_densities[o] += hosts[i]->habitat[o].value;
+        }
+      }
+    }
+  }
+
   if (global->habType == "b" ||
       global->habType == "f") {
     for (size_t j = 0; j < groups.size(); ++j) {
@@ -442,41 +476,46 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
           for (size_t n = 0; n < groups[m].members.size(); ++n) {
             size_t l = groups[m].members[n];
             for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
-              if (hosts[i]->habitat[o].value > 0 &&
-                  hosts[l]->habitat[o].value > 0) {
-                if (global->habType == "b") {
-                  habitatOverlap[j][m] = 1;
-                  habitatOverlap[m][j] = 1;
-                } else {
-                  double diff =
-                    fabs(hosts[i]->habitat[o].value -
-                         hosts[l]->habitat[o].value);
-                  habitatOverlap[j][m] += diff * hosts[i]->habitat[o].value /
-                    static_cast<double>(groups[j].members.size());
-                  habitatOverlap[m][j] += diff * hosts[l]->habitat[o].value /
-                    static_cast<double>(groups[m].members.size());
-                  // std::cout << o << " " << i << " " << l << " "
-                  //           << hosts[i]->habitat[o].value << " "
-                  //           << hosts[l]->habitat[o].value << " "
-                  //           << diff << " " << groups[j].members.size()
-                  //           << " " << groups[m].members.size() << std::endl;
-                  // std::cout << j << " " << m << " " << habitatOverlap[j][m] 
-                  //           << std::endl;
-                  // std::cout << m << " " << j << " " << habitatOverlap[m][j]
-                  //           << std::endl;
-                }
+              if (global->habType == "b") {
+                habitatOverlap[j][m] = 1;
+                habitatOverlap[m][j] = 1;
+              } else {
+                habitatOverlap[j][m] +=
+                  hosts[l]->habitat[o].value / host_densities[l] *
+                  hosts[i]->habitat[o].value / habitat_densities[o];
+                habitatOverlap[m][j] += 
+                  hosts[i]->habitat[o].value / host_densities[i] *
+                  hosts[l]->habitat[o].value / habitat_densities[o];
               }
+              // std::cout << o << " " << i << " " << l << " "
+              //           << hosts[i]->habitat[o].value << " "
+              //           << hosts[l]->habitat[o].value << " "
+              //           << " " << host_densities[i]
+              //           << " " << host_densities[l]
+              //           << " " << habitat_densities[o]
+              //           << " " << habitatOverlap[j][m]
+              //           << " " << habitatOverlap[m][j]
+              //           << std::endl;
             }
           }
         }
       }
     }
-    for (size_t j = 0; j < groups.size(); ++j) {
-      for (size_t k = 0; k < groups[j].members.size(); ++k) {
-        size_t i = groups[j].members[k];
-        hosts[i]->NormaliseHabitats();
-      }
-    }
+
+    // for (size_t j = 0; j < groups.size(); ++j) {
+    //   for (size_t m = j; m < groups.size(); ++m) {
+    //     std::cout << j << " " << m << " " << habitatOverlap[j][m] 
+    //               << std::endl;
+    //   }
+    // }
+                  
+    
+    // for (size_t j = 0; j < groups.size(); ++j) {
+    //   for (size_t k = 0; k < groups[j].members.size(); ++k) {
+    //     size_t i = groups[j].members[k];
+    //     hosts[i]->NormaliseHabitats();
+    //   }
+    // }
   } else {
     for (size_t j = 0; j < groups.size(); ++j) {
       for (size_t m = j; m < groups.size(); ++m) {
