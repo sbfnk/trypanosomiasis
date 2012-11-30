@@ -460,11 +460,21 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
       for (size_t k = 0; k < groups[j].members.size(); ++k) {
         size_t i = groups[j].members[k];
         for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
+          // std::cout << "Host " << i << " Habitat " << o << " " << hosts[i]->habitat[o].value << std::endl;
           host_densities[i] += hosts[i]->habitat[o].value;
           habitat_densities[o] += hosts[i]->habitat[o].value;
         }
       }
     }
+    // for (size_t j = 0; j < groups.size(); ++j) {
+    //   for (size_t k = 0; k < groups[j].members.size(); ++k) {
+    //     size_t i = groups[j].members[k];
+    //     std::cout << "Host " << i << " " << host_densities[i] << std::endl;
+    //     for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
+    //       std::cout << "Habitat " << o << " " << habitat_densities[o] << std::endl;
+    //     }
+    //   }
+    // }
   }
 
   if (global->habType == "b" ||
@@ -480,22 +490,18 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
                 habitatOverlap[j][m] = 1;
                 habitatOverlap[m][j] = 1;
               } else {
+                // std::cout << j << "," << m << " " << 
+                //   hosts[l]->habitat[o].value / host_densities[l] << " " << 
+                //   hosts[i]->habitat[o].value / habitat_densities[o] << std::endl;
                 habitatOverlap[j][m] +=
                   hosts[l]->habitat[o].value / host_densities[l] *
                   hosts[i]->habitat[o].value / habitat_densities[o];
-                habitatOverlap[m][j] += 
-                  hosts[i]->habitat[o].value / host_densities[i] *
-                  hosts[l]->habitat[o].value / habitat_densities[o];
+                if (j != m) {
+                  habitatOverlap[m][j] += 
+                    hosts[i]->habitat[o].value / host_densities[i] *
+                    hosts[l]->habitat[o].value / habitat_densities[o];
+                }
               }
-              // std::cout << o << " " << i << " " << l << " "
-              //           << hosts[i]->habitat[o].value << " "
-              //           << hosts[l]->habitat[o].value << " "
-              //           << " " << host_densities[i]
-              //           << " " << host_densities[l]
-              //           << " " << habitat_densities[o]
-              //           << " " << habitatOverlap[j][m]
-              //           << " " << habitatOverlap[m][j]
-              //           << std::endl;
             }
           }
         }
@@ -503,7 +509,7 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
     }
 
     // for (size_t j = 0; j < groups.size(); ++j) {
-    //   for (size_t m = j; m < groups.size(); ++m) {
+    //   for (size_t m = 0; m < groups.size(); ++m) {
     //     std::cout << j << " " << m << " " << habitatOverlap[j][m] 
     //               << std::endl;
     //   }
