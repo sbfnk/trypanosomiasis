@@ -460,21 +460,21 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
       for (size_t k = 0; k < groups[j].members.size(); ++k) {
         size_t i = groups[j].members[k];
         for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
-          std::cout << "Host " << i << " Habitat " << o << " " << hosts[i]->habitat[o].value << std::endl;
+          // std::cout << "Host " << i << " Habitat " << o << " " << hosts[i]->habitat[o].value << std::endl;
           host_densities[i] += hosts[i]->habitat[o].value;
           habitat_densities[o] += hosts[i]->habitat[o].value;
         }
       }
     }
-    for (size_t j = 0; j < groups.size(); ++j) {
-      for (size_t k = 0; k < groups[j].members.size(); ++k) {
-        size_t i = groups[j].members[k];
-        std::cout << "Host " << i << " " << host_densities[i] << std::endl;
-        for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
-          std::cout << "Habitat " << o << " " << habitat_densities[o] << std::endl;
-        }
-      }
-    }
+    // for (size_t j = 0; j < groups.size(); ++j) {
+    //   for (size_t k = 0; k < groups[j].members.size(); ++k) {
+    //     size_t i = groups[j].members[k];
+    //     std::cout << "Host " << i << " " << host_densities[i] << std::endl;
+    //     for (size_t o = 0; o < hosts[0]->habitat.size(); ++o) {
+    //       std::cout << "Habitat " << o << " " << habitat_densities[o] << std::endl;
+    //     }
+    //   }
+    // }
   }
 
   if (global->habType == "b" ||
@@ -505,12 +505,12 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
       }
     }
 
-    for (size_t j = 0; j < groups.size(); ++j) {
-      for (size_t m = 0; m < groups.size(); ++m) {
-        std::cout << j << " " << m << " " << habitatOverlap[j][m] 
-                  << std::endl;
-      }
-    }
+    // for (size_t j = 0; j < groups.size(); ++j) {
+    //   for (size_t m = 0; m < groups.size(); ++m) {
+    //     std::cout << j << " " << m << " " << habitatOverlap[j][m] 
+    //               << std::endl;
+    //   }
+    // }
                   
     
     // for (size_t j = 0; j < groups.size(); ++j) {
@@ -606,14 +606,22 @@ int betafunc_f(const gsl_vector * x, void * p, gsl_vector * f)
 
   for (size_t j = 0; j < params->groups.size(); ++j) {
     for (size_t v = 0; v < params->vectors.size(); ++v) {
+      double enumerator = .0;
+      double denominator = .0;
+      for (size_t k = 0; k < params->groups.size(); ++k) {
+        enumerator +=
+          params->groups[k].f * params->habitatOverlap[j][k] * pv[k][v];
+        denominator +=
+          params->groups[k].f * params->habitatOverlap[j][k];
+      }
       if (params->global->teneralOnly) {
         yv[j][v] = (params->vectors[v]->mu.value +
                     params->vectors[v]->tau.value) *
           (pv[j][v] + xi[v] / params->vectors[v]->mu.value *
-           (pv[j][v] - params->vPrevalence[v]));
+           (pv[j][v] - enumerator/denominator));
       } else {
         yv[j][v] = (pv[j][v] * params->vectors[v]->mu.value + xi[v] *
-                    (pv[j][v] - params->vPrevalence[v])) /
+                    (pv[j][v] - enumerator/denominator)) /
           (1 - pv[j][v]);
       }
     }

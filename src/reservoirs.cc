@@ -654,11 +654,21 @@ int main(int argc, char* argv[])
             for (size_t l = 0; l < groups.size(); ++l) {
               denominator += p.habitatOverlap[j][l] *
                 groups[l].f;
+              // std::cout << j << "," << l << " "
+              //           << (p.habitatOverlap[j][l] * groups[l].f)
+              //           << std::endl;
             }
+            // std::cout << "denominator: " << denominator << std::endl;
             S(matrixCounter, matrixCounter) =
               S(matrixCounter, matrixCounter) -
               vectors[v]->mu.value - vectors[v]->xi.value;
+            // std::cout << "S[" << matrixCounter << "," << matrixCounter
+            //           << "] += -(mu[" << v << "] + xi[" << v << "]) ("
+            //           << (-vectors[v]->xi.value)
+            //           << ")"
+            //           << std::endl;
             if (vectors[v]->alpha.value > 0) {
+              // std::cout << "g0" << std::endl;
               S(matrixCounter, matrixCounter) =
                 S(matrixCounter, matrixCounter) -
                 vectors[v]->alpha.value;
@@ -675,6 +685,16 @@ int main(int argc, char* argv[])
                 S(matrixCounter,matrixCounter2) +
                 vectors[v]->xi.value * groups[j].f *
                 p.habitatOverlap[j][k] / denominator;
+              // std::cout << "hOl: " << p.habitatOverlap[j][k] << std::endl;
+              // std::cout << "S[" << matrixCounter << "," << matrixCounter2
+              //           << "] += (xi[" << v << "]*f[" << j << "]*ol["
+              //           << j << "," << k << "])/denom ("
+              //           << (vectors[v]->xi.value * groups[j].f *
+              //               p.habitatOverlap[j][k] / denominator)
+              //           << ") ("
+              //           << groups[j].f * p.habitatOverlap[j][k]
+              //           << ")"
+              //           << std::endl;
               if (vectors[v]->alpha.value > 0) {
                 S(matrixCounter + 1, matrixCounter2 + 1) =
                   S(matrixCounter + 1, matrixCounter2 + 1) +
@@ -689,6 +709,14 @@ int main(int argc, char* argv[])
               T(matrixCounter, matrixSize - hosts.size() + i) =
                 vectors[v]->b.value * vectors[v]->tau.value * hosts[i]->f.value /
                 hosts[i]->n.value;
+              // std::cout << "T[" << matrixCounter << ","
+              //           << matrixSize-hosts.size()+i
+              //           << "] = (b[" << v << "]*tau[" << v << "]*f["
+              //           << i << "]*n[" << i << "]) ("
+              //           << (vectors[v]->b.value * vectors[v]->tau.value *
+              //               hosts[i]->f.value / hosts[i]->n.value)
+              //           << ")"
+              //           << std::endl;
             }
             if (vectors[v]->alpha.value > 0) {
               ++matrixCounter;
@@ -698,6 +726,14 @@ int main(int argc, char* argv[])
               T(matrixSize - hosts.size() + i, matrixCounter) =
                 hosts[i]->b.value * vectors[v]->tau.value * hosts[i]->f.value /
                 groups[j].f;
+              // std::cout << "T[" <<  matrixSize - hosts.size() + i<< ","
+              //           << matrixCounter
+              //           << "] = (b[" << v << "]*tau[" << v << "]*f["
+              //           << i << "]/f[" << j << "]) ("
+              //           << (vectors[v]->b.value * vectors[v]->tau.value *
+              //               hosts[i]->f.value / groups[j].f)
+              //           << ")"
+              //           << std::endl;
             }
             ++matrixCounter;
           }
@@ -708,6 +744,12 @@ int main(int argc, char* argv[])
             S(matrixSize - hosts.size() + i,
               matrixSize - hosts.size() + i) -
             hosts[i]->gamma.value - hosts[i]->mu.value;
+          // std::cout << "S[" << (matrixSize - hosts.size() + i) << ","
+          //           << (matrixSize - hosts.size() + i)
+          //           << "] += -(gamma[" << i << "] + mu[" << i << "]) ("
+          //           << -(hosts[i]->gamma.value - hosts[i]->mu.value)
+          //           << ")"
+          //           << std::endl;
         }
 
         if (verbose >= 2) {
