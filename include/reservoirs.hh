@@ -491,12 +491,12 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
                 habitatOverlap[m][j] = 1;
               } else {
                 habitatOverlap[j][m] +=
-                  hosts[l]->habitat[o].value / host_densities[l] *
-                  hosts[i]->habitat[o].value / host_densities[i];
+                  hosts[i]->habitat[o].value / habitat_densities[o] *
+                  hosts[l]->habitat[o].value / host_densities[l];
                 if (j != m) {
                   habitatOverlap[m][j] += 
-                    hosts[i]->habitat[o].value / host_densities[i] *
-                    hosts[l]->habitat[o].value / host_densities[l];
+                    hosts[l]->habitat[o].value / habitat_densities[o] *
+                    hosts[i]->habitat[o].value / host_densities[i];
                 }
               }
             }
