@@ -490,19 +490,19 @@ int main(int argc, char* argv[])
               //           << hosts[j]->getParams()[k].param->value << " "
               //           <<std::endl;
             }
+            // std::cout << hosts[j]->getParams()[k].option
+            //           << ": " << hosts[j]->getParams()[k].param->value
+            //           << " (" << hosts[j]->getParams()[k].param->limits.first
+            //           << ","
+            //           << hosts[j]->getParams()[k].param->limits.second
+            //           << ") " << hosts[j]->getParams()[k].param->sampling
+            //           << std::endl;
             ++sample;
           }
         }
       }
       for (size_t j = 0; j < vectors.size(); ++j) {
         for (size_t k = 0; k < vectors[j]->getParams().size(); ++k) {
-          // std::cout << vectors[j]->getName() << " "
-          //           << vectors[j]->getParams()[k].option << " " 
-          //           << vectors[j]->getParams()[k].param->getMean() << " "
-          //           << vectors[j]->getParams()[k].param->value << " "
-          //           << vectors[j]->getParams()[k].param->limits.first << " " 
-          //           << vectors[j]->getParams()[k].param->limits.second
-          //           << std::endl;
           if (vectors[j]->getParams()[k].param->limits.first >= 0 &&
               vectors[j]->getParams()[k].param->limits.second >= 0) {
             if (vectors[j]->getParams()[k].param->sampling == Linear) {
@@ -521,7 +521,7 @@ int main(int argc, char* argv[])
             } else if (vectors[j]->getParams()[k].param->sampling == Normal) {
               double sd = fabs(vectors[j]->getParams()[k].param->limits.second -
                                vectors[j]->getParams()[k].param->limits.first) /
-                2.;
+                4.;
               vectors[j]->getParams()[k].param->value =
                 vectors[j]->getParams()[k].param->getMean() +
                 sd * quantile(stdNormal,
@@ -532,6 +532,15 @@ int main(int argc, char* argv[])
                               (1 - x[sample] /
                                static_cast<double>(lhsSamples + 1)));
             }
+            std::cout << vectors[j]->getName() << " "
+                      << vectors[j]->getParams()[k].option << ": " 
+                      << vectors[j]->getParams()[k].param->value << " ("
+                      << vectors[j]->getParams()[k].param->limits.first << "," 
+                      << vectors[j]->getParams()[k].param->limits.second << ") "
+                      << vectors[j]->getParams()[k].param->sampling << " ["
+                      << (x[sample] - 1) << ","
+                      << static_cast<double>(lhsSamples - 1) << "]"
+                      << std::endl;
             ++sample;
           }
         }
