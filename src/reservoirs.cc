@@ -532,15 +532,15 @@ int main(int argc, char* argv[])
                               (1 - x[sample] /
                                static_cast<double>(lhsSamples + 1)));
             }
-            std::cout << vectors[j]->getName() << " "
-                      << vectors[j]->getParams()[k].option << ": " 
-                      << vectors[j]->getParams()[k].param->value << " ("
-                      << vectors[j]->getParams()[k].param->limits.first << "," 
-                      << vectors[j]->getParams()[k].param->limits.second << ") "
-                      << vectors[j]->getParams()[k].param->sampling << " ["
-                      << (x[sample] - 1) << ","
-                      << static_cast<double>(lhsSamples - 1) << "]"
-                      << std::endl;
+            // std::cout << vectors[j]->getName() << " "
+            //           << vectors[j]->getParams()[k].option << ": " 
+            //           << vectors[j]->getParams()[k].param->value << " ("
+            //           << vectors[j]->getParams()[k].param->limits.first << "," 
+            //           << vectors[j]->getParams()[k].param->limits.second << ") "
+            //           << vectors[j]->getParams()[k].param->sampling << " ["
+            //           << (x[sample] - 1) << ","
+            //           << static_cast<double>(lhsSamples - 1) << "]"
+            //           << std::endl;
             ++sample;
           }
         }
