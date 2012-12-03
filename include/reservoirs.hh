@@ -418,6 +418,7 @@ Vector::Vector() :
 GlobalParams::GlobalParams() :
   ParamContainer("global"),
   estimateXi(false),
+  xiTau(false),
   teneralOnly(false)
 {
   options->add_options()
