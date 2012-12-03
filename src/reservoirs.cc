@@ -751,9 +751,9 @@ int main(int argc, char* argv[])
               if (verbose > 1) {
                 std::cout << "T[" <<  matrixSize - hosts.size() + i<< ","
                           << matrixCounter
-                          << "] = (b[" << v << "]*tau[" << v << "]*f["
+                          << "] = (b[" << i << "]*tau[" << v << "]*f["
                           << i << "]/f[" << j << "]) ("
-                          << (vectors[v]->b.value * vectors[v]->tau.value *
+                          << (hosts[i]->b.value * vectors[v]->tau.value *
                               hosts[i]->f.value / groups[j].f)
                           << ")"
                           << std::endl;
