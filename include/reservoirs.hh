@@ -510,12 +510,12 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
       }
     }
 
-    for (size_t j = 0; j < groups.size(); ++j) {
-      for (size_t m = 0; m < groups.size(); ++m) {
-        std::cout << j << " " << m << " " << habitatOverlap[j][m] 
-                  << std::endl;
-      }
-    }
+//    for (size_t j = 0; j < groups.size(); ++j) {
+//      for (size_t m = 0; m < groups.size(); ++m) {
+//        std::cout << j << " " << m << " " << habitatOverlap[j][m] 
+//                  << std::endl;
+//      }
+//    }
                   
     
     // for (size_t j = 0; j < groups.size(); ++j) {
