@@ -422,6 +422,7 @@ GlobalParams::GlobalParams() :
 {
   options->add_options()
     ("estimate-xi,x", "Estimate xi (with vector susceptibility set)")
+    ("xi-tau", "set xi to tau")
     ("teneral-only,y", "Only consider teneral flies")
     ("habitat,a", po::value<std::string>()->default_value("n"),
      "type of habitat overlap (n=none,b=binary, f=fractional)")
