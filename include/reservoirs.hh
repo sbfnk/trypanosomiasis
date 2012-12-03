@@ -166,6 +166,7 @@ public:
   void ReadParams(po::variables_map const &vm);
   std::string habType;
   bool estimateXi; //!< estimate xi or alpha
+  bool xiTau; //!< set xi to tau
   bool teneralOnly; //!< only consider teneral flies to be infected
 };
 
@@ -375,6 +376,9 @@ void GlobalParams::ReadParams(po::variables_map const &vm)
   if (vm.count("teneral-only")) {
     teneralOnly = true;
   }
+  if (vm.count("xi-tau")) {
+    xiTau = true;
+  }
   habType = vm["habitat"].as<std::string>();
   if (!(habType == "b" || habType == "f")) {
     if (habType != "n") {
@@ -491,11 +495,11 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
                 habitatOverlap[m][j] = 1;
               } else {
                 habitatOverlap[j][m] +=
-                  hosts[i]->habitat[o].value / habitat_densities[o] *
+                  hosts[i]->habitat[o].value / host_densities[i] *
                   hosts[l]->habitat[o].value / host_densities[l];
                 if (j != m) {
                   habitatOverlap[m][j] += 
-                    hosts[l]->habitat[o].value / habitat_densities[o] *
+                    hosts[l]->habitat[o].value / host_densities[l] *
                     hosts[i]->habitat[o].value / host_densities[i];
                 }
               }
@@ -505,12 +509,12 @@ betafunc_params::betafunc_params(std::vector<Host*> const &hosts,
       }
     }
 
-    // for (size_t j = 0; j < groups.size(); ++j) {
-    //   for (size_t m = 0; m < groups.size(); ++m) {
-    //     std::cout << j << " " << m << " " << habitatOverlap[j][m] 
-    //               << std::endl;
-    //   }
-    // }
+    for (size_t j = 0; j < groups.size(); ++j) {
+      for (size_t m = 0; m < groups.size(); ++m) {
+        std::cout << j << " " << m << " " << habitatOverlap[j][m] 
+                  << std::endl;
+      }
+    }
                   
     
     // for (size_t j = 0; j < groups.size(); ++j) {
