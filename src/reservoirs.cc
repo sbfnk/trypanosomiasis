@@ -523,7 +523,7 @@ int main(int argc, char* argv[])
             } else if (vectors[j]->getParams()[k].param->sampling == Normal) {
               double sd = fabs(vectors[j]->getParams()[k].param->limits.second -
                                vectors[j]->getParams()[k].param->limits.first) /
-                4.;
+                2.;
               vectors[j]->getParams()[k].param->value =
                 vectors[j]->getParams()[k].param->getMean() +
                 sd * quantile(stdNormal,
