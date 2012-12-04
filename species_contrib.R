@@ -134,7 +134,7 @@ quantiles <- melt(subset(species_data, groups=="single" & N>3000 &
   id=c("N","xi","groups","habitat",domains[-1]),
   variable_name="species")
 quantiles$species <- factor(quantiles$species, levels=hosts)
-pdf("stage2_species_contributions_binary.pdf")
+pdf("species_contributions_binary.pdf")
 ggplot(quantiles, aes(species,
   value))+geom_boxplot()+theme_bw(20)+theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1,size=16),
   axis.title.x=element_blank())+scale_y_continuous(substitute("          Contribution to "*R[0]))+geom_hline(yintercept=1)+
@@ -146,7 +146,7 @@ group_quantiles <- melt(subset(species_data, groups=="hum_dom_wild" & N>3000 &
   habitat=="binary" & xi > 10),
   id=c("N","xi","groups","habitat",hosts[-1]),
   variable_name="grouped")
-pdf("stage2_group_contributions_binary.pdf")
+pdf("group_contributions_binary.pdf")
 ggplot(group_quantiles, aes(grouped,
   value))+geom_boxplot()+theme_bw(20)+theme(axis.text.x=element_text(angle=45,hjust=1,vjust=1,size=16),
   axis.title.x=element_blank())+scale_y_continuous(substitute("          Contribution to "*R[0]))+geom_hline(yintercept=1)+
@@ -180,11 +180,15 @@ ggplot(group_quantiles, aes(grouped,
 dev.off()
 rm(group_quantiles)
 
-group_quantiles <- melt(subset(species_data, groups=="single" & N>3000 & 
-  habitat=="fractional" & xi > 10),
+## group_quantiles <- melt(subset(habitat_data_xitau, groups=="habitat" &  
+##   habitat=="fractional"),
+##   id=c("N","tau","groups","habitat",hosts[-1]),
+##   variable_name="grouped")
+group_quantiles <- melt(subset(habitat_data_new, groups=="habitat" &  
+  habitat=="fractional" & xi==48.2578),
   id=c("N","xi","groups","habitat",hosts[-1]),
   variable_name="grouped")
-(CIwild <- quantile(subset(group_quantiles, grouped=="domestic.wildlife")$value, probs=c(0.025, 0.31)))
+(CIwild <- quantile(subset(group_quantiles, grouped=="wildlife")$value, probs=c(0.025, 0.53)))
 postscript(
     "group_contributions_fractional.eps", onefile=F, horizontal=F, paper="special",
     width=3.27, height=3.27,
@@ -213,11 +217,10 @@ ggplot(group_quantiles, aes(grouped, value))+
 dev.off()
 rm(group_quantiles)
 
-group_quantiles <- melt(subset(species_data, groups=="single" & N>3000 & 
-  habitat=="fractional" & xi > 10),
+group_quantiles <- melt(subset(species_data, groups=="random"),
   id=c("N","xi","groups","habitat",hosts),
   variable_name="grouped")
-quantiles <- melt(subset(species_data, groups=="random" & N>3000 & xi > 10), 
+quantiles <- melt(subset(species_data, groups=="random"), 
   id=c("N","xi","groups","habitat",domains[-1]),
   variable_name="species")
 quantiles <- quantiles[!is.nan(quantiles$value),]

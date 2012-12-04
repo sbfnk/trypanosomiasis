@@ -157,9 +157,10 @@ switching <- ggplot(human_animal_hum_domwild,
               level=0.95, stat="identity")+
   theme_bw(12)+
   scale_x_log10(
-                expression(paste("Switch rate between humans+animals (in ", yr^{-1}, ")", sep = "")),
+                expression(paste("Switch rate between humans+animals (in 1/yr)", sep = "")),
                 breaks=c(1e-2,1e-1,1,10,100,1000),
-                labels=expression(10^{-2},10^{-1},10^0,10^1,10^2,10^3)
+                ## labels=expression(10^{2},10^{1},10^0,10^1,10^2,10^3)
+                labels=expression(0.01,0.1,1,10,100,1000)
                 )+
   scale_y_continuous(substitute("Contribution to "*R[0]),
                      limits=c(0,1.5))+
@@ -193,11 +194,11 @@ vp2 <- viewport(
                 y=0.5
                 )
 cairo_ps(
-    "human_contrib_switching.eps", onefile=F, #horizontal=F,
-#    paper="special", 
+    "human_contrib_switching.eps", onefile=F, #horizontal=F, paper="special", 
     width=6.83, height=3.27,
-    family = c("arial.afm.gz", "arialbd.afm.gz", "ariali.afm.gz",
-    "arialbi.afm.gz") 
+    family = "Arial"
+#  c("arial.afm.gz", "arialbd.afm.gz", "ariali.afm.gz",
+#    "arialbi.afm.gz") 
     )
 print(human_pop, vp = vp1)
 print(switching, vp = vp2)
