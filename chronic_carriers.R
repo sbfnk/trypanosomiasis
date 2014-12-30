@@ -1,5 +1,10 @@
 library('data.table')
 library('XLConnect')
+library('adaptivetau')
+library('compiler')
+library('lhs')
+
+enableJIT(1)
 
 wb <- loadWorkbook("~/Research/Analysis/Sleeping_Sickness/Chronic/Village input data.xlsx")
 village_screening <- data.table(readWorksheet(wb, "Sheet1"))
@@ -23,144 +28,343 @@ for (id in village_ids)
     }
 }
 
+sim_chronic_transitions <- list(
+    c(S = -1, Ic = +1), # chronic infection
+    c(Ic = -1, S = +1), # chronic recovery
+    c(S = -1, I1 = +1), # pathogenic infection
+    c(I1 = -1, I2 = +1), # progression into stage 2
+    c(I1 = -1, S = +1, Z1pass = +1), # passive stage 1 detection
+    c(I2 = -1, S = +1, Z2pass = +2), # passive stage 2 detection
+    c(I2 = -1, S = +1) # stage 2 death
+    )
 
-
-sim_chronic <- function(tmax,  params)
+sim_chronic_rates <- function(state, theta, t)
 {
-    S <- 
+    # parameters
+    pc <- theta[["pc"]]
+    lambda <- theta[["lambda"]]
+    rc <- theta[["rc"]]
+    r1 <- theta[["r1"]]
+    p1 <- theta[["p1"]]
+    p2 <- theta[["p2"]]
+    d <- theta[["d"]]
+
+    S <- state[["S"]]
+    Ic <- state[["Ic"]]
+    I1 <- state[["I1"]]
+    I2 <- state[["I2"]]
+    Z1pass <- state[["Z1pass"]]
+    Z2pass <- state[["Z2pass"]]
+
+    return(c(
+        pc * lambda * S, # chronic infection
+        rc * Ic, # chronic recovery
+        (1 - pc) * lambda * S, # pathogenic infection
+        r1 * I1, # progression into stage 2
+        p1 * I1, # passive stage 1 detection
+        p2 * I2, # passitve stage 2 detection
+        d * I2 # stage 2 death
+        ))
 }
 
-# Differential Equations
-next susceptible[1..b] =susceptible[i] - S_I1[i] - S_I1c[i] +  I1c_S[i] + ps1_removal + ps2_removal
-next stage1[1..b] = stage1[i] + S_I1[i] - I1_I2[i] - ps1_removal
-next stage1c[1..b] = stage1c[i] + S_I1c[i] - I1c_S[i]
-next stage2[1..b] = stage2[i] + I1_I2[i] - I2_D[i] - ps2_removal
-next deaths[1..b] = deaths[i] + I2_D[i]
+# village number 2
 
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-{Initial conditions}
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-INIT susceptible[1..b] = S_0
-INIT stage1[1..b] = i1_0[i]
-INIT stage1c[1..b] = i1c_0[i]
-INIT stage2[1..b] = i2_0[i]
-INIT deaths[1..b] = d_0
+rprior <- function(vector)
+{
+    return(c(
+        pc = runif(1, 0, 0.5),
+        lambda = runif(1, 0, 0.05),
+        rc = 1/120,
+        r1 = 0.0019 * 30.42,
+        p1 = runif(1, 0, 1),
+        p2 = runif(1, 0, 1),
+        d = 0.0040 * 30.42,
+        alpha = runif(1, 0, 1),
+        screen1 = runif(1, 0.86, 0.98),
+        screen2 = 0.99
+        ))
+}
 
-{Dimensions of matrix}
-b = 2970						; rows = batchruns with different parameter values
+dprior <- function(theta, log = FALSE)
+{
+    if (log)
+    {
+        res <- 0
+        res <- res + dunif(theta[["pc"]], 0, 0.5, TRUE)
+        res <- res + dunif(theta[["lambda"]], 0, 0.05, TRUE)
+        res <- res + dnorm(theta[["rc"]], 1/120, log = TRUE)
+        res <- res + dnorm(theta[["r1"]],  0.0019 * 30.42, log = TRUE)
+        res <- res + dunif(theta[["p1"]], 0, 1, TRUE)
+        res <- res + dunif(theta[["p2"]], 0, 1, TRUE)
+        res <- res + dnorm(theta[["d"]], 0.0040 * 30.42, log = TRUE)
+        res <- res + dunif(theta[["alpha"]], 0, 1, TRUE)
+        res <- res + dunif(theta[["screen1"]], 0.86, 0.98, TRUE)
+        res <- res + dnorm(theta[["screen2"]], 0.99, log = TRUE)
+    } else
+    {
+        res <- 1
+        res <- res * dunif(theta[["pc"]], 0, 0.5, FALSE)
+        res <- res * dunif(theta[["lambda"]], 0, 0.05, FALSE)
+        res <- res * dnorm(theta[["rc"]], 1/120, log = FALSE)
+        res <- res * dnorm(theta[["r1"]], 0.0019 * 30.42, log = FALSE)
+        res <- res * dunif(theta[["p1"]], 0, 1, FALSE)
+        res <- res * dunif(theta[["p2"]], 0, 1, FALSE)
+        res <- res * dnorm(theta[["d"]], 0.0040 * 30.42, log = FALSE)
+        res <- res * dunif(theta[["alpha"]], 0, 1, FALSE)
+        res <- res * dunif(theta[["screen1"]], 0.86, 0.98, FALSE)
+        res <- res * dnorm(theta[["screen2"]], 0.99, log = FALSE)
+    }
 
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-{Model starting conditions}
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-S_0 = N
-; initial susceptibles, assuming 
+    return(res)
 
-i1_0[1..b] = actual1[i] - observed1[i]
-; initial stage1 prevalence in model after first as
+}
 
-i1c_0[1..b] = actual1c[i] - observed1c[i]
-; initial stage1c prevalence in model after first as
+rinit <- function(theta, village_data)
+{
 
-i2_0[1..b] = actual2[i] - detected2_1
-; initial stage2 prevalence in model after first as
+    N <- village_data[["N"]]
 
-d_0 = 0
-; initial deaths
+    Ic_weight <- theta[["pc"]] / theta[["rc"]]
+    I1_weight <- (1 - theta[["pc"]]) / theta[["r1"]]
+    I2_weight <- (1 - theta[["pc"]]) / theta[["d"]]
 
-{actual prevalent cases}
-{--------------------------------------------------------------------------------------------------------------------------------}
-actual1[1..b] = POISSON(observed1[i] / sigma_start[i])			; estimated actual number of stage1 cases
-actual1c[1..b] = POISSON(observed1c[i] / (sigma_start[i]*alpha[i]))	; estimated actual number of stage1c cases
-actual2[1..b] = POISSON(detected2_1 / sigma_start[i])			; estimated actual number of stage2 cases
+    sum_weights <- Ic_weight + I1_weight + I2_weight
 
-sigma_start[1..b] = RANDOM(min(1.05,1),1)					; probability of observing cases at start
-sigma_end[1..b] = RANDOM(min(0.72,1),1)					; probability of observing cases at end
+    eq_I <- N * (1 - 1 / (1 + theta[["lambda"]] * sum_weights))
 
-{initial observed cases}
-{--------------------------------------------------------------------------------------------------------------------------------}
-detected1_1 = 1													; number of stage 1 (chronic and pathogenic) detected during as
-observed1[1..b] = if STOCH=0 then (detected1_1*proportion_1[i]) else binomial(proportion_1[i], detected1_1)		; number of stage 1 pathogenic detected during as
-observed1c[1..b] = if STOCH=0 then (detected1_1*proportion_1c[i]) else binomial(proportion_1c[i], detected1_1)	; number of stage 1 chronic detected during as
-detected2_1 = 0													; number of stage 2 detected during as
+    initIc <- rpois(1, Ic_weight * eq_I / sum_weights)
+    initI1 <- rpois(1, I1_weight * eq_I / sum_weights)
+    initI2 <- rpois(1, I2_weight * eq_I / sum_weights)
 
-proportion_1c[1..b] = I1c_e[i]/(I1_e[i] + I1c_e[i])
-proportion_1[1..b] = I1_e[i]/(I1_e[i] + I1c_e[i])
+    stage1_detected <- village_data[["detected1_1"]]
+    stage2_detected <- village_data[["detected1_2"]]
 
-{equilibrium prevalence}
-{--------------------------------------------------------------------------------------------------------------------------------}
-I1_e[1..b] = (lambda[i]*(1-pc[i])*S_0) / (r1)			; equilibrium stage 1
-I1c_e[1..b] = (lambda[i]*pc[i]*S_0) / (gamma)		; equilibrium stage 1c
-I2_e[1..b] = (r1*I1_e[i]) / (r2)				; equilibrium stage 2
+    if (initIc + initI1 > stage1_detected)
+    {
+        Ic_ind <- c(rep(1, initIc), rep(0, initI1))
+        Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
+        Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
+        I1_det <- stage1_detected - Ic_det
+        initIc <- initIc - Ic_det
+        initI1 <- initI1 - I1_det
+    } else
+    {
+        initIc <- -1
+        initI1 <- -1
+    }
 
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-{Infection related parameters - in monthly units}
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-{rates of disease progression}
-r1 = 1 - exp(-0.0019*30.42)				; flow from stage 1 - stage 2
-r2 = 1 - exp(-0.0040*30.42)				; flow from stage 2 - deaths (due to HAT)
+    initS <- N - initIc - initI1 - initI2
 
-alpha[1..b] = #alpha(i)					; relative detectability of chronic cf stage1
-lambda[1..b] = #lambda(i)				; incident rate of infection
-pc[1..b] = #pc(i)						; proportion of infections that are chronic
+    return(c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2,
+             Z1pass = 0, Z2pass = 0))
+}
 
-foi_1c[1..b] = lambda[i]*pc[i]				; force of infection to chronic
-foi_1[1..b] = lambda[i]*(1 - pc[i])				; force of infection to stage1
+likelihood <- function(state, stage1_detected = NULL,
+                       stage2_detected = NULL, theta, attendance = 1,
+                       log = FALSE)
+{
+    if (log)
+    {
+        res <- 0
+    } else
+    {
+        res <- 1
+    }
 
-gamma = 1 - exp(-1/120)					; rate at which chronic infection resolves
+    if (!any(state < 0))
+    {
+        if (!is.null(stage1_detected))
+        {
+            if ("Ic" %in% names(state))
+            {
+                stage1_ll <- sum(sapply(seq(0, stage1_detected), function(x)
+                {
+                    prob <-
+                        dbinom(x, state[["Ic"]] + x,
+                               theta[["alpha"]] * theta[["screen1"]] * attendance)
+                    prob <- prob * dbinom(stage1_detected - x, state[["I1"]] + x,
+                                          theta[["screen1"]] * attendance)
+                    prob
+                }))
+                if (log)
+                {
+                    res <- res + log(stage1_ll)
+                } else
+                {
+                    res <- res * stage1_ll
+                }
+            } else
+            {
+                stage1_ll <- dbinom(stage1_detected, state[["I1"]] + stage1_detected,
+                                    theta[["screen1"]] * attendance, log = log)
+                if (log)
+                {
+                    res <- res + stage1_ll
+                } else
+                {
+                    res <- res * stage1_ll
+                }
+            }
+        }
+        if (!is.null(stage2_detected))
+        {
+            stage2_ll <- dbinom(stage2_detected, state[["I2"]] + stage1_detected,
+                                theta[["screen2"]] * attendance, log = log)
+            if (log)
+            {
+                res <- res + stage2_ll
+            } else
+            {
+                res <- res * stage2_ll
+            }
+        }
+    } else {
+        if (log)
+        {
+            res <- -Inf
+        } else
+        {
+            res <- 0
+        }
+    }
 
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-{Demographic parameters}
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-N = 1894						; village specific estimated population at first active screening
+    return(res)
+}
 
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-{Transitions}
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-STOCH=1	; STOCH=0 means deterministic, STOCH=1 is stochastic
+dinit <- function(init, village_data, theta, log = FALSE)
+{
+    stage1_detected <- village_data[["detected1_1"]]
+    stage2_detected <- village_data[["detected1_2"]]
 
-S_I1[1..b] = if STOCH=0 then (foi_1[i]*DT*susceptible[i]) else binomial(foi_1[i]*DT,susceptible[i])
-;transition from susceptible to pathogenic stage 1 infection
+    attendance <- min(village_data[["sigma.start"]], 1)
 
-S_I1c[1..b] = if STOCH=0 then (foi_1c[i]*DT*susceptible[i]) else binomial(foi_1c[i]*DT,susceptible[i])
-; transition from susceptible to chronic stage 1 infection
+    return(likelihood(init, stage1_detected, stage2_detected,
+                      theta, attendance, log = log))
+}
 
-I1c_S[1..b] = if STOCH=0 then (gamma*DT*stage1c[i]) else binomial(gamma*DT, stage1c[i])
-; transition from chronic stage 1 to susceptible infection
+param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE)
+{
+    res <- 0
+    log.prior <- dprior(theta)
+    posteriors <- c()
+    final.attendance <- min(village_data[["sigma.end"]], 1)
+    for (j in seq_len(nruns))
+    {
+        init <- rinit(theta, village_data)
+        log.init <- dinit(init, village_data, theta, TRUE)
+        if (is.finite(log.init))
+        {
+            run <-
+                data.table(ssa.adaptivetau(init, sim_chronic_transitions,
+                                           sim_chronic_rates, theta,
+                                           village_data[["stoptime"]]))
 
-I1_I2[1..b] = if STOCH=0 then (r1*DT*stage1[i]) else (if stage1[i]>0 then binomial(r1*DT,stage1[i]) else 0)
-; transition from pathogenic stage 1 to stage 2
+            passive_state <- c(I1 = run[nrow(run), Z1pass],
+                               I2 = run[nrow(run), Z2pass])
+            ll <- likelihood(passive_state, cum_data[1], cum_data[2], theta,
+                             log = TRUE)
+            ll <- ll + log(likelihood(run[nrow(run)],
+                                      village_data[["detected1_2"]], theta = theta,
+                                      attendance = final.attendance))
+        } else {
+            ll <- -Inf
+        }
+        posteriors[j] <- log.prior + log.init + ll
+    }
 
-I2_D[1..b] = if STOCH=0 then (r2*DT*stage2[i]) else (if stage2[i]>0 then binomial(r2*DT,stage2[i]) else 0)
-; transition from stage 2 to HAT specific death
+    res <- sum(exp(posteriors)) / nruns
 
-{removal of pathogenic stage 1 and stage 2 due to passive screening}
-{--------------------------------------------------------------------------------------------------------------------------------}
-ps1 = #ps1_1(time)					; read in ps1 dataset - passive detection of stage 1 cases
-ps2 = #ps2_1(time)					; read in ps2 dataset - passive detection of stage 2 cases
+    if (log)
+    {
+        return(log(res))
+    } else
+    {
+        return(res)
+    }
+}
 
-ps1_removal = ps1					; ps1 removal of cases passively detected
-ps2_removal = ps2					; ps2 removal of cases passively detected
+samples <- list()
+inits <- list()
+distances <- c()
+likelihoods <- c()
+posteriors <- c()
 
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-{Analysis}
-{----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-{predicted end prevalence}
-{--------------------------------------------------------------------------------------------------------------------------------}
-detected1_2 = 0						; observed end prevalence of stage 1 (chronic plus pathogenic) cases
+set.seed(42)
+n_samples <- 10000
+n_runs <- 100
 
-predicted_end1[1..b] = if STOCH=0 then (if time=STOPTIME then ((stage1[i]*sigma_end[i]) + (stage1c[i]*sigma_end[i]*alpha[i])) else 0) else (if time=STOPTIME then (binomial(sigma_end[i]*DT,stage1[i]) + binomial(sigma_end[i]*alpha[i]*DT,stage1c[i])) else 0)
-							; predicted end prevalence of stage1 (chronic plus pathogenic) cases
+r <- randomLHS(n_samples, 6)
+upper <- c(0.5, 0.05, 1, 1, 1, 0.98)
+lower <- c(0, 0, 0, 0, 0, 0.86)
+r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
+colnames(r) <- c("pc", "lambda", "p1", "p2", "alpha", "screen1")
+theta <- rprior()
 
-{sum of squares}
-{--------------------------------------------------------------------------------------------------------------------------------}
-sum_squares_1[1..b] = if neg_I1[i]=1000000 then (if time=STOPTIME then 1000000 else 0) else (if time=STOPTIME then ((predicted_end1[i] - detected1_2 )^2) else 0)  
-{ FC PhD OPTION: sum_squares_1[1..b] = if neg_I1[i]=1000000 then (if time=STOPTIME then 0 else 0) else (if time=STOPTIME then (if predicted_end1[i] = detected1_2 then 1 else 0) else 0)  }
+cum_data <-
+    village_cases[village.number == 2, list(cases = sum(cases)), by = stage]$cases
 
-{parameter plot dummy variable}
-{--------------------------------------------------------------------------------------------------------------------------------}
-run = 1
+i <- 0
+while(i < n_samples)
+{
+    theta[colnames(r)] <- r[i + 1, ]
+    i <- i + 1
+    samples[[i]] <- theta
+    posteriors[i] <- param_posterior(theta, village_screening[village.number == 2],
+                                     cum_data, n_runs, TRUE)
+    cat(i, posteriors[i], "\n")
+}
 
-{penalise negative cases}
-{--------------------------------------------------------------------------------------------------------------------------------}
-neg_I1[1..b] = if neg_I1[i]=0 and stage1[i]<0 then 1000000 else neg_I1[i]
+saveRDS(list(samples = samples, posteriors = posteriors), "cc_lhs_samples.rds")
+top.10 <- order(posteriors, decreasing = TRUE)[1:10]
 
+start.theta <- samples[[top.10[1]]]
+chain <- list()
+n_iterations <- 100000
+
+theta <- start.theta
+posterior <- posteriors[top.10[1]]
+sdvec <- c(0.01, 0.001, 0, 0, 0.01, 0.01, 0, 0.01, 0.001, 0)
+accepted <- 0
+
+for (i in seq_len(n_iterations))
+{
+    theta_propose <- rnorm(length(theta), theta, sdvec)
+    names(theta_propose) <- names(theta)
+    log_prior <- dprior(theta_propose, log = TRUE)
+    if (is.finite(log_prior))
+    {
+        init <- rinit(theta_propose, village_screening[village.number == 2])
+        log_init <- dinit(init, village_screening[village.number == 2],
+                          theta, TRUE)
+        if (is.finite(log_init))
+        {
+            res <-
+                data.table(ssa.adaptivetau(init, sim_chronic_transitions,
+                                           sim_chronic_rates, theta,
+                                           village_screening[village.number == 2,
+                                                             stoptime]))
+
+            sum_vec <-
+                unname(unlist(res[nrow(res),
+                                  list(sum(Z1pass), sum(Z2pass))]))
+
+            ll <- sum(ifelse(any(sum_vec[1:2] - data_vec[1:2] < 0), -Inf, 0)) +
+                log(stage1_likelihood(res[nrow(res)], data_vec[3], theta,
+                                      final_attendance))
+            if (is.finite(ll))
+            {
+                posterior_propose <- ll + log_prior + log_init
+                log.acceptance <- posterior_propose - posterior
+                is.accepted <- (log(runif (1)) < log.acceptance)
+                if (is.accepted)
+                {
+                    accepted <- accepted + 1
+                    theta <- theta_propose
+                    posterior <- posterior_propose
+                }
+            }
+        }
+    }
+    chain[[i]] <- list(theta = theta, posterior = posterior)
+    cat(i, "acc:",  accepted / i, log_prior, log_init, ll, posterior_propose, "\n")
+}
