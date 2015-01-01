@@ -1,32 +1,7 @@
 library('data.table')
-library('XLConnect')
 library('adaptivetau')
-library('compiler')
 library('lhs')
-
-enableJIT(1)
-
-wb <- loadWorkbook("~/Research/Analysis/Sleeping_Sickness/Chronic/Village input data.xlsx")
-village_screening <- data.table(readWorksheet(wb, "Sheet1"))
-
-village_dirs <- list.files(path = path.expand("~/Research/Analysis/Sleeping_Sickness/Chronic/passive_screening_datasets/"))
-village_ids <- as.integer(gsub("^village ", "", village_dirs))
-village_ids <- village_ids[order(village_ids)]
-
-village_cases <- data.table(village.number = integer(0), month = integer(0), cases = integer(0), stage = integer(0))
-for (id in village_ids)
-{
-    for (stage in c(1, 2))
-    {
-        temp <- data.table(read.csv(paste("~/Research/Analysis/Sleeping_Sickness/Chronic/passive_screening_datasets/village ",
-                                          id, "/ps", stage, "_", id, ".csv", sep = ""), header = F))
-        setnames(temp, 1:2, c("month", "cases"))
-        village_cases <- rbind(village_cases, data.table(village.number = rep(id, nrow(temp)),
-                                                         month = temp[, month],
-                                                         cases = temp[, cases],
-                                                         stage = rep(stage, nrow(temp))))
-    }
-}
+library('reshape2')
 
 sim_chronic_transitions <- list(
     c(S = -1, Ic = +1), # chronic infection
@@ -67,8 +42,6 @@ sim_chronic_rates <- function(state, theta, t)
         ))
 }
 
-# village number 2
-
 rprior <- function(vector)
 {
     return(c(
@@ -80,7 +53,8 @@ rprior <- function(vector)
         p2 = runif(1, 0, 1),
         d = 0.0040 * 30.42,
         alpha = runif(1, 0, 1),
-        screen1 = runif(1, 0.86, 0.98),
+        ## screen1 = runif(1, 0.86, 0.98),
+        screen1 = 0.95,
         screen2 = 0.99
         ))
 }
@@ -119,38 +93,84 @@ dprior <- function(theta, log = FALSE)
 
 }
 
-rinit <- function(theta, village_data)
+rinit <- function(theta, village_data, rand = NULL, equilibrium = TRUE)
 {
 
     N <- village_data[["N"]]
 
-    Ic_weight <- theta[["pc"]] / theta[["rc"]]
-    I1_weight <- (1 - theta[["pc"]]) / theta[["r1"]]
-    I2_weight <- (1 - theta[["pc"]]) / theta[["d"]]
-
-    sum_weights <- Ic_weight + I1_weight + I2_weight
-
-    eq_I <- N * (1 - 1 / (1 + theta[["lambda"]] * sum_weights))
-
-    initIc <- rpois(1, Ic_weight * eq_I / sum_weights)
-    initI1 <- rpois(1, I1_weight * eq_I / sum_weights)
-    initI2 <- rpois(1, I2_weight * eq_I / sum_weights)
-
-    stage1_detected <- village_data[["detected1_1"]]
-    stage2_detected <- village_data[["detected1_2"]]
-
-    if (initIc + initI1 > stage1_detected)
+    if (equilibrium)
     {
-        Ic_ind <- c(rep(1, initIc), rep(0, initI1))
-        Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
-        Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
-        I1_det <- stage1_detected - Ic_det
-        initIc <- initIc - Ic_det
-        initI1 <- initI1 - I1_det
+        Ic_weight <- theta[["pc"]] / theta[["rc"]]
+        I1_weight <- (1 - theta[["pc"]]) / theta[["r1"]]
+        I2_weight <- (1 - theta[["pc"]]) / theta[["d"]]
+
+        sum_weights <- Ic_weight + I1_weight + I2_weight
+
+        eq_I <- N * (1 - 1 / (1 + theta[["lambda"]] * sum_weights))
+
+        initIc <- rpois(1, Ic_weight * eq_I / sum_weights)
+        initI1 <- rpois(1, I1_weight * eq_I / sum_weights)
+        initI2 <- rpois(1, I2_weight * eq_I / sum_weights)
+
+        stage1_detected <- village_data[["detected1_1"]]
+        stage2_detected <- village_data[["detected1_2"]]
+
+        if (initIc + initI1 > stage1_detected)
+        {
+            Ic_ind <- c(rep(1, initIc), rep(0, initI1))
+            Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
+            Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
+            I1_det <- stage1_detected - Ic_det
+            initIc <- initIc - Ic_det
+            initI1 <- initI1 - I1_det
+        } else
+        {
+            initIc <- -1
+            initI1 <- -1
+        }
     } else
     {
-        initIc <- -1
-        initI1 <- -1
+        Ic_weight <- theta[["pc"]] / theta[["rc"]]
+        I1_weight <- (1 - theta[["pc"]]) / theta[["r1"]]
+
+        proportion_chronic <- Ic_weight / (Ic_weight + I1_weight)
+
+        attendance <- min(village_data[["sigma.start"]], 1)
+
+        initI2 <-
+            stage2_detected + rnbinom(1, stage2_detected,
+                                      attendance * theta[["screen2"]])
+        ## sample Ic and I1
+
+        max.I <- N - stage2_detected
+        if (is.null(rand))
+        {
+            rand <- list(dist = list(), prob = c())
+            k <- 0
+            for (i in seq_len(stage1_detected))
+            {
+                for (j in seq(stage1_detected, max.I))
+                {
+                    k <- k + 1
+                    rand$prob[k] <-
+                        dbinom(i, round(proportion_chronic * j),
+                               attendance * theta[["alpha"]] * theta[["screen1"]])
+                    rand$prob[k] <- rand$prob[k] *
+                        dbinom(stage1_detected - i,
+                               round((1 - proportion_chronic) * j),
+                               attendance * theta[["screen1"]])
+                    rand$dist[[k]] <- c(i = i, j = j)
+                }
+            }
+        }
+        pick <- sample(seq_len(k), 1, prob = rand$prob)
+
+        initIc <-
+            round(proportion_chronic * rand$dist[[pick]][["j"]]) -
+                rand$dist[[pick]][["i"]]
+        initI1 <-
+            round((1 - proportion_chronic) * rand$dist[[pick]][["j"]]) -
+                (stage1_detected - rand$dist[[pick]][["i"]])
     }
 
     initS <- N - initIc - initI1 - initI2
@@ -242,37 +262,44 @@ dinit <- function(init, village_data, theta, log = FALSE)
                       theta, attendance, log = log))
 }
 
-param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE)
+param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE, ...)
 {
     res <- 0
-    log.prior <- dprior(theta)
+    log.prior <- dprior(theta, log = TRUE)
     posteriors <- c()
     final.attendance <- min(village_data[["sigma.end"]], 1)
-    for (j in seq_len(nruns))
+    if (is.finite(log.prior))
     {
-        init <- rinit(theta, village_data)
-        log.init <- dinit(init, village_data, theta, TRUE)
-        if (is.finite(log.init))
+        for (j in seq_len(nruns))
         {
-            run <-
-                data.table(ssa.adaptivetau(init, sim_chronic_transitions,
-                                           sim_chronic_rates, theta,
-                                           village_data[["stoptime"]]))
+            init <- rinit(theta, village_data, ...)
+            log.init <- dinit(init, village_data, theta, TRUE)
+            if (is.finite(log.init))
+            {
+                run <-
+                    data.table(ssa.adaptivetau(init, sim_chronic_transitions,
+                                               sim_chronic_rates, theta,
+                                               village_data[["stoptime"]]))
 
-            passive_state <- c(I1 = run[nrow(run), Z1pass],
-                               I2 = run[nrow(run), Z2pass])
-            ll <- likelihood(passive_state, cum_data[1], cum_data[2], theta,
-                             log = TRUE)
-            ll <- ll + log(likelihood(run[nrow(run)],
-                                      village_data[["detected1_2"]], theta = theta,
-                                      attendance = final.attendance))
-        } else {
-            ll <- -Inf
+                passive_state <- c(I1 = run[nrow(run), Z1pass],
+                                   I2 = run[nrow(run), Z2pass])
+                ll <- likelihood(passive_state, cum_data[1], cum_data[2], theta,
+                                 log = TRUE)
+                ll <- ll +
+                    log(likelihood(run[nrow(run)],
+                                   village_data[["detected1_2"]], theta = theta,
+                                   attendance = final.attendance))
+            } else {
+                ll <- -Inf
+            }
+            posteriors[j] <- log.prior + log.init + ll
         }
-        posteriors[j] <- log.prior + log.init + ll
+        res <- sum(exp(posteriors)) / nruns
+    } else
+    {
+        res <- 0
     }
 
-    res <- sum(exp(posteriors)) / nruns
 
     if (log)
     {
@@ -283,88 +310,3 @@ param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE)
     }
 }
 
-samples <- list()
-inits <- list()
-distances <- c()
-likelihoods <- c()
-posteriors <- c()
-
-set.seed(42)
-n_samples <- 10000
-n_runs <- 100
-
-r <- randomLHS(n_samples, 6)
-upper <- c(0.5, 0.05, 1, 1, 1, 0.98)
-lower <- c(0, 0, 0, 0, 0, 0.86)
-r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
-colnames(r) <- c("pc", "lambda", "p1", "p2", "alpha", "screen1")
-theta <- rprior()
-
-cum_data <-
-    village_cases[village.number == 2, list(cases = sum(cases)), by = stage]$cases
-
-i <- 0
-while(i < n_samples)
-{
-    theta[colnames(r)] <- r[i + 1, ]
-    i <- i + 1
-    samples[[i]] <- theta
-    posteriors[i] <- param_posterior(theta, village_screening[village.number == 2],
-                                     cum_data, n_runs, TRUE)
-    cat(i, posteriors[i], "\n")
-}
-
-saveRDS(list(samples = samples, posteriors = posteriors), "cc_lhs_samples.rds")
-top.10 <- order(posteriors, decreasing = TRUE)[1:10]
-
-start.theta <- samples[[top.10[1]]]
-chain <- list()
-n_iterations <- 100000
-
-theta <- start.theta
-posterior <- posteriors[top.10[1]]
-sdvec <- c(0.01, 0.001, 0, 0, 0.01, 0.01, 0, 0.01, 0.001, 0)
-accepted <- 0
-
-for (i in seq_len(n_iterations))
-{
-    theta_propose <- rnorm(length(theta), theta, sdvec)
-    names(theta_propose) <- names(theta)
-    log_prior <- dprior(theta_propose, log = TRUE)
-    if (is.finite(log_prior))
-    {
-        init <- rinit(theta_propose, village_screening[village.number == 2])
-        log_init <- dinit(init, village_screening[village.number == 2],
-                          theta, TRUE)
-        if (is.finite(log_init))
-        {
-            res <-
-                data.table(ssa.adaptivetau(init, sim_chronic_transitions,
-                                           sim_chronic_rates, theta,
-                                           village_screening[village.number == 2,
-                                                             stoptime]))
-
-            sum_vec <-
-                unname(unlist(res[nrow(res),
-                                  list(sum(Z1pass), sum(Z2pass))]))
-
-            ll <- sum(ifelse(any(sum_vec[1:2] - data_vec[1:2] < 0), -Inf, 0)) +
-                log(stage1_likelihood(res[nrow(res)], data_vec[3], theta,
-                                      final_attendance))
-            if (is.finite(ll))
-            {
-                posterior_propose <- ll + log_prior + log_init
-                log.acceptance <- posterior_propose - posterior
-                is.accepted <- (log(runif (1)) < log.acceptance)
-                if (is.accepted)
-                {
-                    accepted <- accepted + 1
-                    theta <- theta_propose
-                    posterior <- posterior_propose
-                }
-            }
-        }
-    }
-    chain[[i]] <- list(theta = theta, posterior = posterior)
-    cat(i, "acc:",  accepted / i, log_prior, log_init, ll, posterior_propose, "\n")
-}
