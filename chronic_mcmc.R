@@ -44,7 +44,7 @@ n_iterations <- 100000
 theta <- start.theta
 posterior <- param_posterior(theta, village_screening[village.number == village_no],
                              cum_data, nruns, TRUE)
-sdvec <- c(0.02, 0.001, 0, 0, 0.02, 0.02, 0, 0.02, 0, 0)
+sdvec <- c(0.05, 0.001, 0, 0, 0.05, 0.05, 0, 0.05, 0, 0)
 #sdvec <- rep(0, 10)
 accepted <- 0
 
@@ -76,7 +76,7 @@ dt_mcmc <- data.table(t(sapply(chain, function(x) {x[["theta"]]})))
 dt_mcmc[, index := 1:nrow(dt_mcmc)]
 mdtm <- melt(dt_mcmc, id.vars = "index")
 
-saveRDS(mdtm, paste("cc_mcmc_", village_no, ".rds", sep = ""))
+saveRDS(mdtm, paste("cc_mcmc2_", village_no, ".rds", sep = ""))
 
 ## ggplot(mdtm, aes(x = value)) + geom_histogram() + facet_wrap(~variable)
 ## ggplot(mdtm, aes(x = index, y = value)) + geom_line() + facet_wrap(~variable, scales = "free")xo
