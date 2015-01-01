@@ -17,21 +17,27 @@ theta <- rprior()
 cum_data <-
     village_cases[village.number == village_no,
                   list(cases = sum(cases)), by = stage]$cases
-res <- readRDS("cc_lhs_samples_eq.rds")
-samples <- res[["samples"]]
-posteriors <- res[["posteriors"]]
+
+#res <- readRDS("cc_lhs_samples_eq.rds")
+samples <- readRDS(path.expand(paste("cc_mcmc_", village_no, ".rds", sep = "")))
+
+## samples <- res[["samples"]]
+## posteriors <- res[["posteriors"]]
 nruns <- 100
 
-dt_samples <- data.table(matrix(unlist(samples), ncol = 10, byrow = TRUE))
-n_top10p <- round(sum(is.finite(posteriors))/10)
-top10p <- order(posteriors, decreasing = TRUE)[1:n_top10p]
+## dt_samples <- data.table(matrix(unlist(samples), ncol = 10, byrow = TRUE))
+## n_top10p <- round(sum(is.finite(posteriors))/10)
+## top10p <- order(posteriors, decreasing = TRUE)[1:n_top10p]
 
-dt_top10p <- dt_samples[top10p]
-setnames(dt_top10p, 1:ncol(dt_top10p), names(theta))
-dt_top10p[, index := seq_len(nrow(dt_top10p))]
-mdtt <- melt(dt_top10p, id.vars = "index")
+## dt_top10p <- dt_samples[top10p]
+## setnames(dt_top10p, 1:ncol(dt_top10p), names(theta))
+## dt_top10p[, index := seq_len(nrow(dt_top10p))]
+## mdtt <- melt(dt_top10p, id.vars = "index")
 
-start.theta <- samples[[top10p[1]]]
+## start.theta <- samples[[top10p[1]]]
+max.index <- max(samples[, index])
+start.theta <- samples[index == max.index, value]
+names(start.theta) <- samples[index == max.index, variable]
 chain <- list()
 n_iterations <- 100000
 
@@ -73,4 +79,5 @@ mdtm <- melt(dt_mcmc, id.vars = "index")
 saveRDS(mdtm, paste("cc_mcmc_", village_no, ".rds", sep = ""))
 
 ## ggplot(mdtm, aes(x = value)) + geom_histogram() + facet_wrap(~variable)
-## ggplot(mdtm, aes(x = index, y = value)) + geom_line() + facet_wrap(~variable, scales = "free")
+## ggplot(mdtm, aes(x = index, y = value)) + geom_line() + facet_wrap(~variable, scales = "free")xo
+
