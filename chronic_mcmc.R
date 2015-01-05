@@ -74,10 +74,12 @@ for (i in seq_len(n_iterations))
 
 dt_mcmc <- data.table(t(sapply(chain, function(x) {x[["theta"]]})))
 dt_mcmc[, index := 1:nrow(dt_mcmc)]
+## vary_parameters <- colnames(dt_mcmc)[which(apply(dt_mcmc, 2, sd) > 0)]
+
 mdtm <- melt(dt_mcmc, id.vars = "index")
 
 saveRDS(mdtm, paste("cc_mcmc2_", village_no, ".rds", sep = ""))
 
-## ggplot(mdtm, aes(x = value)) + geom_histogram() + facet_wrap(~variable)
+## ggplot(mdtm, aes(x = value)) + geom_histogram(binwidth = 0.01) + facet_wrap(~variable, scales = "free")
 ## ggplot(mdtm, aes(x = index, y = value)) + geom_line() + facet_wrap(~variable, scales = "free")
 
