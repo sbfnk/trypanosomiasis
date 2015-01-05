@@ -9,7 +9,7 @@ sim_chronic_transitions <- list(
     c(S = -1, I1 = +1), # pathogenic infection
     c(I1 = -1, I2 = +1), # progression into stage 2
     c(I1 = -1, S = +1, Z1pass = +1), # passive stage 1 detection
-    c(I2 = -1, S = +1, Z2pass = +2), # passive stage 2 detection
+    c(I2 = -1, S = +1, Z2pass = +1), # passive stage 2 detection
     c(I2 = -1, S = +1) # stage 2 death
     )
 
@@ -45,12 +45,12 @@ sim_chronic_rates <- function(state, theta, t)
 rprior <- function(vector)
 {
     return(c(
-        pc = runif(1, 0, 0.5),
+        pc = runif(1, 0, 1),
         lambda = runif(1, 0, 0.05),
         rc = 1/120,
         r1 = 0.0019 * 30.42,
         p1 = runif(1, 0, 1),
-        p2 = runif(1, 0, 1),
+        p2 = runif(1, 0, 2),
         d = 0.0040 * 30.42,
         alpha = runif(1, 0, 1),
         ## screen1 = runif(1, 0.86, 0.98),
@@ -64,12 +64,12 @@ dprior <- function(theta, log = FALSE)
     if (log)
     {
         res <- 0
-        res <- res + dunif(theta[["pc"]], 0, 0.5, TRUE)
+        res <- res + dunif(theta[["pc"]], 0, 1, TRUE)
         res <- res + dunif(theta[["lambda"]], 0, 0.05, TRUE)
         res <- res + dnorm(theta[["rc"]], 1/120, log = TRUE)
         res <- res + dnorm(theta[["r1"]],  0.0019 * 30.42, log = TRUE)
         res <- res + dunif(theta[["p1"]], 0, 1, TRUE)
-        res <- res + dunif(theta[["p2"]], 0, 1, TRUE)
+        res <- res + dunif(theta[["p2"]], 0, 2, TRUE)
         res <- res + dnorm(theta[["d"]], 0.0040 * 30.42, log = TRUE)
         res <- res + dunif(theta[["alpha"]], 0, 1, TRUE)
         res <- res + dunif(theta[["screen1"]], 0.86, 0.98, TRUE)
@@ -77,12 +77,12 @@ dprior <- function(theta, log = FALSE)
     } else
     {
         res <- 1
-        res <- res * dunif(theta[["pc"]], 0, 0.5, FALSE)
+        res <- res * dunif(theta[["pc"]], 0, 1, FALSE)
         res <- res * dunif(theta[["lambda"]], 0, 0.05, FALSE)
         res <- res * dnorm(theta[["rc"]], 1/120, log = FALSE)
         res <- res * dnorm(theta[["r1"]], 0.0019 * 30.42, log = FALSE)
         res <- res * dunif(theta[["p1"]], 0, 1, FALSE)
-        res <- res * dunif(theta[["p2"]], 0, 1, FALSE)
+        res <- res * dunif(theta[["p2"]], 0, 2, FALSE)
         res <- res * dnorm(theta[["d"]], 0.0040 * 30.42, log = FALSE)
         res <- res * dunif(theta[["alpha"]], 0, 1, FALSE)
         res <- res * dunif(theta[["screen1"]], 0.86, 0.98, FALSE)
@@ -115,7 +115,7 @@ rinit <- function(theta, village_data, rand = NULL, equilibrium = TRUE)
         stage1_detected <- village_data[["detected1_1"]]
         stage2_detected <- village_data[["detected1_2"]]
 
-        if (initIc + initI1 > stage1_detected)
+        if (initIc + initI1 >= stage1_detected)
         {
             Ic_ind <- c(rep(1, initIc), rep(0, initI1))
             Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
@@ -127,6 +127,13 @@ rinit <- function(theta, village_data, rand = NULL, equilibrium = TRUE)
         {
             initIc <- -1
             initI1 <- -1
+        }
+        if (initI2 >= stage2_detected)
+        {
+            initI2 <- initI2 - stage2_detected
+        } else
+        {
+            initI2 <- -1
         }
     } else
     {
