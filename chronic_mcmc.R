@@ -78,7 +78,8 @@ dt_mcmc[, index := 1:nrow(dt_mcmc)]
 
 mdtm <- melt(dt_mcmc, id.vars = "index")
 
-saveRDS(mdtm, paste("cc_mcmc_", village_no, ".rds", sep = ""))
+saveRDS(list(chain = mdtm, seed = seed = .Random.seed),
+        paste("cc_mcmc_", village_no, ".rds", sep = ""))
 
 mdtm[, rest := index %% 10]
 mdtm <- mdtm[rest == 0]

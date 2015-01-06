@@ -15,7 +15,7 @@ distances <- c()
 likelihoods <- c()
 posteriors <- c()
 
-set.seed(42)
+## set.seed(42)
 n_samples <- 10000
 n_runs <- 100
 
@@ -40,6 +40,6 @@ while(i < n_samples)
     cat(i, posteriors[i], "\n")
 }
 
-saveRDS(list(samples = samples, posteriors = posteriors),
+saveRDS(list(samples = samples, posteriors = posteriors, seed = .Random.seed),
         paste("cc_lhs_eq_", village_no, ".rds", sep = ""))
 
