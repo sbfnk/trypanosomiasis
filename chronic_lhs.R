@@ -1,3 +1,14 @@
+library('lhs')
+
+source(path.expand("~/code/trypanosomiasis/chronic_carriers.R"))
+village_data <- readRDS("village_data.rds")
+
+village_cases <- village_data[["cases"]]
+village_screening <- village_data[["screening"]]
+
+args <- commandArgs(trailingOnly = TRUE)
+village_no <- as.integer(args[1])
+
 samples <- list()
 inits <- list()
 distances <- c()
@@ -29,5 +40,6 @@ while(i < n_samples)
     cat(i, posteriors[i], "\n")
 }
 
-saveRDS(list(samples = samples, posteriors = posteriors), "cc_lhs_samples_eq.rds")
+saveRDS(list(samples = samples, posteriors = posteriors),
+        paste("cc_lhs_eq_", village_no, ".rds", sep = ""))
 

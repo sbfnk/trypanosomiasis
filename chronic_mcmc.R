@@ -18,7 +18,7 @@ cum_data <-
     village_cases[village.number == village_no,
                   list(cases = sum(cases)), by = stage]$cases
 
-res <- readRDS("cc_lhs_samples_eq.rds")
+res <- readRDS(paste("cc_lhs_eq_", village_no, ".rds", sep = ""))
 ## samples <- readRDS(path.expand(paste("cc_mcmc_", village_no, ".rds", sep = "")))
 
 samples <- res[["samples"]]
@@ -78,7 +78,13 @@ dt_mcmc[, index := 1:nrow(dt_mcmc)]
 
 mdtm <- melt(dt_mcmc, id.vars = "index")
 
-saveRDS(mdtm, paste("cc_mcmc2_", village_no, ".rds", sep = ""))
+saveRDS(mdtm, paste("cc_mcmc_", village_no, ".rds", sep = ""))
+
+mdtm[, rest := index %% 10]
+mdtm <- mdtm[rest == 0]
+mdtm <- mdtm[, index := index %/% 10]
+max.index <- max(mdtm[, index])
+mdtm <- mdtm[index > max.index %/% 2]
 
 ## ggplot(mdtm, aes(x = value)) + geom_histogram(binwidth = 0.01) + facet_wrap(~variable, scales = "free")
 ## ggplot(mdtm, aes(x = index, y = value)) + geom_line() + facet_wrap(~variable, scales = "free")
