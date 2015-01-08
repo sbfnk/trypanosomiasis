@@ -356,45 +356,63 @@ param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE, .
     }
 }
 
-param_posterior_all <- function(theta, village_screening, cum_data, nruns,
-                                log = FALSE, ...)
+param_posterior_villages <- function(theta, village_screening, cum_data, nruns,
+                                     log = FALSE, ...)
 {
     res <- 0
     log.prior <- dprior(theta, log = TRUE)
     posteriors <- c()
-    final.attendance <- min(village_data[["sigma.end"]], 1)
     if (is.finite(log.prior))
     {
-        for (j in seq_len(nruns))
+        res <- sum(apply(village_screening, 1, function(village_data)
         {
-            init <- rinit(theta, village_data, ...)
-            log.init <- dinit(init, village_data, theta, TRUE)
-            if (is.finite(log.init))
+            village_number <- village_data[["village.number"]]
+            params <-
+                grep(paste("\\.", village_number, "$", sep = ""), names(theta),
+                     value = TRUE)
+            for (param in params)
             {
-                run <-
-                    data.table(ssa.adaptivetau(init, sim_chronic_transitions,
-                                               sim_chronic_rates, theta,
-                                               village_data[["stoptime"]]))
-
-                passive_state <- c(I1 = run[nrow(run), Z1pass],
-                                   I2 = run[nrow(run), Z2pass])
-                ll <- likelihood(passive_state, cum_data[1], cum_data[2], theta,
-                                 log = TRUE)
-                ll <- ll +
-                    log(likelihood(run[nrow(run)],
-                                   village_data[["detected1_2"]], theta = theta,
-                                   attendance = final.attendance))
-            } else {
-                ll <- -Inf
+                naked.param <-
+                    sub(paste("\\.", village_number, "$", sep = ""), "", param)
+                theta[[naked.param]] <- theta[[param]]
             }
-            posteriors[j] <- log.prior + log.init + ll
-        }
-        res <- sum(exp(posteriors)) / nruns
+
+            final.attendance <- min(village_data[["sigma.end"]], 1)
+            for (j in seq_len(nruns))
+            {
+                init <- rinit(theta, village_data, village.number = i, ...)
+                log.init <- dinit(init, village_data, theta, TRUE)
+                if (is.finite(log.init))
+                {
+                    run <-
+                        data.table(ssa.adaptivetau(init, sim_chronic_transitions,
+                                                   sim_chronic_rates, theta,
+                                                   village_data[["stoptime"]]))
+
+                    passive_state <- c(I1 = run[nrow(run), Z1pass],
+                                       I2 = run[nrow(run), Z2pass])
+                    ll <- likelihood(passive_state,
+                                     cum_data[village.number == village_number &
+                                                  stage == 1, cases],
+                                     cum_data[village.number == village_number &
+                                                  stage == 2, cases],
+                                     theta,
+                                     log = TRUE)
+                    ll <- ll +
+                        log(likelihood(run[nrow(run)],
+                                       village_data[["detected1_2"]], theta = theta,
+                                       attendance = final.attendance))
+                } else {
+                    ll <- -Inf
+                }
+                posteriors[j] <- log.prior + log.init + ll
+            }
+            sum(exp(posteriors)) / nruns
+        }))
     } else
     {
         res <- 0
     }
-
 
     if (log)
     {

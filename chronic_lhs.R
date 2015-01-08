@@ -1,5 +1,8 @@
 library('lhs')
 
+args <- commandArgs(trailingOnly = TRUE)
+run_no <- as.integer(args[1])
+
 source(path.expand("~/code/trypanosomiasis/chronic_carriers.R"))
 village_data <- readRDS("village_data.rds")
 
@@ -14,7 +17,7 @@ likelihoods <- c()
 posteriors <- c()
 
 ## set.seed(42)
-n_samples <- 100000
+n_samples <- 1000
 n_runs <- 100
 
 r <- randomLHS(n_samples, nb_villages * 3 + 2)
@@ -36,14 +39,14 @@ cum_data <-
 i <- 0
 while(i < n_samples)
 {
-    theta[colnames(r)] <- r[i + 1, ]
     i <- i + 1
+    theta[colnames(r)] <- r[i, ]
     samples[[i]] <- theta
-    posteriors[i] <- param_posterior_all(theta, village_screening,
-                                         cum_data, n_runs, TRUE)
+    posteriors[i] <- param_posterior_villages(theta, village_screening,
+                                              cum_data, n_runs, TRUE)
     cat(i, posteriors[i], "\n")
 }
 
 saveRDS(list(samples = samples, posteriors = posteriors, seed = .Random.seed),
-        paste("cc_lhs_eq_", village_no, ".rds", sep = ""))
+        paste("cc_lhs_eq_", run_no, ".rds", sep = ""))
 
