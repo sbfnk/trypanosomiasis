@@ -42,51 +42,90 @@ sim_chronic_rates <- function(state, theta, t)
         ))
 }
 
-rprior <- function(vector)
+rprior <- function(villages = 1)
 {
-    return(c(
-        pc = runif(1, 0, 1),
-        lambda = runif(1, 0, 0.05),
-        rc = 1/120,
-        r1 = 0.0019 * 30.42,
-        p1 = runif(1, 0, 1),
-        p2 = runif(1, 0, 2),
-        d = 0.0040 * 30.42,
-        alpha = runif(1, 0, 1),
-        ## screen1 = runif(1, 0.86, 0.98),
-        screen1 = 0.95,
-        screen2 = 0.99
-        ))
+    param_vector <- c(pc = runif(1, 0, 1), alpha = runif(1, 0, 1))
+    if (villages == 1)
+    {
+        param_vector <- c(param_vector,
+                          lambda = runif(1, 0, 0.05),
+                          p1 = runif(1, 0, 1),
+                          p2 = runif(1, 0, 2))
+    } else
+    {
+        village_vector <- c(runif(villages, 0, 0.05),
+                            runif(villages, 0, 1),
+                            runif(villages, 0, 2))
+        names(village_vector) <-
+            paste(rep(c("lambda", "p1", "p2"), each = villages),
+                  seq_len(villages), sep = ".")
+        param_vector <- c(param_vector, village_vector)
+
+    }
+    param_vector <- c(param_vector,
+                      rc = 1/120,
+                      r1 = 0.0019 * 30.42,
+                      d = 0.0040 * 30.42,
+                      ## screen1 = runif(1, 0.86, 0.98),
+                      screen1 = 0.95,
+                      screen2 = 0.99,
+                      N = villages)
+    return(param_vector)
 }
 
 dprior <- function(theta, log = FALSE)
 {
+    N <- round(theta[["N"]])
     if (log)
     {
         res <- 0
         res <- res + dunif(theta[["pc"]], 0, 1, TRUE)
-        res <- res + dunif(theta[["lambda"]], 0, 0.05, TRUE)
         res <- res + dnorm(theta[["rc"]], 1/120, log = TRUE)
         res <- res + dnorm(theta[["r1"]],  0.0019 * 30.42, log = TRUE)
-        res <- res + dunif(theta[["p1"]], 0, 1, TRUE)
-        res <- res + dunif(theta[["p2"]], 0, 2, TRUE)
         res <- res + dnorm(theta[["d"]], 0.0040 * 30.42, log = TRUE)
         res <- res + dunif(theta[["alpha"]], 0, 1, TRUE)
         res <- res + dunif(theta[["screen1"]], 0.86, 0.98, TRUE)
         res <- res + dnorm(theta[["screen2"]], 0.99, log = TRUE)
+        if (N == 1)
+        {
+            res <- res + dunif(theta[["lambda"]], 0, 0.05, TRUE)
+            res <- res + dunif(theta[["p1"]], 0, 1, TRUE)
+            res <- res + dunif(theta[["p2"]], 0, 2, TRUE)
+        } else
+        {
+            for (i in seq_len(N))
+            {
+                res <-
+                    res + dunif(theta[[paste("lambda", i, sep = ".")]], 0, 0.05, TRUE)
+                res <- res + dunif(theta[[paste("p1", i, sep = ".")]], 0, 1, TRUE)
+                res <- res + dunif(theta[[paste("p2", i, sep = ".")]], 0, 2, TRUE)
+            }
+        }
     } else
     {
         res <- 1
         res <- res * dunif(theta[["pc"]], 0, 1, FALSE)
-        res <- res * dunif(theta[["lambda"]], 0, 0.05, FALSE)
         res <- res * dnorm(theta[["rc"]], 1/120, log = FALSE)
         res <- res * dnorm(theta[["r1"]], 0.0019 * 30.42, log = FALSE)
-        res <- res * dunif(theta[["p1"]], 0, 1, FALSE)
-        res <- res * dunif(theta[["p2"]], 0, 2, FALSE)
         res <- res * dnorm(theta[["d"]], 0.0040 * 30.42, log = FALSE)
         res <- res * dunif(theta[["alpha"]], 0, 1, FALSE)
         res <- res * dunif(theta[["screen1"]], 0.86, 0.98, FALSE)
         res <- res * dnorm(theta[["screen2"]], 0.99, log = FALSE)
+        if (N == 1)
+        {
+            res <- res * dunif(theta[["lambda"]], 0, 0.05, FALSE)
+            res <- res * dunif(theta[["p1"]], 0, 1, FALSE)
+            res <- res * dunif(theta[["p2"]], 0, 2, FALSE)
+        } else
+        {
+            for (i in seq_len(N))
+            {
+                res <-
+                    res * dunif(theta[[paste("lambda", i, sep = ".")]], 0, 0.05, FALSE)
+                res <- res * dunif(theta[[paste("p1", i, sep = ".")]], 0, 1, FALSE)
+                res <- res * dunif(theta[[paste("p2", i, sep = ".")]], 0, 2, FALSE)
+            }
+        }
     }
 
     return(res)
@@ -317,3 +356,51 @@ param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE, .
     }
 }
 
+param_posterior_all <- function(theta, village_screening, cum_data, nruns,
+                                log = FALSE, ...)
+{
+    res <- 0
+    log.prior <- dprior(theta, log = TRUE)
+    posteriors <- c()
+    final.attendance <- min(village_data[["sigma.end"]], 1)
+    if (is.finite(log.prior))
+    {
+        for (j in seq_len(nruns))
+        {
+            init <- rinit(theta, village_data, ...)
+            log.init <- dinit(init, village_data, theta, TRUE)
+            if (is.finite(log.init))
+            {
+                run <-
+                    data.table(ssa.adaptivetau(init, sim_chronic_transitions,
+                                               sim_chronic_rates, theta,
+                                               village_data[["stoptime"]]))
+
+                passive_state <- c(I1 = run[nrow(run), Z1pass],
+                                   I2 = run[nrow(run), Z2pass])
+                ll <- likelihood(passive_state, cum_data[1], cum_data[2], theta,
+                                 log = TRUE)
+                ll <- ll +
+                    log(likelihood(run[nrow(run)],
+                                   village_data[["detected1_2"]], theta = theta,
+                                   attendance = final.attendance))
+            } else {
+                ll <- -Inf
+            }
+            posteriors[j] <- log.prior + log.init + ll
+        }
+        res <- sum(exp(posteriors)) / nruns
+    } else
+    {
+        res <- 0
+    }
+
+
+    if (log)
+    {
+        return(log(res))
+    } else
+    {
+        return(res)
+    }
+}

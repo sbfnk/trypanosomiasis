@@ -1,9 +1,6 @@
 library('compiler')
 library('data.table')
 
-args <- commandArgs(trailingOnly = TRUE)
-village_no <- as.integer(args[1])
-
 enableJIT(1)
 
 source(path.expand("~/code/trypanosomiasis/chronic_carriers.R"))
