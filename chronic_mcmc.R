@@ -22,12 +22,12 @@ samples <- res[["samples"]]
 posteriors <- res[["posteriors"]]
 nruns <- 100
 
-dt_samples <- data.table(matrix(unlist(samples), ncol = 10, byrow = TRUE))
+dt_samples <- data.table(matrix(unlist(samples), ncol = length(samples[[1]]), byrow = TRUE))
+setnames(dt_samples, seq_len(ncol(dt_samples)), names(samples[[1]]))
 n_top10p <- round(sum(is.finite(posteriors))/10)
 top10p <- order(posteriors, decreasing = TRUE)[1:n_top10p]
 
 dt_top10p <- dt_samples[top10p]
-setnames(dt_top10p, 1:ncol(dt_top10p), names(theta))
 dt_top10p[, index := seq_len(nrow(dt_top10p))]
 mdtt <- melt(dt_top10p, id.vars = "index")
 
