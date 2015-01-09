@@ -23,3 +23,14 @@ for (id in village_ids)
 }
 
 saveRDS(list(cases = village_cases, screening = village_screening), "village_data.rds")
+
+sim_chronic_transitions <- list(
+    c(S = -1, Ic = +1), # chronic infection
+    c(Ic = -1, S = +1), # chronic recovery
+    c(S = -1, I1 = +1), # pathogenic infection
+    c(I1 = -1, I2 = +1), # progression into stage 2
+    c(I1 = -1, S = +1, Z1pass = +1), # passive stage 1 detection
+    c(I2 = -1, S = +1, Z2pass = +1), # passive stage 2 detection
+    c(I2 = -1, S = +1) # stage 2 death
+    )
+

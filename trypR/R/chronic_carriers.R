@@ -1,18 +1,11 @@
-library('data.table')
-library('adaptivetau')
-library('lhs')
-library('reshape2')
-
-sim_chronic_transitions <- list(
-    c(S = -1, Ic = +1), # chronic infection
-    c(Ic = -1, S = +1), # chronic recovery
-    c(S = -1, I1 = +1), # pathogenic infection
-    c(I1 = -1, I2 = +1), # progression into stage 2
-    c(I1 = -1, S = +1, Z1pass = +1), # passive stage 1 detection
-    c(I2 = -1, S = +1, Z2pass = +1), # passive stage 2 detection
-    c(I2 = -1, S = +1) # stage 2 death
-    )
-
+##' Simulation step for trypanosomiasis model with chronic infections
+##'
+##' For use with \code{ssa.adaptivetau}
+##' @param state current state of the model
+##' @param theta parameter vector of the model
+##' @param t time
+##' @return current transition rates
+##' @author Sebastian Funk
 sim_chronic_rates <- function(state, theta, t)
 {
     # parameters
@@ -42,13 +35,18 @@ sim_chronic_rates <- function(state, theta, t)
         ))
 }
 
+##' Draw a parameter sample from the prior density
+##'
+##' @param villages Number of villages with different parameters
+##' @return parameter vector
+##' @author Sebastian Funk
 rprior <- function(villages = 1)
 {
     param_vector <- c(pc = runif(1, 0, 1), alpha = runif(1, 0, 1))
     if (villages == 1)
     {
         param_vector <- c(param_vector,
-                          lambda = runif(1, 0, 0.05),
+                          lambda = 10^(runif(1, -5, -2)), 
                           p1 = runif(1, 0, 1),
                           p2 = runif(1, 0, 2))
     } else
@@ -73,6 +71,12 @@ rprior <- function(villages = 1)
     return(param_vector)
 }
 
+##' Evaluate prior probability density of a parameter vector for the trypanosomiasis model
+##'
+##' @param theta Parameter vector
+##' @param log whether to take return the logarithm of the prior probability density
+##' @return Probability density
+##' @author Sebastian Funk
 dprior <- function(theta, log = FALSE)
 {
     N <- round(theta[["N"]])
@@ -132,10 +136,20 @@ dprior <- function(theta, log = FALSE)
 
 }
 
-rinit <- function(theta, village_data, rand = NULL, equilibrium = TRUE)
+##' Draw an initial condition sample from the prior density distribution of the trypanosomiasis model
+##'
+##' @param theta Parameter vector
+##' @param rand A list of combinations for how infections are distributed between chronic and symptomatic infections, with corresponding probabilities
+##' @param equilibrium whether the initial conditions should be derived from equilibrium states
+##' @import data.table
+##' @return initial conditions vector
+##' @author Sebastian Funk
+rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
 {
 
-    N <- village_data[["N"]]
+    data(village_data)
+    
+    N <- village_screening[village.number = village_number, N]
 
     if (equilibrium)
     {
@@ -151,8 +165,10 @@ rinit <- function(theta, village_data, rand = NULL, equilibrium = TRUE)
         initI1 <- rpois(1, I1_weight * eq_I / sum_weights)
         initI2 <- rpois(1, I2_weight * eq_I / sum_weights)
 
-        stage1_detected <- village_data[["detected1_1"]]
-        stage2_detected <- village_data[["detected1_2"]]
+        stage1_detected <- village_screening[village.number = village_number,
+                                             detected1_1]
+        stage2_detected <- village_screening[village.number = village_number,
+                                             detected1_2]
 
         if (initIc + initI1 >= stage1_detected)
         {
@@ -181,7 +197,8 @@ rinit <- function(theta, village_data, rand = NULL, equilibrium = TRUE)
 
         proportion_chronic <- Ic_weight / (Ic_weight + I1_weight)
 
-        attendance <- min(village_data[["sigma.start"]], 1)
+        attendance <- min(village_screening[village.number = village_number,
+                                            sigma.start], 1)
 
         initI2 <-
             stage2_detected + rnbinom(1, stage2_detected,
@@ -225,6 +242,16 @@ rinit <- function(theta, village_data, rand = NULL, equilibrium = TRUE)
              Z1pass = 0, Z2pass = 0))
 }
 
+##' Evaluate the likelihood of a model state of the trypanosomiasis model
+##'
+##' @param state Model state
+##' @param stage1_detected Number of stage 1 cases detected
+##' @param stage2_detected Number of stage 2 cases detected
+##' @param theta parameter vector
+##' @param attendance screening attendance
+##' @param log whether to return the logarithm
+##' @return point likelihood
+##' @author Sebastian Funk
 likelihood <- function(state, stage1_detected = NULL,
                        stage2_detected = NULL, theta, attendance = 1,
                        log = FALSE)
@@ -297,23 +324,55 @@ likelihood <- function(state, stage1_detected = NULL,
     return(res)
 }
 
-dinit <- function(init, village_data, theta, log = FALSE)
+##' Evaluate the probability density of a given set of initial conditions of the trypanosomiasis model
+##'
+##' @param init initial conditions
+##' @param village_data Village data
+##' @param theta parameter vector
+##' @param log whether to return the logarithm
+##' @return Probability density
+##' @import data.table
+##' @author Sebastian Funk
+dinit <- function(init, village_number, theta, log = FALSE)
 {
-    stage1_detected <- village_data[["detected1_1"]]
-    stage2_detected <- village_data[["detected1_2"]]
+    data(village_data)
+    
+    stage1_detected <- village_screening[village.number = village_number,
+                                         detected1_1]
+    stage2_detected <- village_screening[village.number = village_number,
+                                         detected1_2]
 
-    attendance <- min(village_data[["sigma.start"]], 1)
+    attendance <- min(village_screening[village.number = village_number,
+                                        sigma.start], 1)
 
     return(likelihood(init, stage1_detected, stage2_detected,
                       theta, attendance, log = log))
 }
 
-param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE, ...)
+##' Calculate the posterior density for a given set of parameters for the trypanosomiasis model
+##'
+##' @param theta parameter vector
+##' @param village_data village data
+##' @param cum_data cumulative data
+##' @param nruns number of runs (to estimate the likelihood)
+##' @param log whether to return the logarithm of the posterior density
+##' @param ...
+##' @import data.table adaptivetau
+##' @return posterior density
+##' @author Sebastian Funk
+param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
 {
+    data(village_data)
+
+    cum_data <-
+        village_cases[village.number == village_number,
+                      list(cases = sum(cases)), by = stage]$cases
+    
     res <- 0
     log.prior <- dprior(theta, log = TRUE)
     posteriors <- c()
-    final.attendance <- min(village_data[["sigma.end"]], 1)
+    final.attendance <- min(village_screening[village.number = village_number,
+                                              sigma.end], 1)
     if (is.finite(log.prior))
     {
         for (j in seq_len(nruns))
@@ -325,7 +384,9 @@ param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE, .
                 run <-
                     data.table(ssa.adaptivetau(init, sim_chronic_transitions,
                                                sim_chronic_rates, theta,
-                                               village_data[["stoptime"]]))
+                                               village_screening[village.number =
+                                                                     village_number,
+                                                                 stoptime]))
 
                 passive_state <- c(I1 = run[nrow(run), Z1pass],
                                    I2 = run[nrow(run), Z2pass])
@@ -333,7 +394,8 @@ param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE, .
                                  log = TRUE)
                 ll <- ll +
                     log(likelihood(run[nrow(run)],
-                                   village_data[["detected1_2"]], theta = theta,
+                                   village_screening[village.number = village_number,
+                                                     detected1_2], theta = theta,
                                    attendance = final.attendance))
             } else {
                 ll <- -Inf
@@ -356,17 +418,33 @@ param_posterior <- function(theta, village_data, cum_data, nruns, log = FALSE, .
     }
 }
 
-param_posterior_villages <- function(theta, village_screening, cum_data, nruns,
-                                     log = FALSE, ...)
+##' Calculate the posterior density for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages
+##'
+##' @param theta parameter vector
+##' @param village_screening village screening data
+##' @param cum_data village cumulative data
+##' @param nruns number of runs (to estimate the likelihood)
+##' @param log whether to return the logarithm of the posterior density
+##' @param ...
+##' @import data.table adaptivetau
+##' @return posterior density
+##' @author Sebastian Funk
+param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
 {
+    data(village_data)
+
+    cum_data <-
+        village_cases[, list(cases = sum(cases)),
+                      by = list(stage, village.number)]
+    
     res <- 0
     log.prior <- dprior(theta, log = TRUE)
     posteriors <- c()
     if (is.finite(log.prior))
     {
-        res <- sum(apply(village_screening, 1, function(village_data)
+        res <- sum(apply(village_screening, 1, function(village)
         {
-            village_number <- village_data[["village.number"]]
+            village_number <- village[["village.number"]]
             params <-
                 grep(paste("\\.", village_number, "$", sep = ""), names(theta),
                      value = TRUE)
@@ -377,17 +455,17 @@ param_posterior_villages <- function(theta, village_screening, cum_data, nruns,
                 theta[[naked.param]] <- theta[[param]]
             }
 
-            final.attendance <- min(village_data[["sigma.end"]], 1)
+            final.attendance <- min(village[["sigma.end"]], 1)
             for (j in seq_len(nruns))
             {
-                init <- rinit(theta, village_data, ...)
-                log.init <- dinit(init, village_data, theta, TRUE)
+                init <- rinit(theta, village, ...)
+                log.init <- dinit(init, village, theta, TRUE)
                 if (is.finite(log.init))
                 {
                     run <-
                         data.table(ssa.adaptivetau(init, sim_chronic_transitions,
                                                    sim_chronic_rates, theta,
-                                                   village_data[["stoptime"]]))
+                                                   village[["stoptime"]]))
 
                     passive_state <- c(I1 = run[nrow(run), Z1pass],
                                        I2 = run[nrow(run), Z2pass])
@@ -400,7 +478,7 @@ param_posterior_villages <- function(theta, village_screening, cum_data, nruns,
                                      log = TRUE)
                     ll <- ll +
                         log(likelihood(run[nrow(run)],
-                                       village_data[["detected1_2"]], theta = theta,
+                                       village[["detected1_2"]], theta = theta,
                                        attendance = final.attendance))
                 } else {
                     ll <- -Inf
@@ -421,4 +499,61 @@ param_posterior_villages <- function(theta, village_screening, cum_data, nruns,
     {
         return(exp(res))
     }
+}
+
+##' Draw latin hypercube samples for the trypanosomiasis model with chronic carriers
+##'
+##' @param nsamples 
+##' @param nruns number of runs
+##' @param nsamples number of samples
+##' @param seed random number seed
+##' @return samples, posteriors, random numbers
+##' @import lhs data.table
+##' @export
+##' @author Sebastian Funk
+chronic_carriers_lhs <- function(nsamples = 1, nruns = 100, seed = NULL)
+{
+    data(village_data)
+
+    nb_villages <- nrow(village_screening)
+
+    samples <- list()
+    likelihoods <- c()
+    posteriors <- c()
+
+    if (!is.null(seed))
+    {
+        set.seed(seed)
+    }
+
+    r <- randomLHS(nsamples, nb_villages * 3 + 2)
+    ## upper <- c(1, 0.05, 1, 2, 1)
+    ## lower <- c(0, 0, 0, 0, 0)
+    upper <- c(1, 1, rep(c(-2, 1, 2), each = nb_villages))
+    lower <- c(0, 0, rep(c(-3, 0, 0), each = nb_villages))
+    r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
+    ## colnames(r) <- c("pc", "lambda", "p1", "p2", "alpha")
+    colnames(r) <- c("pc", "alpha",
+                     paste(rep(c("lambda", "p1", "p2"), each = nb_villages),
+                           seq_len(nb_villages), sep = "."))
+
+    r[, grep("^lambda", colnames(r), value = TRUE)] <-
+        10^r[, grep("^lambda", colnames(r), value = TRUE)]
+
+    theta <- rprior(villages = nb_villages)
+
+    cum_data <-
+        village_cases[, list(cases = sum(cases)), by = list(village.number, stage)]
+
+    i <- 0
+    while(i < nsamples)
+    {
+        i <- i + 1
+        theta[colnames(r)] <- r[i, ]
+        samples[[i]] <- theta
+        posteriors[i] <- param_posterior_villages(theta, nruns, TRUE)
+        cat(i, posteriors[i], "\n")
+    }
+
+    return(list(samples = samples, posteriors = posteriors, seed = .Random.seed))
 }
