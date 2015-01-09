@@ -380,7 +380,7 @@ param_posterior_villages <- function(theta, village_screening, cum_data, nruns,
             final.attendance <- min(village_data[["sigma.end"]], 1)
             for (j in seq_len(nruns))
             {
-                init <- rinit(theta, village_data, village.number = i, ...)
+                init <- rinit(theta, village_data, ...)
                 log.init <- dinit(init, village_data, theta, TRUE)
                 if (is.finite(log.init))
                 {
@@ -407,7 +407,7 @@ param_posterior_villages <- function(theta, village_screening, cum_data, nruns,
                 }
                 posteriors[j] <- log.prior + log.init + ll
             }
-            sum(exp(posteriors)) / nruns
+            log(sum(exp(posteriors)) / nruns)
         }))
     } else
     {
@@ -416,9 +416,9 @@ param_posterior_villages <- function(theta, village_screening, cum_data, nruns,
 
     if (log)
     {
-        return(log(res))
+        return(res)
     } else
     {
-        return(res)
+        return(exp(res))
     }
 }
