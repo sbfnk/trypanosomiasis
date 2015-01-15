@@ -4,7 +4,7 @@
 \alias{rprior}
 \title{Draw a parameter sample from the prior density}
 \usage{
-rprior(villages = 1)
+rprior(villages = 1, passive = TRUE)
 }
 \arguments{
 \item{villages}{Number of villages with different parameters}

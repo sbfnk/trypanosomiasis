@@ -13,8 +13,21 @@ sim_chronic_rates <- function(state, theta, t)
     lambda <- theta[["lambda"]]
     rc <- theta[["rc"]]
     r1 <- theta[["r1"]]
-    p1 <- theta[["p1"]]
-    p2 <- theta[["p2"]]
+    if ("p1" %in% names(theta))
+    {
+        p1 <- theta[["p1"]]
+    } else
+    {
+        p1 <- 0
+    }
+    if ("p1" %in% names(theta))
+    {
+        p2 <- theta[["p2"]]
+    } else
+    {
+        p2 <- 0
+    }
+
     d <- theta[["d"]]
 
     S <- state[["S"]]
@@ -40,22 +53,32 @@ sim_chronic_rates <- function(state, theta, t)
 ##' @param villages Number of villages with different parameters
 ##' @return parameter vector
 ##' @author Sebastian Funk
-rprior <- function(villages = 1)
+rprior <- function(villages = 1, passive = TRUE)
 {
     param_vector <- c(pc = runif(1, 0, 1), alpha = runif(1, 0, 1))
     if (villages == 1)
     {
         param_vector <- c(param_vector,
-                          lambda = 10^(runif(1, -5, -2)), 
-                          p1 = runif(1, 0, 1),
-                          p2 = runif(1, 0, 2))
+                          lambda = 10^(runif(1, -5, -2)))
+        if (passive)
+        {
+            param_vector <- c(param_vector,
+                              p1 = runif(1, 0, 1),
+                              p2 = runif(1, 0, 2))
+        }
     } else
     {
-        village_vector <- c(runif(villages, 0, 0.05),
-                            runif(villages, 0, 1),
-                            runif(villages, 0, 2))
+        village_vector <- c(runif(villages, 0, 0.05))
+        rep_names <- "lambda"
+        if (passive)
+        {
+            village_vector <- c(village_vector,
+                                runif(villages, 0, 1),
+                                runif(villages, 0, 2))
+            rep_names <- c(rep_names, "p1", "p2")
+        }
         names(village_vector) <-
-            paste(rep(c("lambda", "p1", "p2"), each = villages),
+            paste(rep(rep_names, each = villages),
                   seq_len(villages), sep = ".")
         param_vector <- c(param_vector, village_vector)
 
@@ -93,16 +116,28 @@ dprior <- function(theta, log = FALSE)
         if (N == 1)
         {
             res <- res + dunif(theta[["lambda"]], 0, 0.05, TRUE)
-            res <- res + dunif(theta[["p1"]], 0, 1, TRUE)
-            res <- res + dunif(theta[["p2"]], 0, 2, TRUE)
+            if ("p1" %in% names(theta))
+            {
+                res <- res + dunif(theta[["p1"]], 0, 1, TRUE)
+            }
+            if ("p2" %in% names(theta))
+            {
+                res <- res + dunif(theta[["p2"]], 0, 2, TRUE)
+            }
         } else
         {
             for (i in seq_len(N))
             {
                 res <-
                     res + dunif(theta[[paste("lambda", i, sep = ".")]], 0, 0.05, TRUE)
-                res <- res + dunif(theta[[paste("p1", i, sep = ".")]], 0, 1, TRUE)
-                res <- res + dunif(theta[[paste("p2", i, sep = ".")]], 0, 2, TRUE)
+                if ("p1" %in% names(theta))
+                {
+                    res <- res + dunif(theta[[paste("p1", i, sep = ".")]], 0, 1, TRUE)
+                }
+                if ("p2" %in% names(theta))
+                {
+                    res <- res + dunif(theta[[paste("p2", i, sep = ".")]], 0, 2, TRUE)
+                }
             }
         }
     } else
@@ -118,8 +153,14 @@ dprior <- function(theta, log = FALSE)
         if (N == 1)
         {
             res <- res * dunif(theta[["lambda"]], 0, 0.05, FALSE)
-            res <- res * dunif(theta[["p1"]], 0, 1, FALSE)
-            res <- res * dunif(theta[["p2"]], 0, 2, FALSE)
+            if ("p1" %in% names(theta))
+            {
+                res <- res * dunif(theta[["p1"]], 0, 1, FALSE)
+            }
+            if ("p2" %in% names(theta))
+            {
+                res <- res * dunif(theta[["p2"]], 0, 2, FALSE)
+            }
         } else
         {
             for (i in seq_len(N))
@@ -141,15 +182,14 @@ dprior <- function(theta, log = FALSE)
 ##' @param theta Parameter vector
 ##' @param rand A list of combinations for how infections are distributed between chronic and symptomatic infections, with corresponding probabilities
 ##' @param equilibrium whether the initial conditions should be derived from equilibrium states
-##' @import data.table
 ##' @return initial conditions vector
 ##' @author Sebastian Funk
 rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
 {
 
     data(village_data)
-    
-    N <- village_screening[village.number = village_number, N]
+
+    N <- village_screening[village.number == village_number, N]
 
     if (equilibrium)
     {
@@ -165,9 +205,9 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
         initI1 <- rpois(1, I1_weight * eq_I / sum_weights)
         initI2 <- rpois(1, I2_weight * eq_I / sum_weights)
 
-        stage1_detected <- village_screening[village.number = village_number,
+        stage1_detected <- village_screening[village.number == village_number,
                                              detected1_1]
-        stage2_detected <- village_screening[village.number = village_number,
+        stage2_detected <- village_screening[village.number == village_number,
                                              detected1_2]
 
         if (initIc + initI1 >= stage1_detected)
@@ -197,7 +237,7 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
 
         proportion_chronic <- Ic_weight / (Ic_weight + I1_weight)
 
-        attendance <- min(village_screening[village.number = village_number,
+        attendance <- min(village_screening[village.number == village_number,
                                             sigma.start], 1)
 
         initI2 <-
@@ -331,18 +371,17 @@ likelihood <- function(state, stage1_detected = NULL,
 ##' @param theta parameter vector
 ##' @param log whether to return the logarithm
 ##' @return Probability density
-##' @import data.table
 ##' @author Sebastian Funk
 dinit <- function(init, village_number, theta, log = FALSE)
 {
     data(village_data)
-    
-    stage1_detected <- village_screening[village.number = village_number,
+
+    stage1_detected <- village_screening[village.number == village_number,
                                          detected1_1]
-    stage2_detected <- village_screening[village.number = village_number,
+    stage2_detected <- village_screening[village.number == village_number,
                                          detected1_2]
 
-    attendance <- min(village_screening[village.number = village_number,
+    attendance <- min(village_screening[village.number == village_number,
                                         sigma.start], 1)
 
     return(likelihood(init, stage1_detected, stage2_detected,
@@ -357,7 +396,7 @@ dinit <- function(init, village_number, theta, log = FALSE)
 ##' @param nruns number of runs (to estimate the likelihood)
 ##' @param log whether to return the logarithm of the posterior density
 ##' @param ...
-##' @import data.table adaptivetau
+##' @import adaptivetau
 ##' @return posterior density
 ##' @author Sebastian Funk
 param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
@@ -367,34 +406,39 @@ param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
     cum_data <-
         village_cases[village.number == village_number,
                       list(cases = sum(cases)), by = stage]$cases
-    
+
     res <- 0
     log.prior <- dprior(theta, log = TRUE)
     posteriors <- c()
-    final.attendance <- min(village_screening[village.number = village_number,
+    final.attendance <- min(village_screening[village.number == village_number,
                                               sigma.end], 1)
     if (is.finite(log.prior))
     {
         for (j in seq_len(nruns))
         {
             init <- rinit(theta, village_data, ...)
-            log.init <- dinit(init, village_data, theta, TRUE)
+            log.init <- dinit(init, village_number, theta, TRUE)
             if (is.finite(log.init))
             {
+                ll <- 0
                 run <-
-                    data.table(ssa.adaptivetau(init, sim_chronic_transitions,
-                                               sim_chronic_rates, theta,
-                                               village_screening[village.number =
-                                                                     village_number,
-                                                                 stoptime]))
+                    data.table(adaptivetau::ssa.adaptivetau
+                               (init, sim_chronic_transitions,
+                                sim_chronic_rates, theta,
+                                village_screening[village.number ==
+                                                      village_number,
+                                                  stoptime]))
 
-                passive_state <- c(I1 = run[nrow(run), Z1pass],
-                                   I2 = run[nrow(run), Z2pass])
-                ll <- likelihood(passive_state, cum_data[1], cum_data[2], theta,
-                                 log = TRUE)
+                if ("p1" %in% names(theta) && "p2" %in% names(theta))
+                {
+                    passive_state <- c(I1 = run[nrow(run), Z1pass],
+                                       I2 = run[nrow(run), Z2pass])
+                    ll <- ll + likelihood(passive_state, cum_data[1], cum_data[2],
+                                          theta, log = TRUE)
+                }
                 ll <- ll +
                     log(likelihood(run[nrow(run)],
-                                   village_screening[village.number = village_number,
+                                   village_screening[village.number == village_number,
                                                      detected1_2], theta = theta,
                                    attendance = final.attendance))
             } else {
@@ -426,7 +470,7 @@ param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
 ##' @param nruns number of runs (to estimate the likelihood)
 ##' @param log whether to return the logarithm of the posterior density
 ##' @param ...
-##' @import data.table adaptivetau
+##' @import adaptivetau
 ##' @return posterior density
 ##' @author Sebastian Funk
 param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
@@ -436,13 +480,13 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
     cum_data <-
         village_cases[, list(cases = sum(cases)),
                       by = list(stage, village.number)]
-    
+
     res <- 0
     log.prior <- dprior(theta, log = TRUE)
     posteriors <- c()
     if (is.finite(log.prior))
     {
-        res <- sum(apply(village_screening, 1, function(village)
+        village.posteriors <- apply(village_screening, 1, function(village)
         {
             village_number <- village[["village.number"]]
             params <-
@@ -459,23 +503,28 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
             for (j in seq_len(nruns))
             {
                 init <- rinit(theta, village, ...)
-                log.init <- dinit(init, village, theta, TRUE)
+                log.init <- dinit(init, village_number, theta, TRUE)
                 if (is.finite(log.init))
                 {
                     run <-
-                        data.table(ssa.adaptivetau(init, sim_chronic_transitions,
-                                                   sim_chronic_rates, theta,
-                                                   village[["stoptime"]]))
+                        data.table(adaptivetau::ssa.adaptivetau
+                                   (init, sim_chronic_transitions,
+                                    sim_chronic_rates, theta,
+                                    village[["stoptime"]]))
 
-                    passive_state <- c(I1 = run[nrow(run), Z1pass],
-                                       I2 = run[nrow(run), Z2pass])
-                    ll <- likelihood(passive_state,
-                                     cum_data[village.number == village_number &
-                                                  stage == 1, cases],
-                                     cum_data[village.number == village_number &
-                                                  stage == 2, cases],
-                                     theta,
-                                     log = TRUE)
+                    ll <- 0
+                    if ("p1" %in% names(theta) && "p2" %in% names(theta))
+                    {
+                        passive_state <- c(I1 = run[nrow(run), Z1pass],
+                                           I2 = run[nrow(run), Z2pass])
+                        ll <- likelihood(passive_state,
+                                         cum_data[village.number == village_number &
+                                                      stage == 1, cases],
+                                         cum_data[village.number == village_number &
+                                                      stage == 2, cases],
+                                         theta,
+                                         log = TRUE)
+                    }
                     ll <- ll +
                         log(likelihood(run[nrow(run)],
                                        village[["detected1_2"]], theta = theta,
@@ -486,10 +535,11 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
                 posteriors[j] <- log.prior + log.init + ll
             }
             log(sum(exp(posteriors)) / nruns)
-        }))
+        })
+        res <- village.posteriors
     } else
     {
-        res <- 0
+        res <- rep(0, nrow(village_screening))
     }
 
     if (log)
@@ -503,15 +553,19 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
 
 ##' Draw latin hypercube samples for the trypanosomiasis model with chronic carriers
 ##'
-##' @param nsamples 
-##' @param nruns number of runs
 ##' @param nsamples number of samples
+##' @param finite interpret \code{nsamples} as number of finite samples
+##' @param nruns number of runs
 ##' @param seed random number seed
+##' @param verbose whether to print out posteriors as it goes along
+##' @param passive
 ##' @return samples, posteriors, random numbers
-##' @import lhs data.table
+##' @import lhs
 ##' @export
 ##' @author Sebastian Funk
-chronic_carriers_lhs <- function(nsamples = 1, nruns = 100, seed = NULL)
+chronic_carriers_lhs <- function(nsamples = 1,
+                                 nruns = 100, seed = NULL,
+                                 verbose = FALSE, passive = TRUE)
 {
     data(village_data)
 
@@ -526,34 +580,103 @@ chronic_carriers_lhs <- function(nsamples = 1, nruns = 100, seed = NULL)
         set.seed(seed)
     }
 
-    r <- randomLHS(nsamples, nb_villages * 3 + 2)
-    ## upper <- c(1, 0.05, 1, 2, 1)
-    ## lower <- c(0, 0, 0, 0, 0)
-    upper <- c(1, 1, rep(c(-2, 1, 2), each = nb_villages))
-    lower <- c(0, 0, rep(c(-3, 0, 0), each = nb_villages))
+    if (passive)
+    {
+        repeat_vec_upper <- c(-2, 1, 2)
+        repeat_vec_lower <- c(-4, 0, 0)
+        repeat_names <- c("lambda", "p1", "p2")
+    } else
+    {
+        repeat_vec_upper <- -2
+        repeat_vec_lower <- -4
+        repeat_names <- c("lambda")
+    }
+
+    r <- lhs::randomLHS(nsamples, nb_villages * length(repeat_names) + 2)
+    upper <- c(1, 1, rep(repeat_vec_upper, each = nb_villages))
+    lower <- c(0, 0, rep(repeat_vec_lower, each = nb_villages))
     r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
-    ## colnames(r) <- c("pc", "lambda", "p1", "p2", "alpha")
     colnames(r) <- c("pc", "alpha",
-                     paste(rep(c("lambda", "p1", "p2"), each = nb_villages),
+                     paste(rep(repeat_names, each = nb_villages),
                            seq_len(nb_villages), sep = "."))
 
     r[, grep("^lambda", colnames(r), value = TRUE)] <-
         10^r[, grep("^lambda", colnames(r), value = TRUE)]
 
-    theta <- rprior(villages = nb_villages)
-
-    cum_data <-
-        village_cases[, list(cases = sum(cases)), by = list(village.number, stage)]
+    theta <- rprior(villages = nb_villages, passive = passive)
 
     i <- 0
-    while(i < nsamples)
+    samples.done <- i
+    while(samples.done <- nsamples)
     {
         i <- i + 1
         theta[colnames(r)] <- r[i, ]
-        samples[[i]] <- theta
-        posteriors[i] <- param_posterior_villages(theta, nruns, TRUE)
-        cat(i, posteriors[i], "\n")
+        posterior <- param_posterior_villages(theta, nruns, TRUE)
+        samples.done <- samples.done + 1
+        samples[[samples.done]] <- list(parameters = theta)
+        samples[[samples.done]][["village_posteriors"]] <- posterior
+        samples[[samples.done]][["posterior"]] <- sum(posterior)
+
+        if (verbose)
+        {
+            message(i, samples[[i]][["posterior"]], "\n")
+        }
     }
 
-    return(list(samples = samples, posteriors = posteriors, seed = .Random.seed))
+    return(samples)
+}
+
+##' run MCMC on the model for chronic carriers of trypanosomiasis
+##'
+##' @param init initial state of the chain
+##' @param n_iterations number of iterations
+##' @param sd standard deviation of each parameter
+##' @param upper upper limit on parameters (if given)
+##' @param lower lower limit on parameters (if given)
+##' @param verbose whether to print verbose output
+##' @param ... parameters to be passed to \code{param_posterior_villages}
+##' @return chain
+##' @import truncnorm
+##' @author Sebastian Funk
+chronic_carriers_mcmc <- function(init, n_iterations, sd,
+                                  upper = NULL, lower = NULL,
+                                  verbose = FALSE, ...)
+{
+    theta <- init
+
+    accepted <- 0
+
+    if (is.null(upper))
+    {
+        upper <- rep(Inf, length(theta))
+    }
+    if (is.null(lower))
+    {
+        lower <- rep(-Inf, length(theta))
+    }
+
+    for (i in seq_len(n_iterations))
+    {
+        is.accepted <- FALSE
+        theta_propose <- rtruncnorm(length(theta), lower, upper, theta, sd / 2)
+        names(theta_propose) <- names(theta)
+
+        posterior_propose <-
+            param_posterior_villages(theta_propose, ...)
+        if (is.finite(posterior_propose))
+        {
+            log.acceptance <- posterior_propose - posterior
+            is.accepted <- (log(runif (1)) < log.acceptance)
+            if (is.accepted)
+            {
+                accepted <- accepted + 1
+                theta <- theta_propose
+                posterior <- posterior_propose
+            }
+        }
+        chain[[i]] <- list(theta = theta, posterior = posterior)
+        cat(i, "acc:", is.accepted, accepted / i, posterior, "\n")
+    }
+
+    return(chain)
 }

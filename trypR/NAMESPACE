@@ -2,5 +2,5 @@
 
 export(chronic_carriers_lhs)
 import(adaptivetau)
-import(data.table)
 import(lhs)
+import(truncnorm)

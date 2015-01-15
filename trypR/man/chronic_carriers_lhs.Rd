@@ -4,16 +4,21 @@
 \alias{chronic_carriers_lhs}
 \title{Draw latin hypercube samples for the trypanosomiasis model with chronic carriers}
 \usage{
-chronic_carriers_lhs(nsamples = 1, nruns = 100, seed = NULL)
+chronic_carriers_lhs(nsamples = 1, nruns = 100, seed = NULL,
+  verbose = FALSE, passive = TRUE)
 }
 \arguments{
-\item{nsamples}{}
+\item{nsamples}{number of samples}
 
 \item{nruns}{number of runs}
 
 \item{seed}{random number seed}
 
-\item{nsamples}{number of samples}
+\item{verbose}{whether to print out posteriors as it goes along}
+
+\item{passive}{}
+
+\item{finite}{interpret \code{nsamples} as number of finite samples}
 }
 \value{
 samples, posteriors, random numbers
