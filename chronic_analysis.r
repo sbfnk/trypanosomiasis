@@ -1,21 +1,19 @@
 library('data.table')
+library('trypR')
 
-chains <- NULL
-for (i in seq_len(26)) {
-    chain <- readRDS(paste("cc_mcmc_short_", i, ".rds", sep = ""))[["chain"]]
-    chain[, village := i]
-    if (is.null(chains))
-    {
-        chains <- chain
-    } else
-    {
-        chains <- rbind(chains, chain)
-    }
-    p <- ggplot(chain, aes(x = value))
-    p <- p + geom_histogram()
-    p <- p + facet_wrap(~variable, scales = "free")
-    p <- p + theme(legend.position = "bottom",
-                   axis.text.x = element_text(angle = 45, hjust = 1))
-    ggsave(paste("chain_village_", i, ".pdf", sep = ""))
-}
+samples <- chronic_carriers_lhs(passive = FALSE, nsamples = 100, finite = FALSE)
 
+posteriors <- sapply(seq_along(samples), function(x)
+{
+    samples[[x]][["posterior"]]
+})
+
+## param_posterior_villages(theta = samples[[92]]$parameters, nruns = 100, log = TRUE)
+
+n.inf <- apply(posteriors, 2, function(x) {sum(!is.finite(x))})
+finite.runs <- which(n.inf == 0)
+top.10 <- finite.runs[order(posteriors)][1:10]
+finite.samples <- sapply(top.10, function(x)
+{
+    samples[[x]][["parameters"]]
+})
