@@ -470,7 +470,7 @@ param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
 ##' @param nruns number of runs (to estimate the likelihood)
 ##' @param log whether to return the logarithm of the posterior density
 ##' @param ...
-##' @import adaptivetau
+##' @import adaptivetau data.table
 ##' @return posterior density
 ##' @author Sebastian Funk
 param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
@@ -554,11 +554,10 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
 ##' Draw latin hypercube samples for the trypanosomiasis model with chronic carriers
 ##'
 ##' @param nsamples number of samples
-##' @param finite interpret \code{nsamples} as number of finite samples
 ##' @param nruns number of runs
 ##' @param seed random number seed
 ##' @param verbose whether to print out posteriors as it goes along
-##' @param passive
+##' @param passive wheter to fit to passive detection data
 ##' @return samples, posteriors, random numbers
 ##' @import lhs
 ##' @export
@@ -606,21 +605,71 @@ chronic_carriers_lhs <- function(nsamples = 1,
     theta <- rprior(villages = nb_villages, passive = passive)
 
     i <- 0
-    samples.done <- i
-    while(samples.done <- nsamples)
+    while(i < nsamples)
     {
         i <- i + 1
         theta[colnames(r)] <- r[i, ]
         posterior <- param_posterior_villages(theta, nruns, TRUE)
-        samples.done <- samples.done + 1
-        samples[[samples.done]] <- list(parameters = theta)
-        samples[[samples.done]][["village_posteriors"]] <- posterior
-        samples[[samples.done]][["posterior"]] <- sum(posterior)
+        samples[[i]] <- list(parameters = theta)
+        samples[[i]][["village_posteriors"]] <- posterior
+        samples[[i]][["posterior"]] <- sum(posterior)
 
         if (verbose)
         {
             message(i, samples[[i]][["posterior"]], "\n")
         }
+    }
+
+    return(samples)
+}
+
+##' Draw prior  samples for the trypanosomiasis model with chronic carriers
+##'
+##' @param nsamples number of samples
+##' @param finite interpret \code{nsamples} as number of finite samples
+##' @param nruns number of runs
+##' @param seed random number seed
+##' @param verbose whether to print out posteriors as it goes along
+##' @param passive whether to fit to passive case data
+##' @return samples, posteriors, random numbers
+##' @export
+##' @author Sebastian Funk
+chronic_carriers_prior <- function(nsamples = 1, finite = FALSE,
+                                   nruns = 100, seed = NULL,
+                                   verbose = FALSE, passive = TRUE)
+{
+    data(village_data)
+
+    nb_villages <- nrow(village_screening)
+
+    samples <- list()
+    likelihoods <- c()
+    posteriors <- c()
+
+    if (!is.null(seed))
+    {
+        set.seed(seed)
+    }
+
+    i <- 0
+    while(i < nsamples)
+    {
+        theta <- rprior(villages = nb_villages, passive = passive)
+        posterior <- param_posterior_villages(theta, nruns, log = TRUE)
+        if (!finite || is.finite(sum(posterior)))
+        {
+            i <- i + 1
+            samples[[i]] <- list(parameters = theta)
+            samples[[i]][["village_posteriors"]] <- posterior
+            samples[[i]][["posterior"]] <- sum(posterior)
+            if (verbose)
+            {
+                message(i, samples[[i]][["posterior"]], "\n")
+            }
+        } else {
+            message("Infinite posterior")
+        }
+
     }
 
     return(samples)

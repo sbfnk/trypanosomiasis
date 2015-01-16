@@ -16,9 +16,7 @@ chronic_carriers_lhs(nsamples = 1, nruns = 100, seed = NULL,
 
 \item{verbose}{whether to print out posteriors as it goes along}
 
-\item{passive}{}
-
-\item{finite}{interpret \code{nsamples} as number of finite samples}
+\item{passive}{wheter to fit to passive detection data}
 }
 \value{
 samples, posteriors, random numbers
