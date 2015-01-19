@@ -339,7 +339,7 @@ likelihood <- function(state, stage1_detected = NULL,
                 }
             }
         }
-        if (!is.null(stage2_detected))
+        if ("p1" %in% names(theta) && "p2" %in% names(theta))
         {
             stage2_ll <- dbinom(stage2_detected, state[["I2"]] + stage1_detected,
                                 theta[["screen2"]] * attendance, log = log)
@@ -350,6 +350,8 @@ likelihood <- function(state, stage1_detected = NULL,
             {
                 res <- res * stage2_ll
             }
+        } else
+        {
         }
     } else {
         if (log)
@@ -358,6 +360,101 @@ likelihood <- function(state, stage1_detected = NULL,
         } else
         {
             res <- 0
+        }
+    }
+
+    return(res)
+}
+
+##' Evaluate the likelihood of a trajectory or the trypanosomiasis model
+##'
+##' @param traj Model trajectory
+##' @param theta parameter vector
+##' @param attendance screening attendance
+##' @param log whether to return the logarithm
+##' @return trajectory likelihood
+##' @author Sebastian Funk
+traj.likelihood <- function(traj, theta, village_number, log = FALSE)
+{
+
+    data(village_data)
+
+    if (log)
+    {
+        res <- 0
+    } else
+    {
+        res <- 1
+    }
+
+    attendance <- min(village_screening[village.number == village_number,
+                                        sigma.start], 1)
+
+    traj <- data.table(traj)
+    passive_data <- village_cases[village.number == village_number]
+    traj[, I1 := I1 - cumsum(passive_data[stage == 1, cases])]
+    traj[, I2 := I2 - cumsum(passive_data[stage == 2, cases])]
+
+    stage1_detected <-
+        village_screening[village.number == village_number, detected1_2]
+
+    if (any(traj[-1, ] < 0))
+    {
+        if (log)
+        {
+            res <- -Inf
+        } else
+        {
+            res <- 0
+        }
+    } else
+    {
+        if (!is.null(stage1_detected))
+        {
+            if ("Ic" %in% colnames(traj))
+            {
+                stage1_ll <- sum(sapply(seq(0, stage1_detected), function(x)
+                {
+                    prob <-
+                        dbinom(x, traj[nrow(traj), Ic] + x,
+                               theta[["alpha"]] * theta[["screen1"]] * attendance)
+                    prob <- prob * dbinom(stage1_detected - x,
+                                          traj[nrow(traj), I1] + x,
+                                          theta[["screen1"]] * attendance)
+                    prob
+                }))
+                if (log)
+                {
+                    res <- res + log(stage1_ll)
+                } else
+                {
+                    res <- res * stage1_ll
+                }
+            } else
+            {
+                stage1_ll <- dbinom(stage1_detected,
+                                    traj[nrow(traj), I1] + stage1_detected,
+                                    theta[["screen1"]] * attendance, log = log)
+                if (log)
+                {
+                    res <- res + stage1_ll
+                } else
+                {
+                    res <- res * stage1_ll
+                }
+            }
+        }
+        if ("p1" %in% names(theta) && "p2" %in% names(theta))
+        {
+            stage2_ll <- dbinom(stage2_detected, state[["I2"]] + stage1_detected,
+                                theta[["screen2"]] * attendance, log = log)
+            if (log)
+            {
+                res <- res + stage2_ll
+            } else
+            {
+                res <- res * stage2_ll
+            }
         }
     }
 
@@ -396,7 +493,7 @@ dinit <- function(init, village_number, theta, log = FALSE)
 ##' @param nruns number of runs (to estimate the likelihood)
 ##' @param log whether to return the logarithm of the posterior density
 ##' @param ...
-##' @import adaptivetau
+##' @import adaptivetau fitR
 ##' @return posterior density
 ##' @author Sebastian Funk
 param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
@@ -414,20 +511,32 @@ param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
                                               sigma.end], 1)
     if (is.finite(log.prior))
     {
+
+        params <-
+            grep(paste("\\.", village_number, "$", sep = ""), names(theta),
+                 value = TRUE)
+        for (param in params)
+        {
+            naked.param <-
+                sub(paste("\\.", village_number, "$", sep = ""), "", param)
+            theta[[naked.param]] <- theta[[param]]
+        }
+        stoptime <- village_screening[village.number == village_number, stoptime]
+        session.2.detected1 <-
+            village_screening[village.number == village_number, detected1_2]
+
         for (j in seq_len(nruns))
         {
-            init <- rinit(theta, village_data, ...)
+            init <- rinit(theta, village_number)
             log.init <- dinit(init, village_number, theta, TRUE)
             if (is.finite(log.init))
             {
                 ll <- 0
-                run <-
-                    data.table(adaptivetau::ssa.adaptivetau
-                               (init, sim_chronic_transitions,
-                                sim_chronic_rates, theta,
-                                village_screening[village.number ==
-                                                      village_number,
-                                                  stoptime]))
+                df_run <-
+                    simulateModelStochastic(theta, init, seq(0, stoptime),
+                                            sim_chronic_transitions,
+                                            sim_chronic_rates)
+                run <- data.table(df_run)
 
                 if ("p1" %in% names(theta) && "p2" %in% names(theta))
                 {
@@ -435,12 +544,14 @@ param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
                                        I2 = run[nrow(run), Z2pass])
                     ll <- ll + likelihood(passive_state, cum_data[1], cum_data[2],
                                           theta, log = TRUE)
+                    ll <- ll +
+                        log(likelihood(run[nrow(run)],
+                                       session.2.detected1, theta = theta,
+                                       attendance = final.attendance))
+                } else
+                {
+                    ll <- ll + traj.likelihood(run, theta, village_number, log = TRUE)
                 }
-                ll <- ll +
-                    log(likelihood(run[nrow(run)],
-                                   village_screening[village.number == village_number,
-                                                     detected1_2], theta = theta,
-                                   attendance = final.attendance))
             } else {
                 ll <- -Inf
             }
@@ -470,7 +581,7 @@ param_posterior <- function(theta, village_number, nruns, log = FALSE, ...)
 ##' @param nruns number of runs (to estimate the likelihood)
 ##' @param log whether to return the logarithm of the posterior density
 ##' @param ...
-##' @import adaptivetau data.table
+##' @import adaptivetau data.table fitR
 ##' @return posterior density
 ##' @author Sebastian Funk
 param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
@@ -489,52 +600,10 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
         village.posteriors <- apply(village_screening, 1, function(village)
         {
             village_number <- village[["village.number"]]
-            params <-
-                grep(paste("\\.", village_number, "$", sep = ""), names(theta),
-                     value = TRUE)
-            for (param in params)
-            {
-                naked.param <-
-                    sub(paste("\\.", village_number, "$", sep = ""), "", param)
-                theta[[naked.param]] <- theta[[param]]
-            }
+            stoptime <- village[["stoptime"]]
 
             final.attendance <- min(village[["sigma.end"]], 1)
-            for (j in seq_len(nruns))
-            {
-                init <- rinit(theta, village, ...)
-                log.init <- dinit(init, village_number, theta, TRUE)
-                if (is.finite(log.init))
-                {
-                    run <-
-                        data.table(adaptivetau::ssa.adaptivetau
-                                   (init, sim_chronic_transitions,
-                                    sim_chronic_rates, theta,
-                                    village[["stoptime"]]))
-
-                    ll <- 0
-                    if ("p1" %in% names(theta) && "p2" %in% names(theta))
-                    {
-                        passive_state <- c(I1 = run[nrow(run), Z1pass],
-                                           I2 = run[nrow(run), Z2pass])
-                        ll <- likelihood(passive_state,
-                                         cum_data[village.number == village_number &
-                                                      stage == 1, cases],
-                                         cum_data[village.number == village_number &
-                                                      stage == 2, cases],
-                                         theta,
-                                         log = TRUE)
-                    }
-                    ll <- ll +
-                        log(likelihood(run[nrow(run)],
-                                       village[["detected1_2"]], theta = theta,
-                                       attendance = final.attendance))
-                } else {
-                    ll <- -Inf
-                }
-                posteriors[j] <- log.prior + log.init + ll
-            }
-            log(sum(exp(posteriors)) / nruns)
+            posterior <- param_posterior(theta, village_number, nruns, log = TRUE)
         })
         res <- village.posteriors
     } else
