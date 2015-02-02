@@ -79,6 +79,15 @@ ChronicModel::Simulate(std::vector<int> times, unsigned int seed)
     {
         while (times[next_time] <= time)
         {
+            if (static_cast<int>(passive_stage1.size()) > next_time)
+            {
+                states["I1"] -= passive_stage1[next_time];
+            }
+            if (static_cast<int>(passive_stage2.size()) > next_time)
+            {
+                states["I2"] -= passive_stage2[next_time];
+            }
+
             traj["time"].push_back(times[next_time]);
             for (std::map<std::string, int>::iterator it =
                      states.begin(); it != states.end(); ++it)
@@ -101,7 +110,7 @@ ChronicModel::Simulate(std::vector<int> times, unsigned int seed)
         int chosenEvent = 0;
         double rateAcc = 0;
 
-        while ((chosenEvent < eventList.size()) &
+        while ((chosenEvent < static_cast<int>(eventList.size())) &
                (eventRates[chosenEvent] > 0 | rateAcc <= randEvent))
         {
             rateAcc += eventRates[chosenEvent];
