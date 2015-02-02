@@ -1,9 +1,11 @@
 Package: trypR
+Type: Package
 Title: What the package does (one line)
 Version: 0.1
 Authors@R: "First Last <first.last@example.com> [aut, cre]"
 Description: What the package does (one paragraph)
 Depends: R (>= 3.1.2)
-Imports: data.table
-License: What license is it under?
+Imports: Rcpp (>= 0.11.3), data.table
+LinkingTo: Rcpp
+License: GPL (>= 2)
 LazyData: true

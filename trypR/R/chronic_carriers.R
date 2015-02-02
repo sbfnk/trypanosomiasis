@@ -95,7 +95,7 @@ sim_chronic_rates <- function(state, theta, t)
         p2 <- 0
     }
 
-    d <- theta[["d"]]
+    r2 <- theta[["r2"]]
 
     S <- state[["S"]]
     Ic <- state[["Ic"]]
@@ -111,7 +111,7 @@ sim_chronic_rates <- function(state, theta, t)
         r1 * I1, # progression into stage 2
         p1 * I1, # passive stage 1 detection
         p2 * I2, # passitve stage 2 detection
-        d * I2 # stage 2 death
+        r2 * I2 # stage 2 death
         ))
 }
 
@@ -153,7 +153,7 @@ rprior <- function(villages = 1, passive = TRUE)
     param_vector <- c(param_vector,
                       rc = 1/120,
                       r1 = 0.0019 * 30.42,
-                      d = 0.0040 * 30.42,
+                      r2 = 0.0040 * 30.42,
                       ## screen1 = runif(1, 0.86, 0.98),
                       screen1 = 0.95,
                       screen2 = 0.99,
@@ -176,7 +176,7 @@ dprior <- function(theta, log = FALSE)
         res <- res + dunif(theta[["pc"]], 0, 1, TRUE)
         res <- res + dnorm(theta[["rc"]], 1/120, log = TRUE)
         res <- res + dnorm(theta[["r1"]],  0.0019 * 30.42, log = TRUE)
-        res <- res + dnorm(theta[["d"]], 0.0040 * 30.42, log = TRUE)
+        res <- res + dnorm(theta[["r2"]], 0.0040 * 30.42, log = TRUE)
         res <- res + dunif(theta[["alpha"]], 0, 1, TRUE)
         res <- res + dunif(theta[["screen1"]], 0.86, 0.98, TRUE)
         res <- res + dnorm(theta[["screen2"]], 0.99, log = TRUE)
@@ -219,7 +219,7 @@ dprior <- function(theta, log = FALSE)
         res <- res * dunif(theta[["pc"]], 0, 1, FALSE)
         res <- res * dnorm(theta[["rc"]], 1/120, log = FALSE)
         res <- res * dnorm(theta[["r1"]], 0.0019 * 30.42, log = FALSE)
-        res <- res * dnorm(theta[["d"]], 0.0040 * 30.42, log = FALSE)
+        res <- res * dnorm(theta[["r2"]], 0.0040 * 30.42, log = FALSE)
         res <- res * dunif(theta[["alpha"]], 0, 1, FALSE)
         res <- res * dunif(theta[["screen1"]], 0.86, 0.98, FALSE)
         res <- res * dnorm(theta[["screen2"]], 0.99, log = FALSE)
@@ -263,9 +263,12 @@ dprior <- function(theta, log = FALSE)
 ##' @param theta Parameter vector
 ##' @param rand A list of combinations for how infections are distributed between chronic and symptomatic infections, with corresponding probabilities
 ##' @param equilibrium whether the initial conditions should be derived from equilibrium states
+##' @param village_number village number (if parameters for multiple villages are given
+##' @param passive whether to accumulate infections for passive detection (Z1pass, Z2pass)
 ##' @return initial conditions vector
 ##' @author Sebastian Funk
-rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
+rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1,
+                  passive = FALSE)
 {
 
     data(village_data)
@@ -282,7 +285,7 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
     {
         Ic_weight <- theta[["pc"]] / theta[["rc"]]
         I1_weight <- (1 - theta[["pc"]]) / theta[["r1"]]
-        I2_weight <- (1 - theta[["pc"]]) / theta[["d"]]
+        I2_weight <- (1 - theta[["pc"]]) / theta[["r2"]]
 
         sum_weights <- Ic_weight + I1_weight + I2_weight
 
@@ -365,8 +368,14 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
 
     initS <- N - initIc - initI1 - initI2
 
-    return(c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2,
-             Z1pass = 0, Z2pass = 0))
+    initVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
+
+    if (passive)
+    {
+        initVec <- c(initVec, c(Z1pass = 0, Z2pass = 0))
+    }
+
+    return(initVec)
 }
 
 ##' Evaluate the likelihood of a model state of the trypanosomiasis model
