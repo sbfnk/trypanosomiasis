@@ -38,11 +38,8 @@ sim_chronic_carriers <- function(init, theta, village_number)
         if (!any(state < 0))
         {
             inter_traj <-
-                data.table(simulateModelStochastic(theta, state,
-                                                   seq(sim_times[inter - 1],
-                                                       sim_times[inter]),
-                                                   sim_chronic_transitions,
-                                                   sim_chronic_rates))
+                data.table(chronic(theta, state,seq(sim_times[inter - 1],
+                                                    sim_times[inter])))
             stage1_cases <-
                 passive_data[stage == 1 & month == sim_times[inter], cases]
             stage2_cases <-
@@ -588,7 +585,9 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
     {
         village.posteriors <- apply(village_screening, 1, function(village)
         {
-            village_number <- village[["village.number"]]
+            ##:ess-bp-start::browser@nil:##
+browser(expr=is.null(.ESSBP.[["@10@"]]))##:ess-bp-end:##
+village_number <- village[["village.number"]]
             stoptime <- village[["stoptime"]]
 
             final.attendance <- min(village[["sigma.end"]], 1)
@@ -621,19 +620,24 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
 ##' @export
 ##' @author Sebastian Funk
 chronic_carriers_lhs <- function(nsamples = 1,
-                                 nruns = 100, seed = NULL,
+                                 nruns = 100, seed,
                                  verbose = FALSE, passive = TRUE,
-                                 calc.posterior = FALSE)
+                                 calc.posterior = TRUE,
+                                 villages)
 {
     data(village_data)
 
-    nb_villages <- nrow(village_screening)
+    if (missing(villages))
+    {
+        villages <- seq_len(nrow(village_screening))
+    }
+    nb_villages <- length(villages)
 
     samples <- list()
     likelihoods <- c()
     posteriors <- c()
 
-    if (!is.null(seed))
+    if (!missing(seed))
     {
         set.seed(seed)
     }
@@ -654,10 +658,16 @@ chronic_carriers_lhs <- function(nsamples = 1,
     upper <- c(1, 1, rep(repeat_vec_upper, each = nb_villages))
     lower <- c(0, 0, rep(repeat_vec_lower, each = nb_villages))
     r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
-    colnames(r) <- c("pc", "alpha",
-                     paste(rep(repeat_names, each = nb_villages),
-                           seq_len(nb_villages), sep = "."))
-
+    theta_names <- c("pc", "alpha")
+    if (nb_villages > 1)
+    {
+        theta_names <- c(theta_names, 
+                         paste(rep(repeat_names, each = nb_villages),
+                               villages, sep = "."))
+    } else {
+        theta_names <- c(theta_names, repeat_names)
+    }
+    colnames(r) <- theta_names
     r[, grep("^lambda", colnames(r), value = TRUE)] <-
         10^r[, grep("^lambda", colnames(r), value = TRUE)]
 
@@ -666,9 +676,7 @@ chronic_carriers_lhs <- function(nsamples = 1,
     i <- 0
     while(i < nsamples)
     {
-        ##:ess-bp-start::browser@nil:##
-browser(expr=is.null(.ESSBP.[["@4@"]]))##:ess-bp-end:##
-i <- i + 1
+        i <- i + 1
         theta[colnames(r)] <- r[i, ]
         if (calc.posterior)
         {
@@ -686,9 +694,7 @@ i <- i + 1
             village_number <- 1
             stoptime <- village_screening[village.number == village_number, stoptime]
             passive_data <- village_cases[village.number == village_number]
-            ##:ess-bp-start::browser@nil:##
-browser(expr=is.null(.ESSBP.[["@3@"]]))##:ess-bp-end:##
-sims <- lapply(seq_len(nruns), function(x) {chronic(params = theta, init = rinit(theta), times = seq(0, stoptime), stage1_passive = village_cases[village.number == village.number & stage == 1, cases], stage2_passive = village_cases[village.number == village.number & stage == 2, cases])})
+            sims <- lapply(seq_len(nruns), function(x) {chronic(params = theta, init = rinit(theta), times = seq(0, stoptime), stage1_passive = village_cases[village.number == village.number & stage == 1, cases], stage2_passive = village_cases[village.number == village.number & stage == 2, cases])})
             samples[[i]] <- list(parameters = theta)
             samples[[i]][["nneg"]] <- sum(sapply(sims, function(x) { any(x[["I1"]] < 0 | x[["I2"]] < 0)  }))
             samples[[i]][["final_I1"]] <- sapply(sims, function(x) { tail(x[["I1"]], 1) })
