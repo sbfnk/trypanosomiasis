@@ -19,6 +19,8 @@ public:
                  std::vector<unsigned int> p1s =
                  std::vector<unsigned int>(),
                  std::vector<unsigned int> p2s =
+                 std::vector<unsigned int>(),
+                 std::vector<unsigned int> verbose =
                  std::vector<unsigned int>());
 
     std::map<std::string, std::vector<double> >
@@ -36,6 +38,8 @@ private:
 
     std::vector<Event> eventList;
 
+    unsigned int verbose;
+    
     std::vector<unsigned int> passive_stage1;
     std::vector<unsigned int> passive_stage2;
 

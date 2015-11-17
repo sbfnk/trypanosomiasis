@@ -6,23 +6,19 @@
 using namespace Rcpp;
 
 // chronic
-SEXP chronic(Rcpp::IntegerVector init, Rcpp::NumericVector params, Rcpp::IntegerVector times, Rcpp::IntegerVector stage1_passive = Rcpp::IntegerVector::create(), Rcpp::IntegerVector stage2_passive = Rcpp::IntegerVector::create(), Rcpp::NumericVector seed = R_NilValue, Rcpp::IntegerVector verbose = 0);
-RcppExport SEXP trypR_chronic(SEXP initSEXP, SEXP paramsSEXP, SEXP timesSEXP, SEXP stage1_passiveSEXP, SEXP stage2_passiveSEXP, SEXP seedSEXP, SEXP verboseSEXP) {
+SEXP chronic(Rcpp::NumericVector params, Rcpp::IntegerVector init, Rcpp::IntegerVector times, Rcpp::IntegerVector stage1_passive, Rcpp::IntegerVector stage2_passive, Rcpp::IntegerVector seed, Rcpp::IntegerVector verbose);
+RcppExport SEXP trypR_chronic(SEXP paramsSEXP, SEXP initSEXP, SEXP timesSEXP, SEXP stage1_passiveSEXP, SEXP stage2_passiveSEXP, SEXP seedSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
-    SEXP __sexp_result;
-    {
-        Rcpp::RNGScope __rngScope;
-        Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type init(initSEXP );
-        Rcpp::traits::input_parameter< Rcpp::NumericVector >::type params(paramsSEXP );
-        Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type times(timesSEXP );
-        Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type stage1_passive(stage1_passiveSEXP );
-        Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type stage2_passive(stage2_passiveSEXP );
-        Rcpp::traits::input_parameter< Rcpp::NumericVector >::type seed(seedSEXP );
-        Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type verbose(verboseSEXP );
-        SEXP __result = chronic(init, params, times, stage1_passive, stage2_passive, seed, verbose);
-        PROTECT(__sexp_result = Rcpp::wrap(__result));
-    }
-    UNPROTECT(1);
-    return __sexp_result;
+    Rcpp::RObject __result;
+    Rcpp::RNGScope __rngScope;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type params(paramsSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type init(initSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type times(timesSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type stage1_passive(stage1_passiveSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type stage2_passive(stage2_passiveSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type verbose(verboseSEXP);
+    __result = Rcpp::wrap(chronic(params, init, times, stage1_passive, stage2_passive, seed, verbose));
+    return __result;
 END_RCPP
 }

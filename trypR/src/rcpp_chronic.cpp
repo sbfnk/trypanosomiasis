@@ -11,13 +11,13 @@
 #include "chronic_model.hpp"
 
 // [[Rcpp::export]]
-SEXP chronic(Rcpp::IntegerVector init,
-             Rcpp::NumericVector params,
+SEXP chronic(Rcpp::NumericVector params,
+             Rcpp::IntegerVector init,
              Rcpp::IntegerVector times,
              Rcpp::IntegerVector stage1_passive = Rcpp::IntegerVector::create(),
              Rcpp::IntegerVector stage2_passive = Rcpp::IntegerVector::create(),
-             Rcpp::NumericVector seed = R_NilValue,
-             Rcpp::IntegerVector verbose = 0)
+             Rcpp::IntegerVector seed = Rcpp::IntegerVector::create(),
+             Rcpp::IntegerVector verbose = Rcpp::IntegerVector::create())
 {
     std::map<std::string, double> cpp_param;
     std::map<std::string, int> cpp_init;
@@ -37,13 +37,21 @@ SEXP chronic(Rcpp::IntegerVector init,
 
     ChronicModel model(cpp_param, cpp_init,
                        Rcpp::as<std::vector<unsigned int> >(stage1_passive),
-                       Rcpp::as<std::vector<unsigned int> >(stage2_passive));
+                       Rcpp::as<std::vector<unsigned int> >(stage2_passive),
+                       Rcpp::as<std::vector<unsigned int> >(verbose));
 
     std::vector<int> cpp_times =
         Rcpp::as<std::vector<int> >(times);
 
-    std::map<std::string, std::vector<double> > traj =
-        model.Simulate(cpp_times);
+    std::map<std::string, std::vector<double> > traj;
+
+    if (seed.size() > 0)
+    {
+        traj = model.Simulate(cpp_times, seed[0]);
+    } else
+    {
+        traj = model.Simulate(cpp_times);
+    }
 
     Rcpp::List Rtraj(traj.size());
     Rcpp::CharacterVector nameVector(traj.size());

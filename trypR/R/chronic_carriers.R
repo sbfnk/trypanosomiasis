@@ -75,7 +75,7 @@ sim_chronic_carriers <- function(init, theta, village_number)
 ##' @author Sebastian Funk
 sim_chronic_rates <- function(state, theta, t)
 {
-    # parameters
+                                        # parameters
     pc <- theta[["pc"]]
     lambda <- theta[["lambda"]]
     rc <- theta[["rc"]]
@@ -107,12 +107,12 @@ sim_chronic_rates <- function(state, theta, t)
     return(c(
         pc * lambda * S, # chronic infection
         rc * Ic, # chronic recovery
-        (1 - pc) * lambda * S, # pathogenic infection
-        r1 * I1, # progression into stage 2
-        p1 * I1, # passive stage 1 detection
-        p2 * I2, # passitve stage 2 detection
-        r2 * I2 # stage 2 death
-        ))
+    (1 - pc) * lambda * S, # pathogenic infection
+    r1 * I1, # progression into stage 2
+    p1 * I1, # passive stage 1 detection
+    p2 * I2, # passitve stage 2 detection
+    r2 * I2 # stage 2 death
+    ))
 }
 
 ##' Draw a parameter sample from the prior density
@@ -197,21 +197,21 @@ dprior <- function(theta, log = FALSE)
                 res <- res +
                     sum(unlist(sapply(grep("^lambda\\.", names(theta), value = TRUE),
                                       function(x)
-                                      {
-                                          dunif(theta[[x]], 0, 0.05, TRUE)
-                                      })))
+                    {
+                        dunif(theta[[x]], 0, 0.05, TRUE)
+                    })))
             res <- res +
                 sum(unlist(sapply(grep("^p1\\.", names(theta), value = TRUE),
                                   function(x)
-                                  {
-                                      dunif(theta[[x]], 0, 1, TRUE)
-                                  })))
+                {
+                    dunif(theta[[x]], 0, 1, TRUE)
+                })))
             res <- res +
                 sum(unlist(sapply(grep("^p2\\.", names(theta), value = TRUE),
                                   function(x)
-                                  {
-                                      dunif(theta[[x]], 0, 2, TRUE)
-                                  })))
+                {
+                    dunif(theta[[x]], 0, 2, TRUE)
+                })))
         }
     } else
     {
@@ -360,10 +360,10 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1,
 
         initIc <-
             round(proportion_chronic * rand$dist[[pick]][["j"]]) -
-                rand$dist[[pick]][["i"]]
+            rand$dist[[pick]][["i"]]
         initI1 <-
             round((1 - proportion_chronic) * rand$dist[[pick]][["j"]]) -
-                (stage1_detected - rand$dist[[pick]][["i"]])
+            (stage1_detected - rand$dist[[pick]][["i"]])
     }
 
     initS <- N - initIc - initI1 - initI2
@@ -622,7 +622,8 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
 ##' @author Sebastian Funk
 chronic_carriers_lhs <- function(nsamples = 1,
                                  nruns = 100, seed = NULL,
-                                 verbose = FALSE, passive = TRUE)
+                                 verbose = FALSE, passive = TRUE,
+                                 calc.posterior = FALSE)
 {
     data(village_data)
 
@@ -665,16 +666,34 @@ chronic_carriers_lhs <- function(nsamples = 1,
     i <- 0
     while(i < nsamples)
     {
-        i <- i + 1
+        ##:ess-bp-start::browser@nil:##
+browser(expr=is.null(.ESSBP.[["@4@"]]))##:ess-bp-end:##
+i <- i + 1
         theta[colnames(r)] <- r[i, ]
-        posterior <- param_posterior_villages(theta, nruns, TRUE)
-        samples[[i]] <- list(parameters = theta)
-        samples[[i]][["village_posteriors"]] <- posterior
-        samples[[i]][["posterior"]] <- sum(posterior)
-
-        if (verbose)
+        if (calc.posterior)
         {
-            message(i, samples[[i]][["posterior"]], "\n")
+            posterior <- param_posterior_villages(theta, nruns, TRUE)
+            samples[[i]] <- list(parameters = theta)
+            samples[[i]][["village_posteriors"]] <- posterior
+            samples[[i]][["posterior"]] <- sum(posterior)
+
+            if (verbose)
+            {
+                message(i, samples[[i]][["posterior"]], "\n")
+            }
+        } else
+        {
+            village_number <- 1
+            stoptime <- village_screening[village.number == village_number, stoptime]
+            passive_data <- village_cases[village.number == village_number]
+            ##:ess-bp-start::browser@nil:##
+browser(expr=is.null(.ESSBP.[["@3@"]]))##:ess-bp-end:##
+sims <- lapply(seq_len(nruns), function(x) {chronic(params = theta, init = rinit(theta), times = seq(0, stoptime), stage1_passive = village_cases[village.number == village.number & stage == 1, cases], stage2_passive = village_cases[village.number == village.number & stage == 2, cases])})
+            samples[[i]] <- list(parameters = theta)
+            samples[[i]][["nneg"]] <- sum(sapply(sims, function(x) { any(x[["I1"]] < 0 | x[["I2"]] < 0)  }))
+            samples[[i]][["final_I1"]] <- sapply(sims, function(x) { tail(x[["I1"]], 1) })
+            samples[[i]][["final_I2"]] <- sapply(sims, function(x) { tail(x[["I2"]], 1) })
+            
         }
     }
 
