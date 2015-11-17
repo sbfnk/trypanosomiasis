@@ -7,8 +7,10 @@
 ChronicModel::ChronicModel(std::map<std::string, double> params,
                            std::map<std::string, int> init,
                            std::vector<unsigned int> p1s,
-                           std::vector<unsigned int> p2s) :
-    states(init), rates(params), passive_stage1(p1s), passive_stage2(p2s)
+                           std::vector<unsigned int> p2s,
+                           std::vector<unsigned int> verbose) :
+    states(init), rates(params), passive_stage1(p1s), passive_stage2(p2s),
+    verbose(verbose.size() > 0 ? verbose[0] : 0)
 {
     Event chronic_infection(params["lambda"] * params["pc"],
                             std::vector<std::string>(1, "S"));
@@ -94,6 +96,9 @@ ChronicModel::Simulate(std::vector<int> times, unsigned int seed)
             {
                 traj[it->first].push_back(it->second);
             }
+
+            if (states["I1"] < 0) states["I1"] = 0;
+            if (states["I2"] < 0) states["I2"] = 0;
             ++next_time;
         }
 
@@ -101,22 +106,39 @@ ChronicModel::Simulate(std::vector<int> times, unsigned int seed)
 
         // event time
         double eventSum = generateEventList(eventRates);
+
+        if (verbose) {
+            std::cout << std::endl << "Time " << time << ": ";
+            for (std::vector<double>::iterator it = eventRates.begin();
+                 it != eventRates.end(); ++it)
+            {
+                std::cout << *it << " ";
+            }
+            std::cout << "-- " << eventSum << std::endl;
+        }
         double dt = -log(gen()) / eventSum;
         time += dt;
 
         // choose event
         double randEvent = gen() * eventSum;
 
+        if (verbose) {
+            std::cout << "Random event " << randEvent << ": ";
+        }
+
         int chosenEvent = 0;
         double rateAcc = 0;
 
         while ((chosenEvent < static_cast<int>(eventList.size())) &
-               (eventRates[chosenEvent] > 0 | rateAcc <= randEvent))
+               (rateAcc + eventRates[chosenEvent] < randEvent))
         {
             rateAcc += eventRates[chosenEvent];
             chosenEvent++;
         }
-        --chosenEvent;
+
+        if (verbose) {
+            std::cout << chosenEvent << std::endl;
+        }
 
         if (chosenEvent >= 0)
         {

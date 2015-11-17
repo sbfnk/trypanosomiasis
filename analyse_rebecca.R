@@ -2,6 +2,9 @@ library('XLConnect')
 library('data.table')
 library('ggplot2')
 library('ggthemr')
+library('reshape2')
+
+ggthemr('fresh')
 
 path <- path.expand("~/Research/Francesco/MSc\ project\ Rebecca\ Oettle/Results/")
 
@@ -33,7 +36,9 @@ dt[, village := as.integer(as.character(village))]
 setkey(dt, village)
 saveRDS(dt, "village_results.rds")
 
-plot_marginal <- function(df, var)
+fit_dt <- data.table(value = numeric(0), fit = numeric(0), param = character(0))
+
+for (param in setdiff(names(dt), c("batchrun.number", "fit", "village.number")))
 {
     ggthemr('fresh')
     
@@ -43,5 +48,4 @@ plot_marginal <- function(df, var)
     p <- p + geom_line()
     return(p)
 }
-
 

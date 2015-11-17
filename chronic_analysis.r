@@ -1,13 +1,26 @@
 library('data.table')
 library('trypR')
-library('compiler')
 
-enableJIT(1)
+village <- 1
 
+system.time(lhs_samples <- chronic_carriers_lhs(passive = FALSE, nsamples = 1000, nruns = 5, verbose = FALSE, village = village))
+
+theta <- rprior(villages = 1, passive = FALSE)
+
+current.posterior <- traj_likelihood(theta, 1, 5, log = TRUE, passive = FALSE)
+
+acceptance <- 0
+for (i in 1:10000)
 {
-    timing_lhs <- system.time(lhs_samples <- chronic_carriers_lhs(passive = FALSE, nsamples = 100))
-    timing_prior <- system.time(prior_samples <- chronic_carriers_prior(passive = FALSE, nsamples = 10, finite = TRUE, verbose = TRUE))
+    proposal.posterior <- traj_likelihood(theta, 1, 5, log = TRUE, passive = FALSE)
+    if (runif(1) < exp(proposal.posterior - current.posterior))
+    {
+        current.posterior <- proposal.posterior
+        acceptance <- acceptance + 1
+    }
+    cat(acceptance / i, "\n")
 }
+
 
 lhs_posteriors <- sapply(seq_along(lhs_samples), function(x)
 {
