@@ -288,8 +288,8 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
 ##' @param log whether to return the logarithm
 ##' @return point likelihood
 ##' @author Sebastian Funk
-likelihood <- function(state, stage1_detected = NULL,
-                       stage2_detected = NULL, theta, attendance = 1,
+likelihood <- function(state, stage1_detected, stage2_detected,
+                       theta, attendance = 1, active = TRUE, 
                        log = FALSE)
 {
     if (log)
@@ -302,18 +302,23 @@ likelihood <- function(state, stage1_detected = NULL,
 
     if (!any(state < 0))
     {
-        if (!is.null(stage1_detected))
+        if (!missing(stage1_detected))
         {
+            if (active) {
+                detection_probability <- theta[["screen1"]] * attendance
+            } else
+            {
+                detection_probability <- 1 ## sensitivity of passive screening
+            }
             if ("Ic" %in% names(state))
             {
                 stage1_ll <- sum(sapply(seq(0, stage1_detected), function(x)
                 {
                     prob <-
                         dbinom(x, state[["Ic"]] + x,
-                               theta[["alpha"]] * theta[["screen1"]] * attendance)
+                               theta[["alpha"]] * detection_probability)
                     prob <- prob * dbinom(stage1_detected - x, state[["I1"]] + x,
-                                          theta[["screen1"]] * attendance)
-                    prob
+                                          detection_probability)
                 }))
                 if (log)
                 {
@@ -325,7 +330,7 @@ likelihood <- function(state, stage1_detected = NULL,
             } else
             {
                 stage1_ll <- dbinom(stage1_detected, state[["I1"]] + stage1_detected,
-                                    theta[["screen1"]] * attendance, log = log)
+                                    detection_probability, log = log)
                 if (log)
                 {
                     res <- res + stage1_ll
@@ -335,10 +340,16 @@ likelihood <- function(state, stage1_detected = NULL,
                 }
             }
         }
-        if ("p1" %in% names(theta) && "p2" %in% names(theta))
+        if (!missing(stage2_detected))
         {
-            stage2_ll <- dbinom(stage2_detected, state[["I2"]] + stage1_detected,
-                                theta[["screen2"]] * attendance, log = log)
+            if (active) {
+                detection_probability <- theta[["screen1"]] * attendance
+            } else
+            {
+                detection_probability <- 1 ## sensitivity of passive screening
+            }
+            stage2_ll <- dbinom(stage2_detected, state[["I2"]] + stage2_detected,
+                                detection_probability, log = log)
             if (log)
             {
                 res <- res + stage2_ll
