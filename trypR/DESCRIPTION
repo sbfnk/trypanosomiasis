@@ -5,7 +5,7 @@ Version: 0.1
 Authors@R: "First Last <first.last@example.com> [aut, cre]"
 Description: What the package does (one paragraph)
 Depends: R (>= 3.1.2)
-Imports: Rcpp (>= 0.11.3), data.table
+Imports: Rcpp (>= 0.11.3)
 LinkingTo: Rcpp
 License: GPL (>= 2)
 LazyData: true
