@@ -16,32 +16,52 @@ ChronicModel::ChronicModel(std::map<std::string, double> params,
                             std::vector<std::string>(1, "S"));
     chronic_infection.addAction("S", -1);
     chronic_infection.addAction("Ic", +1);
+    eventList.push_back(chronic_infection);
 
     Event stage1_infection(params["lambda"] * (1 - params["pc"]),
                             std::vector<std::string>(1, "S"));
     stage1_infection.addAction("S", -1);
     stage1_infection.addAction("I1", +1);
+    eventList.push_back(stage1_infection);
 
     Event chronic_recovery(params["rc"],
                            std::vector<std::string>(1, "Ic"));
     chronic_recovery.addAction("S", +1);
     chronic_recovery.addAction("Ic", -1);
+    eventList.push_back(chronic_recovery);
 
     Event stage1_progression(params["r1"],
                           std::vector<std::string>(1, "I1"));
     stage1_progression.addAction("I2", +1);
     stage1_progression.addAction("I1", -1);
+    eventList.push_back(stage1_progression);
 
     Event stage2_removal(params["r2"],
                              std::vector<std::string>(1, "I2"));
     stage2_removal.addAction("S", +1);
     stage2_removal.addAction("I2", -1);
-
-    eventList.push_back(chronic_infection);
-    eventList.push_back(stage1_infection);
-    eventList.push_back(chronic_recovery);
-    eventList.push_back(stage1_progression);
     eventList.push_back(stage2_removal);
+
+    if (params.find("p1") != params.end()) {
+        Event stage1_passive_detection(params["p1"],
+                                       std::vector<std::string>(1, "I1"));
+        stage1_passive_detection.addAction("I1", -1);
+        stage1_passive_detection.addAction("S", +1);
+        stage1_passive_detection.addAction("Z1pass", +1);
+        eventList.push_back(stage1_passive_detection);
+        states["Z1pass"] = 0;
+    }
+
+    if (params.find("p2") != params.end()) {
+        Event stage2_passive_detection(params["p2"],
+                                       std::vector<std::string>(1, "I2"));
+        stage2_passive_detection.addAction("I2", -1);
+        stage2_passive_detection.addAction("S", +1);
+        stage2_passive_detection.addAction("Z2pass", +1);
+        eventList.push_back(stage2_passive_detection);
+        states["Z2pass"] = 0;
+    }
+
 }
 
 std::map<std::string, std::vector<double> >
@@ -75,6 +95,8 @@ ChronicModel::Simulate(std::vector<int> times, unsigned int seed)
     traj.emplace("Ic", std::vector<double>());
     traj.emplace("I1", std::vector<double>());
     traj.emplace("I2", std::vector<double>());
+    if (rates.find("p1") != rates.end()) traj.emplace("Z1pass", std::vector<double>());
+    if (rates.find("p2") != rates.end()) traj.emplace("Z2pass", std::vector<double>());
 
     double time = 0;
     while (time < last_time)
