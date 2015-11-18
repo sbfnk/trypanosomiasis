@@ -403,20 +403,29 @@ dinit <- function(init, village_number, theta, log = FALSE)
 ##' @param nruns number of runs (to estimate the likelihood)
 ##' @param log whether to return the logarithm of the posterior density
 ##' @param ...
-##' @import adaptivetau fitR
 ##' @return posterior density
 ##' @author Sebastian Funk
 traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
 {
     data(village_data)
 
-    if ("p1" %in% names(theta) && "p2" %in% names(theta))
+    params <-
+        grep(paste0("\\.", village_number, "$"), names(theta),
+             value = TRUE)
+    naked.params <- c()
+    for (param in params)
     {
-        cum_data <-
-            village_cases[village.number == village_number,
-                          list(cases = sum(cases)), by = stage]$cases
+        naked.param <-
+            sub(paste0("\\.", village_number, "$"), "", param)
+        theta[[naked.param]] <- theta[[param]]
+        naked.params <- c(naked.params, naked.param)
     }
 
+    passive <- lapply(1:2, function(x)
+    {
+        village_cases[village.number == village.number & stage == x, cases]
+    })
+    
     res <- 0
     likelihoods <- c()
     final.attendance <- min(village_screening[village.number == village_number,
@@ -433,40 +442,56 @@ traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
         if (is.finite(log.init))
         {
             ll <- 0
-            if ("p1" %in% names(theta) && "p2" %in% names(theta))
+            chronic_options <- list(params = theta, init = init,
+                                    times = seq(0, stoptime))
+            for (stage in 1:2)
             {
-                df_run <-
-                    simulateModelStochastic(theta, init, seq(0, stoptime),
-                                            sim_chronic_transitions,
-                                            sim_chronic_rates)
-                run <- data.table(df_run)
+                if (!paste0("p", stage) %in% names(theta))
+                {
+                    chronic_options[[paste0("stage", stage, "_passive")]] <-
+                        passive[[stage]]
+                }                    
+            }
+            
+            run <- do.call(chronic, chronic_options)
 
-                passive_state <- c(I1 = run[nrow(run), Z1pass],
-                                   I2 = run[nrow(run), Z2pass])
-                ll <- ll + likelihood(passive_state, cum_data[1], cum_data[2],
-                                      theta, log = TRUE)
-                ll <- ll +
-                    likelihood(run[nrow(run)],
-                               session.2.detected1, theta = theta,
-                               attendance = final.attendance, log = TRUE)
+            if (any(c(run[, "I1"], run[, "I2"]) < 0)) {
+                ll <- -Inf
             } else
             {
-                run <- sim_chronic_carriers(init, theta, village_number)
-                if (any(run < 0)) {
-                    ll <- -Inf
-                } else
-                {
-                    ll <- ll + likelihood(run[nrow(run)], session.2.detected1,
-                                          theta = theta,
-                                          attendance = final.attendance, log = TRUE)
-                }
+                ll <- ll + likelihood(run[nrow(run), ], session.2.detected1,
+                                      theta = theta,
+                                      attendance = final.attendance, log = TRUE)
             }
+            
+            for (stage in 1:2)
+            {
+                if (paste0("p", stage) %in% names(theta))
+                {
+                    passive_state <- run[nrow(run), paste0("Z", stage, "pass")]
+                    names(passive_state) <- paste0("I", stage)
+                    likelihood_options <- list(state = passive_state,
+                                               detected = sum(passive[[stage]]), 
+                                               theta = theta, log = TRUE,
+                                               active = FALSE)
+                    detected_option <- which(names(likelihood_options) == "detected")
+                    names(likelihood_options)[detected_option] <-
+                        paste0("stage", stage, "_detected")
+                    ll <- ll + do.call(likelihood, likelihood_options)
+                }                    
+            }
+            
         } else {
             ll <- -Inf
         }
         likelihoods[j] <- log.init + ll
     }
     res <- sum(exp(likelihoods)) / nruns
+
+    if (length(naked.params) > 0)
+    {
+        theta <- theta[-(which(names(theta) %in% naked.params))]
+    }
 
     if (log)
     {
@@ -485,32 +510,38 @@ traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
 ##' @param nruns number of runs (to estimate the likelihood)
 ##' @param log whether to return the logarithm of the posterior density
 ##' @param ...
-##' @import adaptivetau data.table fitR
 ##' @return posterior density
 ##' @author Sebastian Funk
-param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
+param_posterior_villages <- function(theta, nruns, log = FALSE, villages, ...)
 {
     data(village_data)
+
+    if (missing(villages))
+    {
+        sim_village_screening <- village_screening
+    } else
+    {
+        sim_village_screening <- village_screening[village.number %in% villages]
+    }
 
     res <- 0
     log.prior <- dprior(theta, log = TRUE)
     posteriors <- c()
     if (is.finite(log.prior))
     {
-        village.posteriors <- apply(village_screening, 1, function(village)
+        village.posteriors <- apply(sim_village_screening, 1, function(village)
         {
-            ##:ess-bp-start::browser@nil:##
-browser(expr=is.null(.ESSBP.[["@10@"]]))##:ess-bp-end:##
-village_number <- village[["village.number"]]
+            village_number <- village[["village.number"]]
             stoptime <- village[["stoptime"]]
 
             final.attendance <- min(village[["sigma.end"]], 1)
+
             posterior <- traj_likelihood(theta, village_number, nruns, log = TRUE)
         })
         res <- village.posteriors
     } else
     {
-        res <- rep(0, nrow(village_screening))
+        res <- rep(0, nrow(sim_village_screening))
     }
 
     if (log)
@@ -537,7 +568,7 @@ chronic_carriers_lhs <- function(nsamples = 1,
                                  nruns = 100, seed,
                                  verbose = FALSE, passive = TRUE,
                                  calc.posterior = TRUE,
-                                 villages)
+                                 villages, progress.bar = TRUE)
 {
     data(village_data)
 
@@ -575,7 +606,7 @@ chronic_carriers_lhs <- function(nsamples = 1,
     theta_names <- c("pc", "alpha")
     if (nb_villages > 1)
     {
-        theta_names <- c(theta_names, 
+        theta_names <- c(theta_names,
                          paste(rep(repeat_names, each = nb_villages),
                                villages, sep = "."))
     } else {
@@ -585,8 +616,10 @@ chronic_carriers_lhs <- function(nsamples = 1,
     r[, grep("^lambda", colnames(r), value = TRUE)] <-
         10^r[, grep("^lambda", colnames(r), value = TRUE)]
 
-    theta <- rprior(villages = nb_villages, passive = passive)
+    theta <- rprior(villages = villages, passive = passive)
 
+    if (progress.bar) pb <- txtProgressBar(min = 0, max = nsamples - 1, style = 3)
+    
     i <- 0
     while(i < nsamples)
     {
@@ -594,7 +627,7 @@ chronic_carriers_lhs <- function(nsamples = 1,
         theta[colnames(r)] <- r[i, ]
         if (calc.posterior)
         {
-            posterior <- param_posterior_villages(theta, nruns, TRUE)
+            posterior <- param_posterior_villages(theta, nruns, TRUE, villages)
             samples[[i]] <- list(parameters = theta)
             samples[[i]][["village_posteriors"]] <- posterior
             samples[[i]][["posterior"]] <- sum(posterior)
@@ -605,17 +638,47 @@ chronic_carriers_lhs <- function(nsamples = 1,
             }
         } else
         {
-            village_number <- 1
-            stoptime <- village_screening[village.number == village_number, stoptime]
-            passive_data <- village_cases[village.number == village_number]
-            sims <- lapply(seq_len(nruns), function(x) {chronic(params = theta, init = rinit(theta), times = seq(0, stoptime), stage1_passive = village_cases[village.number == village.number & stage == 1, cases], stage2_passive = village_cases[village.number == village.number & stage == 2, cases])})
             samples[[i]] <- list(parameters = theta)
-            samples[[i]][["nneg"]] <- sum(sapply(sims, function(x) { any(x[["I1"]] < 0 | x[["I2"]] < 0)  }))
-            samples[[i]][["final_I1"]] <- sapply(sims, function(x) { tail(x[["I1"]], 1) })
-            samples[[i]][["final_I2"]] <- sapply(sims, function(x) { tail(x[["I2"]], 1) })
-            
+            samples[[i]][["nneg"]] <- c()
+            samples[[i]][["final_I1"]] <- c()
+            samples[[i]][["final_I2"]] <- c()
+            for (village_number in villages) {
+                stoptime <-
+                    village_screening[village.number == village_number, stoptime]
+                passive_data <- village_cases[village.number == village_number]
+                sims <- lapply(seq_len(nruns), function(x)
+                {
+                    chronic(params = theta, init = rinit(theta),
+                            times = seq(0, stoptime),
+                            stage1_passive =
+                                village_cases[village.number == village.number &
+                                              stage == 1, cases],
+                            stage2_passive =
+                                village_cases[village.number == village.number &
+                                              stage == 2, cases])})
+                samples[[i]][["nneg"]] <- c(samples[[i]][["nneg"]],
+                                            sum(sapply(sims, function(x)
+                {
+                    any(x[["I1"]] < 0 | x[["I2"]] < 0)
+                })))
+                samples[[i]][["final_I1"]] <- c(samples[[i]][["final_I1"]],
+                                                sapply(sims, function(x)
+                {
+                    tail(x[["I1"]], 1)
+                }))
+                samples[[i]][["final_I2"]] <- c(samples[[i]][["final_I2"]],
+                                                sapply(sims, function(x)
+                {
+                    tail(x[["I2"]], 1)
+                }))
+            }
+            names(samples[[i]][["nneg"]]) <- villages
+            names(samples[[i]][["final_I1"]]) <- villages
+            names(samples[[i]][["final_I2"]]) <- villages
         }
+        if (progress.bar) setTxtProgressBar(pb, i)
     }
+    if (progress.bar) close(pb)
 
     return(samples)
 }
