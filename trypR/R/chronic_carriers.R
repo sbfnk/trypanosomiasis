@@ -585,9 +585,7 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, ...)
     {
         village.posteriors <- apply(village_screening, 1, function(village)
         {
-            ##:ess-bp-start::browser@nil:##
-browser(expr=is.null(.ESSBP.[["@10@"]]))##:ess-bp-end:##
-village_number <- village[["village.number"]]
+            village_number <- village[["village.number"]]
             stoptime <- village[["stoptime"]]
 
             final.attendance <- min(village[["sigma.end"]], 1)
@@ -691,7 +689,6 @@ chronic_carriers_lhs <- function(nsamples = 1,
             }
         } else
         {
-            village_number <- 1
             stoptime <- village_screening[village.number == village_number, stoptime]
             passive_data <- village_cases[village.number == village_number]
             sims <- lapply(seq_len(nruns), function(x) {chronic(params = theta, init = rinit(theta), times = seq(0, stoptime), stage1_passive = village_cases[village.number == village.number & stage == 1, cases], stage2_passive = village_cases[village.number == village.number & stage == 2, cases])})
