@@ -655,7 +655,8 @@ chronic_carriers_lhs <- function(nsamples = 1,
                                               stage == 1, cases],
                             stage2_passive =
                                 village_cases[village.number == village.number &
-                                              stage == 2, cases])})
+                                              stage == 2, cases])}
+                )
                 samples[[i]][["nneg"]] <- c(samples[[i]][["nneg"]],
                                             sum(sapply(sims, function(x)
                 {

@@ -3,7 +3,7 @@ library('trypR')
 
 village <- 1
 
-system.time(lhs_samples <- chronic_carriers_lhs(passive = FALSE, nsamples = 1000, nruns = 5, verbose = FALSE, village = village))
+system.time(lhs_samples <- chronic_carriers_lhs(passive = FALSE, nsamples = 1000, nruns = 5, verbose = FALSE, village.number = 1, calc.posterior = TRUE))
 
 theta <- rprior(villages = 1, passive = FALSE)
 
