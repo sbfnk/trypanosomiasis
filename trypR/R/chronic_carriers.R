@@ -29,7 +29,7 @@ sim_trajectory <- function(theta, village)
 rprior <- function(villages = 1, passive = TRUE)
 {
     param_vector <- c(pc = runif(1, 0, 1), alpha = runif(1, 0, 1))
-    if (villages == 1)
+    if (length(villages) == 1)
     {
         param_vector <- c(param_vector,
                           lambda = 10^(runif(1, -5, -2)))
@@ -41,18 +41,18 @@ rprior <- function(villages = 1, passive = TRUE)
         }
     } else
     {
-        village_vector <- c(runif(villages, 0, 0.05))
+        village_vector <- c(runif(length(villages), 0, 0.05))
         rep_names <- "lambda"
         if (passive)
         {
             village_vector <- c(village_vector,
-                                runif(villages, 0, 1),
-                                runif(villages, 0, 2))
+                                runif(length(villages), 0, 1),
+                                runif(length(villages), 0, 2))
             rep_names <- c(rep_names, "p1", "p2")
         }
         names(village_vector) <-
-            paste(rep(rep_names, each = villages),
-                  seq_len(villages), sep = ".")
+            paste(rep(rep_names, each = length(villages)),
+                  villages, sep = ".")
         param_vector <- c(param_vector, village_vector)
 
     }
@@ -63,7 +63,7 @@ rprior <- function(villages = 1, passive = TRUE)
                       ## screen1 = runif(1, 0.86, 0.98),
                       screen1 = 0.95,
                       screen2 = 0.99,
-                      N = villages)
+                      N = length(villages))
     return(param_vector)
 }
 
