@@ -173,8 +173,7 @@ dprior <- function(theta, log = FALSE)
 ##' @param passive whether to accumulate infections for passive detection (Z1pass, Z2pass)
 ##' @return initial conditions vector
 ##' @author Sebastian Funk
-rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1,
-                  passive = FALSE)
+rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
 {
 
     data(village_data)
@@ -275,11 +274,6 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1,
     initS <- N - initIc - initI1 - initI2
 
     initVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
-
-    if (passive)
-    {
-        initVec <- c(initVec, c(Z1pass = 0, Z2pass = 0))
-    }
 
     return(initVec)
 }
