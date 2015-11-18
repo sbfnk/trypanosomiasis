@@ -1,115 +1,24 @@
-##' Simulate the trypanosomiasis model, with passive case detection
+##' Produe a single simuation run
 ##'
-##' @param init initial state
 ##' @param theta parameter vector
-##' @param village_number village number
-##' @return trajectory
-##' @import data.table fitR
-##' @author Sebastian Funk
-sim_chronic_carriers <- function(init, theta, village_number)
+##' @return data frame with trajctor
+##' @author seb
+##' @export
+sim_trajectory <- function(theta, village)
 {
-    data(village_data)
-
-    stoptime <- village_screening[village.number == village_number, stoptime]
-
-    params <-
-        grep(paste("\\.", village_number, "$", sep = ""), names(theta),
-             value = TRUE)
-    for (param in params)
+    stoptime <- village_screening[village_screening$village.number == village]$stoptime
+    chronic_options <- list(params = theta, init = rinit(theta),
+                            times = seq(0, stoptime))
+    for (stage in 1:2)
     {
-        naked.param <-
-            sub(paste("\\.", village_number, "$", sep = ""), "", param)
-        theta[[naked.param]] <- theta[[param]]
-    }
-
-    sim_times <-
-        unique(c(0,
-                 village_cases[village.number == village_number & cases > 0, month],
-                 stoptime))
-    sim_times <- sim_times[order(sim_times)]
-
-    passive_data <- village_cases[village.number == village_number]
-
-    state <- init
-    traj <- NULL
-
-    for (inter in seq(2, length(sim_times)))
-    {
-        if (!any(state < 0))
+        if (!paste0("p", stage) %in% names(theta))
         {
-            inter_traj <-
-                data.table(chronic(theta, state,seq(sim_times[inter - 1],
-                                                    sim_times[inter])))
-            stage1_cases <-
-                passive_data[stage == 1 & month == sim_times[inter], cases]
-            stage2_cases <-
-                passive_data[stage == 2 & month == sim_times[inter], cases]
-            inter_traj[nrow(inter_traj), I1 := I1 - stage1_cases]
-            inter_traj[nrow(inter_traj), I2 := I2 - stage2_cases]
-
-            if (is.null(traj))
-            {
-                traj <- inter_traj
-            } else
-            {
-                traj <- rbind(traj, inter_traj)
-            }
-            state <- unlist(traj[nrow(traj), -1, with = F])
-            traj <- traj[-nrow(traj)]
-        }
+            chronic_options[[paste0("stage", stage, "_passive")]] <-
+                passive[[stage]]
+        }                    
     }
-
-    return(traj)
-}
-
-##' Simulation step for trypanosomiasis model with chronic infections
-##'
-##' For use with \code{ssa.adaptivetau}
-##' @param state current state of the model
-##' @param theta parameter vector of the model
-##' @param t time
-##' @return current transition rates
-##' @author Sebastian Funk
-sim_chronic_rates <- function(state, theta, t)
-{
-                                        # parameters
-    pc <- theta[["pc"]]
-    lambda <- theta[["lambda"]]
-    rc <- theta[["rc"]]
-    r1 <- theta[["r1"]]
-    if ("p1" %in% names(theta))
-    {
-        p1 <- theta[["p1"]]
-    } else
-    {
-        p1 <- 0
-    }
-    if ("p1" %in% names(theta))
-    {
-        p2 <- theta[["p2"]]
-    } else
-    {
-        p2 <- 0
-    }
-
-    r2 <- theta[["r2"]]
-
-    S <- state[["S"]]
-    Ic <- state[["Ic"]]
-    I1 <- state[["I1"]]
-    I2 <- state[["I2"]]
-    Z1pass <- state[["Z1pass"]]
-    Z2pass <- state[["Z2pass"]]
-
-    return(c(
-        pc * lambda * S, # chronic infection
-        rc * Ic, # chronic recovery
-    (1 - pc) * lambda * S, # pathogenic infection
-    r1 * I1, # progression into stage 2
-    p1 * I1, # passive stage 1 detection
-    p2 * I2, # passitve stage 2 detection
-    r2 * I2 # stage 2 death
-    ))
+    
+    return(do.call(chronic, chronic_options))
 }
 
 ##' Draw a parameter sample from the prior density
