@@ -313,7 +313,7 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
 ##' @return point likelihood
 ##' @author Sebastian Funk
 likelihood <- function(state, stage1_detected, stage2_detected,
-                       theta, attendance = 1, active = TRUE, 
+                       theta, attendance = 1, active = TRUE,
                        log = FALSE)
 {
     if (log)
@@ -449,7 +449,7 @@ traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
     {
         village_cases[village.number == village.number & stage == x, cases]
     })
-    
+
     res <- 0
     likelihoods <- c()
     final.attendance <- min(village_screening[village.number == village_number,
@@ -466,18 +466,7 @@ traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
         if (is.finite(log.init))
         {
             ll <- 0
-            chronic_options <- list(params = theta, init = init,
-                                    times = seq(0, stoptime))
-            for (stage in 1:2)
-            {
-                if (!paste0("p", stage) %in% names(theta))
-                {
-                    chronic_options[[paste0("stage", stage, "_passive")]] <-
-                        passive[[stage]]
-                }                    
-            }
-            
-            run <- do.call(chronic, chronic_options)
+            run <- sim_trajectory(theta, init, village_number)
 
             if (any(c(run[, "I1"], run[, "I2"]) < 0)) {
                 ll <- -Inf
@@ -487,7 +476,7 @@ traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
                                       theta = theta,
                                       attendance = final.attendance, log = TRUE)
             }
-            
+
             for (stage in 1:2)
             {
                 if (paste0("p", stage) %in% names(theta))
@@ -495,16 +484,16 @@ traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
                     passive_state <- run[nrow(run), paste0("Z", stage, "pass")]
                     names(passive_state) <- paste0("I", stage)
                     likelihood_options <- list(state = passive_state,
-                                               detected = sum(passive[[stage]]), 
+                                               detected = sum(passive[[stage]]),
                                                theta = theta, log = TRUE,
                                                active = FALSE)
                     detected_option <- which(names(likelihood_options) == "detected")
                     names(likelihood_options)[detected_option] <-
                         paste0("stage", stage, "_detected")
                     ll <- ll + do.call(likelihood, likelihood_options)
-                }                    
+                }
             }
-            
+
         } else {
             ll <- -Inf
         }
