@@ -1,6 +1,6 @@
 #' trypR
 #'
 #' @name trypR
-#' @importFrom Rcpp evalCpp
-#' @useDynLib WMUtils
+#' @useDynLib trypR
+#' @importFrom Rcpp sourceCpp
 #' @docType package
