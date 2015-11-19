@@ -18,11 +18,41 @@ ChronicModel::ChronicModel(std::map<std::string, double> params,
     chronic_infection.addAction("Ic", +1);
     eventList.push_back(chronic_infection);
 
-    Event stage1_infection(params["lambda"] * (1 - params["pc"]),
+    Event chronic_infection_from_Ic(params["lambda"] * params["pc"] *
+                                    params["delta"],
+                                    std::vector<std::string>(1, "S"));
+    chronic_infection_from_Ic.addAction("S", -1);
+    chronic_infection_from_Ic.addAction("Ic", +1);
+    chronic_infection_from_Ic.addMultiplier("Ic");
+    eventList.push_back(chronic_infection_from_Ic);
+
+    Event chronic_infection_from_I1(params["lambda"] * params["pc"],
+                                    std::vector<std::string>(1, "S"));
+    chronic_infection_from_I1.addAction("S", -1);
+    chronic_infection_from_I1.addAction("Ic", +1);
+    chronic_infection_from_I1.addMultiplier("I1");
+    eventList.push_back(chronic_infection_from_I1);
+
+    Event stage1_infection(params["lambda"] * params["pc"],
                             std::vector<std::string>(1, "S"));
     stage1_infection.addAction("S", -1);
     stage1_infection.addAction("I1", +1);
     eventList.push_back(stage1_infection);
+
+    Event stage1_infection_from_Ic(params["beta"] * (1 - params["pc"]) *
+                                   params["delta"],
+                                   std::vector<std::string>(1, "S"));
+    stage1_infection_from_Ic.addAction("S", -1);
+    stage1_infection_from_Ic.addAction("I1", +1);
+    stage1_infection_from_Ic.addMultiplier("Ic");
+        eventList.push_back(stage1_infection_from_Ic);
+
+    Event stage1_infection_from_I1(params["beta"] * (1 - params["pc"]),
+                                   std::vector<std::string>(1, "S"));
+    stage1_infection_from_I1.addAction("S", -1);
+    stage1_infection_from_I1.addAction("I1", +1);
+    stage1_infection_from_I1.addMultiplier("I1");
+    eventList.push_back(stage1_infection_from_I1);
 
     Event chronic_recovery(params["rc"],
                            std::vector<std::string>(1, "Ic"));
@@ -31,13 +61,13 @@ ChronicModel::ChronicModel(std::map<std::string, double> params,
     eventList.push_back(chronic_recovery);
 
     Event stage1_progression(params["r1"],
-                          std::vector<std::string>(1, "I1"));
+                             std::vector<std::string>(1, "I1"));
     stage1_progression.addAction("I2", +1);
     stage1_progression.addAction("I1", -1);
     eventList.push_back(stage1_progression);
 
     Event stage2_removal(params["r2"],
-                             std::vector<std::string>(1, "I2"));
+                         std::vector<std::string>(1, "I2"));
     stage2_removal.addAction("S", +1);
     stage2_removal.addAction("I2", -1);
     eventList.push_back(stage2_removal);
