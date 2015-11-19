@@ -4,20 +4,21 @@
 ##' @return data frame with trajctor
 ##' @author seb
 ##' @export
-sim_trajectory <- function(theta, village)
+sim_trajectory <- function(theta, init, village)
 {
     stoptime <- village_screening[village_screening$village.number == village]$stoptime
-    chronic_options <- list(params = theta, init = rinit(theta),
-                            times = seq(0, stoptime))
+    if (missing(init)) init <- rinit(theta)
+    
+    chronic_options <- list(params = theta, init = init, times = seq(0, stoptime))
     for (stage in 1:2)
     {
         if (!paste0("p", stage) %in% names(theta))
         {
             chronic_options[[paste0("stage", stage, "_passive")]] <-
                 passive[[stage]]
-        }                    
+        }
     }
-    
+
     return(do.call(chronic, chronic_options))
 }
 
