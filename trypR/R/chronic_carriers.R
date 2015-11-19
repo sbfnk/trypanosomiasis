@@ -564,24 +564,98 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, villages)
     }
 }
 
-##' Draw latin hypercube samples for the trypanosomiasis model with chronic carriers
+##' Calculate summary statistic for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages
+##'
+##' @param theta parameter vector
+##' @param nruns number of runs
+##' @param villages villages to simuate
+##' @return posterior density
+##' @author Sebastian Funk
+param_sumstat_villages <- function(theta, nruns, villages, ...)
+{
+    data(village_data)
+
+    if (missing(villages))
+    {
+        sim_village_screening <- village_screening
+    } else
+    {
+        sim_village_screening <- village_screening[village.number %in% villages]
+    }
+
+    summary.statistics <- apply(sim_village_screening, 1, function(village)
+    {
+        village_number <- village[["village.number"]]
+        res <- list(village.number = village_number)
+        stoptime <- village[["stoptime"]]
+
+        final.attendance <- min(village[["sigma.end"]], 1)
+        passive_data <- village_cases[village.number == village_number]
+
+        sims <- lapply(seq_len(nruns),
+                       function(x)
+        {
+            sim_trajectory(theta, village = village_number)
+        })
+
+
+        res[["nneg"]] <- sum(sapply(sims, function(x)
+        {
+            any(x[["I1"]] < 0 | x[["I2"]] < 0)
+        }))
+
+        res[["active_stage1"]] <- sapply(sims, function(x)
+        {
+            rbinom(1, x[["Ic"]],
+                   theta[["alpha"]] * theta[["screen1"]] * final.attendance) +
+                rbinom(1, x[["I1"]],
+                       theta[["screen1"]] * final.attendance)
+        })
+
+        for (stage in 1:2)
+        {
+            if (grep(paste0("^p", stage), names(theta)))
+            {
+                passive_stage <- paste0("passive_stage", stage)
+                res[[passive_stage]] <- sapply(sims, function(x)
+                {
+                    tail(x[[paste0("Z", stage, "pass")]], 1)
+                })
+            }
+        }
+        return(res)
+    })
+    return(summary.statistics)
+}
+
+
+##' Draw samples for the trypanosomiasis model with chronic carriers
 ##'
 ##' @param nsamples number of samples
 ##' @param nruns number of runs
 ##' @param seed random number seed
 ##' @param verbose whether to print out posteriors as it goes along
 ##' @param passive wheter to fit to passive detection data
+##' @param calc.posterior whether to calculate the posterior. Alernatively, will calculate summary statistic
+##' @param villages villages to simuate
+##' @param progress.bar whether to show a progress bar (TRUE by default)
+##' @param sample how to sample (lhs or prior)
+##' @param ... further options for rprior
 ##' @return samples, posteriors, random numbers
-##' @import lhs
+##' @importFrom lhs randomLHS
 ##' @export
 ##' @author Sebastian Funk
-chronic_carriers_lhs <- function(nsamples = 1,
-                                 nruns = 100, seed,
-                                 verbose = FALSE, passive = TRUE,
-                                 calc.posterior = TRUE,
-                                 villages, progress.bar = TRUE)
+chronic_carriers_sample <- function(nsamples = 1,
+                                    nruns = 100, seed,
+                                    verbose = FALSE, passive = TRUE,
+                                    calc.posterior = TRUE,
+                                    villages, progress.bar = TRUE,
+                                    sample = c("lhs", "prior"),
+                                    ...)
 {
     data(village_data)
+
+    sample <- match.arg(sample)
 
     if (missing(villages))
     {
@@ -598,44 +672,48 @@ chronic_carriers_lhs <- function(nsamples = 1,
         set.seed(seed)
     }
 
-    if (passive)
+    if (sample == "lhs")
     {
-        repeat_vec_upper <- c(-2, 1, 2)
-        repeat_vec_lower <- c(-4, 0, 0)
-        repeat_names <- c("lambda", "p1", "p2")
-    } else
-    {
-        repeat_vec_upper <- -2
-        repeat_vec_lower <- -4
-        repeat_names <- c("lambda")
-    }
+        if (passive)
+        {
+            repeat_vec_upper <- c(-2, 1, 2)
+            repeat_vec_lower <- c(-4, 0, 0)
+            repeat_names <- c("lambda", "p1", "p2")
+        } else
+        {
+            repeat_vec_upper <- -2
+            repeat_vec_lower <- -4
+            repeat_names <- c("lambda")
+        }
 
-    r <- lhs::randomLHS(nsamples, nb_villages * length(repeat_names) + 2)
-    upper <- c(1, 1, rep(repeat_vec_upper, each = nb_villages))
-    lower <- c(0, 0, rep(repeat_vec_lower, each = nb_villages))
-    r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
-    theta_names <- c("pc", "alpha")
-    if (nb_villages > 1)
-    {
-        theta_names <- c(theta_names,
-                         paste(rep(repeat_names, each = nb_villages),
-                               villages, sep = "."))
-    } else {
-        theta_names <- c(theta_names, repeat_names)
+        r <- lhs::randomLHS(nsamples, nb_villages * length(repeat_names) + 3)
+        upper <- c(1, 1, 1, rep(repeat_vec_upper, each = nb_villages))
+        lower <- c(0, 0, 0, rep(repeat_vec_lower, each = nb_villages))
+        r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
+        theta_names <- c("pc", "alpha", "delta")
+        if (nb_villages > 1)
+        {
+            theta_names <- c(theta_names,
+                             paste(rep(repeat_names, each = nb_villages),
+                                   villages, sep = "."))
+        } else {
+            theta_names <- c(theta_names, repeat_names)
+        }
+        colnames(r) <- theta_names
+        r[, grep("^lambda", colnames(r), value = TRUE)] <-
+            10^r[, grep("^lambda", colnames(r), value = TRUE)]
     }
-    colnames(r) <- theta_names
-    r[, grep("^lambda", colnames(r), value = TRUE)] <-
-        10^r[, grep("^lambda", colnames(r), value = TRUE)]
-
-    theta <- rprior(villages = villages, passive = passive)
 
     if (progress.bar) pb <- txtProgressBar(min = 0, max = nsamples - 1, style = 3)
-    
+
     i <- 0
     while(i < nsamples)
     {
         i <- i + 1
-        theta[colnames(r)] <- r[i, ]
+        theta <- rprior(villages = villages, passive = passive, ...)
+        if (sample == "lhs") {
+            theta[colnames(r)] <- r[i, ]
+        }
         if (calc.posterior)
         {
             posterior <- param_posterior_villages(theta, nruns, TRUE, villages)
@@ -649,100 +727,13 @@ chronic_carriers_lhs <- function(nsamples = 1,
             }
         } else
         {
-            samples[[i]] <- list(parameters = theta)
-            samples[[i]][["nneg"]] <- c()
-            samples[[i]][["final_I1"]] <- c()
-            samples[[i]][["final_I2"]] <- c()
-            for (village_number in villages) {
-                stoptime <-
-                    village_screening[village.number == village_number, stoptime]
-                passive_data <- village_cases[village.number == village_number]
-                sims <- lapply(seq_len(nruns), function(x)
-                {
-                    chronic(params = theta, init = rinit(theta),
-                            times = seq(0, stoptime),
-                            stage1_passive =
-                                village_cases[village.number == village.number &
-                                              stage == 1, cases],
-                            stage2_passive =
-                                village_cases[village.number == village.number &
-                                              stage == 2, cases])}
-                )
-                samples[[i]][["nneg"]] <- c(samples[[i]][["nneg"]],
-                                            sum(sapply(sims, function(x)
-                {
-                    any(x[["I1"]] < 0 | x[["I2"]] < 0)
-                })))
-                samples[[i]][["final_I1"]] <- c(samples[[i]][["final_I1"]],
-                                                sapply(sims, function(x)
-                {
-                    tail(x[["I1"]], 1)
-                }))
-                samples[[i]][["final_I2"]] <- c(samples[[i]][["final_I2"]],
-                                                sapply(sims, function(x)
-                {
-                    tail(x[["I2"]], 1)
-                }))
-            }
-            names(samples[[i]][["nneg"]]) <- villages
-            names(samples[[i]][["final_I1"]]) <- villages
-            names(samples[[i]][["final_I2"]]) <- villages
+            samples[[i]] <- list(parameters = theta,
+                                 summary_statistics =
+                                     param_sumstat_villages(theta, nruns, villages))
         }
         if (progress.bar) setTxtProgressBar(pb, i)
     }
     if (progress.bar) close(pb)
-
-    return(samples)
-}
-
-##' Draw prior  samples for the trypanosomiasis model with chronic carriers
-##'
-##' @param nsamples number of samples
-##' @param finite interpret \code{nsamples} as number of finite samples
-##' @param nruns number of runs
-##' @param seed random number seed
-##' @param verbose whether to print out posteriors as it goes along
-##' @param passive whether to fit to passive case data
-##' @return samples, posteriors, random numbers
-##' @export
-##' @author Sebastian Funk
-chronic_carriers_prior <- function(nsamples = 1, finite = FALSE,
-                                   nruns = 100, seed = NULL,
-                                   verbose = FALSE, passive = TRUE)
-{
-    data(village_data)
-
-    nb_villages <- nrow(village_screening)
-
-    samples <- list()
-    likelihoods <- c()
-    posteriors <- c()
-
-    if (!is.null(seed))
-    {
-        set.seed(seed)
-    }
-
-    i <- 0
-    while(i < nsamples)
-    {
-        theta <- rprior(villages = nb_villages, passive = passive)
-        posterior <- param_posterior_villages(theta, nruns, log = TRUE)
-        if (!finite || is.finite(sum(posterior)))
-        {
-            i <- i + 1
-            samples[[i]] <- list(parameters = theta)
-            samples[[i]][["village_posteriors"]] <- posterior
-            samples[[i]][["posterior"]] <- sum(posterior)
-            if (verbose)
-            {
-                message(i, samples[[i]][["posterior"]], "\n")
-            }
-        } else {
-            message("Infinite posterior")
-        }
-
-    }
 
     return(samples)
 }
