@@ -777,7 +777,7 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
             param_posterior_villages(theta_propose, ...)
         if (is.finite(posterior_propose))
         {
-            log.acceptance <- posterior_propose - posterior
+            log.acceptance <- posterior_propose - posterior + dtruncnorm(posterior, loer, upper, posterior_propose, sd / 2, log = TRUE) - dtruncnorm(posterior_propose, loer, upper, posterior, sd / 2, log = TRUE)
             is.accepted <- (log(runif (1)) < log.acceptance)
             if (is.accepted)
             {
