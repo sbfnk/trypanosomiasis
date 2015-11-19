@@ -518,14 +518,12 @@ traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
 ##' Calculate the posterior density for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages
 ##'
 ##' @param theta parameter vector
-##' @param village_screening village screening data
-##' @param cum_data village cumulative data
 ##' @param nruns number of runs (to estimate the likelihood)
 ##' @param log whether to return the logarithm of the posterior density
-##' @param ...
+##' @param villages villages to simuate
 ##' @return posterior density
 ##' @author Sebastian Funk
-param_posterior_villages <- function(theta, nruns, log = FALSE, villages, ...)
+param_posterior_villages <- function(theta, nruns, log = FALSE, villages)
 {
     data(village_data)
 
