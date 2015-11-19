@@ -24,16 +24,29 @@ sim_trajectory <- function(theta, init, village)
 
 ##' Draw a parameter sample from the prior density
 ##'
+##' Default parameters reflect Rebecca's study
 ##' @param villages Number of villages with different parameters
+##' @param passive whether to simulate passive detection
+##' @param background whether to simuate backgroud infection rates
+##' @param transmitted  whether to simulate transmitted infection rates
+##' @param chronic whether chronic carriers transmit
 ##' @return parameter vector
 ##' @author Sebastian Funk
-rprior <- function(villages = 1, passive = TRUE)
+rprior <- function(villages = 1, passive = TRUE, background = TRUE,
+                   transmitted = FALSE, chronic = TRUE)
 {
-    param_vector <- c(pc = runif(1, 0, 1), alpha = runif(1, 0, 1))
+    param_vector <-
+        c(pc = runif(1, 0, 1), alpha = runif(1, 0, 1))
+    param_vector["delta"] <- ifelse(chronic, runif(1, 0, 1), 0)
+
     if (length(villages) == 1)
     {
-        param_vector <- c(param_vector,
-                          lambda = 10^(runif(1, -5, -2)))
+        if (background)
+        {
+            param_vector <- c(param_vector,
+                              lambda = 10^(runif(1, -5, -2)))
+        }
+
         if (passive)
         {
             param_vector <- c(param_vector,
@@ -42,8 +55,14 @@ rprior <- function(villages = 1, passive = TRUE)
         }
     } else
     {
-        village_vector <- c(runif(length(villages), 0, 0.05))
-        rep_names <- "lambda"
+        village_vector <- c()
+
+        if (background)
+        {
+            village_vector <- c(village_vector, runif(length(villages), 0, 0.05))
+            rep_names <- "lambda"
+        }
+
         if (passive)
         {
             village_vector <- c(village_vector,
@@ -51,17 +70,19 @@ rprior <- function(villages = 1, passive = TRUE)
                                 runif(length(villages), 0, 2))
             rep_names <- c(rep_names, "p1", "p2")
         }
-        names(village_vector) <-
-            paste(rep(rep_names, each = length(villages)),
-                  villages, sep = ".")
-        param_vector <- c(param_vector, village_vector)
 
+        if (length(village_vector))
+        {
+            names(village_vector) <-
+                paste(rep(rep_names, each = length(villages)),
+                      villages, sep = ".")
+            param_vector <- c(param_vector, village_vector)
+        }
     }
     param_vector <- c(param_vector,
                       rc = 1/120,
                       r1 = 0.0019 * 30.42,
                       r2 = 0.0040 * 30.42,
-                      ## screen1 = runif(1, 0.86, 0.98),
                       screen1 = 0.95,
                       screen2 = 0.99,
                       N = length(villages))
@@ -85,6 +106,7 @@ dprior <- function(theta, log = FALSE)
         res <- res + dnorm(theta[["r1"]],  0.0019 * 30.42, log = TRUE)
         res <- res + dnorm(theta[["r2"]], 0.0040 * 30.42, log = TRUE)
         res <- res + dunif(theta[["alpha"]], 0, 1, TRUE)
+        res <- res + dunif(theta[["delta"]], 0, 1, TRUE)
         res <- res + dunif(theta[["screen1"]], 0.86, 0.98, TRUE)
         res <- res + dnorm(theta[["screen2"]], 0.99, log = TRUE)
         if (N == 1)
@@ -128,6 +150,7 @@ dprior <- function(theta, log = FALSE)
         res <- res * dnorm(theta[["r1"]], 0.0019 * 30.42, log = FALSE)
         res <- res * dnorm(theta[["r2"]], 0.0040 * 30.42, log = FALSE)
         res <- res * dunif(theta[["alpha"]], 0, 1, FALSE)
+        res <- res * dunif(theta[["delta"]], 0, 1, FALSE)
         res <- res * dunif(theta[["screen1"]], 0.86, 0.98, FALSE)
         res <- res * dnorm(theta[["screen2"]], 0.99, log = FALSE)
         if (N == 1)
