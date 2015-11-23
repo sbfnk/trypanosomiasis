@@ -4,14 +4,12 @@
 \alias{chronic_carriers_sample}
 \title{Draw samples for the trypanosomiasis model with chronic carriers}
 \usage{
-chronic_carriers_sample(nsamples = 1, nruns = 100, seed, verbose = FALSE,
+chronic_carriers_sample(nsamples = 1, seed, verbose = FALSE,
   passive = TRUE, calc.posterior = TRUE, villages, progress.bar = TRUE,
   sample = c("lhs", "prior"), ...)
 }
 \arguments{
 \item{nsamples}{number of samples}
-
-\item{nruns}{number of runs}
 
 \item{seed}{random number seed}
 

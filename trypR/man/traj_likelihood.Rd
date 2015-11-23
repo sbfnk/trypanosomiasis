@@ -4,12 +4,12 @@
 \alias{traj_likelihood}
 \title{Calculate the posterior density for a given set of parameters for the trypanosomiasis model}
 \usage{
-traj_likelihood(theta, village_number, nruns, log = FALSE, ...)
+traj_likelihood(theta, village_number, nruns = 1, log = FALSE, ...)
 }
 \arguments{
 \item{theta}{parameter vector}
 
-\item{nruns}{number of runs (to estimate the likelihood)}
+\item{nruns}{number of runs (to estimate the likelihood), 1 by default}
 
 \item{log}{whether to return the logarithm of the posterior density}
 

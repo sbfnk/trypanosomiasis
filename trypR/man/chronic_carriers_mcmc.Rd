@@ -4,8 +4,8 @@
 \alias{chronic_carriers_mcmc}
 \title{run MCMC on the model for chronic carriers of trypanosomiasis}
 \usage{
-chronic_carriers_mcmc(init, n_iterations, sd, upper = NULL, lower = NULL,
-  verbose = FALSE, ...)
+chronic_carriers_mcmc(init, n_iterations, sd, upper, lower, epsilon,
+  data_summary, verbose = FALSE, ...)
 }
 \arguments{
 \item{init}{initial state of the chain}
@@ -17,6 +17,10 @@ chronic_carriers_mcmc(init, n_iterations, sd, upper = NULL, lower = NULL,
 \item{upper}{upper limit on parameters (if given)}
 
 \item{lower}{lower limit on parameters (if given)}
+
+\item{epsilon}{value of epsilon (if ABC is run)}
+
+\item{data_summary}{summary statistic of the data (if ABC is run)}
 
 \item{verbose}{whether to print verbose output}
 

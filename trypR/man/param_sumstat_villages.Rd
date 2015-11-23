@@ -2,9 +2,9 @@
 % Please edit documentation in R/chronic_carriers.R
 \name{param_sumstat_villages}
 \alias{param_sumstat_villages}
-\title{Calculate summarystatistic for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages}
+\title{Calculate summary statistic for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages}
 \usage{
-param_sumstat_villages(theta, nruns, villages, ...)
+param_sumstat_villages(theta, nruns = 1, villages, ...)
 }
 \arguments{
 \item{theta}{parameter vector}
@@ -12,14 +12,12 @@ param_sumstat_villages(theta, nruns, villages, ...)
 \item{nruns}{number of runs}
 
 \item{villages}{villages to simuate}
-
-\item{log}{whether to return the logarithm of the posterior density}
 }
 \value{
 posterior density
 }
 \description{
-Calculate summarystatistic for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages
+Calculate summary statistic for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages
 }
 \author{
 Sebastian Funk

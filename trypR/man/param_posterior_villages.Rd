@@ -4,16 +4,16 @@
 \alias{param_posterior_villages}
 \title{Calculate the posterior density for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages}
 \usage{
-param_posterior_villages(theta, nruns, log = FALSE, villages)
+param_posterior_villages(theta, villages, log = TRUE, ...)
 }
 \arguments{
 \item{theta}{parameter vector}
 
-\item{nruns}{number of runs (to estimate the likelihood)}
-
-\item{log}{whether to return the logarithm of the posterior density}
-
 \item{villages}{villages to simuate}
+
+\item{log}{whether to return the logarithm}
+
+\item{...}{further options for traj_likelihood}
 }
 \value{
 posterior density

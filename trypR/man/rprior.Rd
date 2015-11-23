@@ -22,7 +22,7 @@ rprior(villages = 1, passive = TRUE, background = TRUE,
 parameter vector
 }
 \description{
-Default arameters reflect Rebecca's study
+Default parameters reflect Rebecca's study
 }
 \author{
 Sebastian Funk
