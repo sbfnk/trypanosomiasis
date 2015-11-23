@@ -8,7 +8,7 @@ sim_trajectory <- function(theta, init, village)
 {
     stoptime <- village_screening[village_screening$village.number == village]$stoptime
     if (missing(init)) init <- rinit(theta)
-    
+
     chronic_options <- list(params = theta, init = init, times = seq(0, stoptime))
     for (stage in 1:2)
     {
@@ -66,8 +66,8 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
         if (passive)
         {
             village_vector <- c(village_vector,
-                                runif(length(villages), 0, 1),
-                                runif(length(villages), 0, 2))
+                                runif(length(villages), 0, 12),
+                                runif(length(villages), 0, 52))
             rep_names <- c(rep_names, "p1", "p2")
         }
 
@@ -220,35 +220,28 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
 
         eq_I <- N * (1 - 1 / (1 + theta[[village_lambda]] * sum_weights))
 
-        initIc <- rpois(1, Ic_weight * eq_I / sum_weights)
-        initI1 <- rpois(1, I1_weight * eq_I / sum_weights)
-        initI2 <- rpois(1, I2_weight * eq_I / sum_weights)
-
         stage1_detected <- village_screening[village.number == village_number,
                                              detected1_1]
         stage2_detected <- village_screening[village.number == village_number,
                                              detected1_2]
 
-        if (initIc + initI1 >= stage1_detected)
-        {
-            Ic_ind <- c(rep(1, initIc), rep(0, initI1))
-            Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
-            Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
-            I1_det <- stage1_detected - Ic_det
-            initIc <- initIc - Ic_det
-            initI1 <- initI1 - I1_det
-        } else
-        {
-            initIc <- -1
-            initI1 <- -1
+        found.OK <- FALSE
+
+        while(!found.OK) {
+            initIc <- rpois(1, Ic_weight * eq_I / sum_weights)
+            initI1 <- rpois(1, I1_weight * eq_I / sum_weights)
+            initI2 <- rpois(1, I2_weight * eq_I / sum_weights)
+
+            found.OK <- (initIc + initI1 >= stage1_detected) &&
+                (initI2 >= stage2_detected)
         }
-        if (initI2 >= stage2_detected)
-        {
-            initI2 <- initI2 - stage2_detected
-        } else
-        {
-            initI2 <- -1
-        }
+        Ic_ind <- c(rep(1, initIc), rep(0, initI1))
+        Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
+        Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
+        I1_det <- stage1_detected - Ic_det
+        initIc <- initIc - Ic_det
+        initI1 <- initI1 - I1_det
+        initI2 <- initI2 - stage2_detected
     } else
     {
         Ic_weight <- theta[["pc"]] / theta[["rc"]]
@@ -424,12 +417,12 @@ dinit <- function(init, village_number, theta, log = FALSE)
 ##' @param theta parameter vector
 ##' @param village_data village data
 ##' @param cum_data cumulative data
-##' @param nruns number of runs (to estimate the likelihood)
+##' @param nruns number of runs (to estimate the likelihood), 1 by default
 ##' @param log whether to return the logarithm of the posterior density
 ##' @param ...
 ##' @return posterior density
 ##' @author Sebastian Funk
-traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
+traj_likelihood <- function(theta, village_number, nruns = 1, log = FALSE, ...)
 {
     data(village_data)
 
@@ -518,12 +511,12 @@ traj_likelihood <- function(theta, village_number, nruns, log = FALSE, ...)
 ##' Calculate the posterior density for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages
 ##'
 ##' @param theta parameter vector
-##' @param nruns number of runs (to estimate the likelihood)
-##' @param log whether to return the logarithm of the posterior density
 ##' @param villages villages to simuate
+##' @param log whether to return the logarithm
+##' @param ... further options for traj_likelihood
 ##' @return posterior density
 ##' @author Sebastian Funk
-param_posterior_villages <- function(theta, nruns, log = FALSE, villages)
+param_posterior_villages <- function(theta, villages, log = TRUE, ...)
 {
     data(village_data)
 
@@ -547,7 +540,7 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, villages)
 
             final.attendance <- min(village[["sigma.end"]], 1)
 
-            posterior <- traj_likelihood(theta, village_number, nruns, log = TRUE)
+            posterior <- traj_likelihood(theta, village_number, log = TRUE, ...)
         })
         res <- village.posteriors
     } else
@@ -571,7 +564,7 @@ param_posterior_villages <- function(theta, nruns, log = FALSE, villages)
 ##' @param villages villages to simuate
 ##' @return posterior density
 ##' @author Sebastian Funk
-param_sumstat_villages <- function(theta, nruns, villages, ...)
+param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
 {
     data(village_data)
 
@@ -592,8 +585,7 @@ param_sumstat_villages <- function(theta, nruns, villages, ...)
         final.attendance <- min(village[["sigma.end"]], 1)
         passive_data <- village_cases[village.number == village_number]
 
-        sims <- lapply(seq_len(nruns),
-                       function(x)
+        sims <- lapply(seq_len(nruns), function(x)
         {
             sim_trajectory(theta, village = village_number)
         })
@@ -625,6 +617,10 @@ param_sumstat_villages <- function(theta, nruns, villages, ...)
         }
         return(res)
     })
+    if (length(summary.statistics) == 1)
+    {
+        summary.statistics <- unlist(summary.statistics)
+    }
     return(summary.statistics)
 }
 
@@ -632,7 +628,6 @@ param_sumstat_villages <- function(theta, nruns, villages, ...)
 ##' Draw samples for the trypanosomiasis model with chronic carriers
 ##'
 ##' @param nsamples number of samples
-##' @param nruns number of runs
 ##' @param seed random number seed
 ##' @param verbose whether to print out posteriors as it goes along
 ##' @param passive wheter to fit to passive detection data
@@ -645,8 +640,7 @@ param_sumstat_villages <- function(theta, nruns, villages, ...)
 ##' @importFrom lhs randomLHS
 ##' @export
 ##' @author Sebastian Funk
-chronic_carriers_sample <- function(nsamples = 1,
-                                    nruns = 100, seed,
+chronic_carriers_sample <- function(nsamples = 1, seed,
                                     verbose = FALSE, passive = TRUE,
                                     calc.posterior = TRUE,
                                     villages, progress.bar = TRUE,
@@ -716,7 +710,9 @@ chronic_carriers_sample <- function(nsamples = 1,
         }
         if (calc.posterior)
         {
-            posterior <- param_posterior_villages(theta, nruns, TRUE, villages)
+            posterior <- param_posterior_villages(theta, log = TRUE,
+                                                  villages = villages,
+                                                  ...)
             samples[[i]] <- list(parameters = theta)
             samples[[i]][["village_posteriors"]] <- posterior
             samples[[i]][["posterior"]] <- sum(posterior)
@@ -729,7 +725,9 @@ chronic_carriers_sample <- function(nsamples = 1,
         {
             samples[[i]] <- list(parameters = theta,
                                  summary_statistics =
-                                     param_sumstat_villages(theta, nruns, villages))
+                                     param_sumstat_villages(theta = theta,
+                                                            villages = villages,
+                                                            ...))
         }
         if (progress.bar) setTxtProgressBar(pb, i)
     }
@@ -745,24 +743,30 @@ chronic_carriers_sample <- function(nsamples = 1,
 ##' @param sd standard deviation of each parameter
 ##' @param upper upper limit on parameters (if given)
 ##' @param lower lower limit on parameters (if given)
+##' @param epsilon value of epsilon (if ABC is run)
+##' @param data_summary summary statistic of the data (if ABC is run)
 ##' @param verbose whether to print verbose output
 ##' @param ... parameters to be passed to \code{param_posterior_villages}
 ##' @return chain
-##' @import truncnorm
+##' @importFrom truncnorm rtruncnorm dtruncnorm
 ##' @author Sebastian Funk
 chronic_carriers_mcmc <- function(init, n_iterations, sd,
-                                  upper = NULL, lower = NULL,
+                                  upper, lower,
+                                  epsilon, data_summary,
                                   verbose = FALSE, ...)
 {
     theta <- init
+    prior_theta <- dprior(theta, log = TRUE)
 
     accepted <- 0
 
-    if (is.null(upper))
+    chain <- list()
+
+    if (missing(upper))
     {
         upper <- rep(Inf, length(theta))
     }
-    if (is.null(lower))
+    if (missing(lower))
     {
         lower <- rep(-Inf, length(theta))
     }
@@ -770,24 +774,52 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
     for (i in seq_len(n_iterations))
     {
         is.accepted <- FALSE
-        theta_propose <- rtruncnorm(length(theta), lower, upper, theta, sd / 2)
+        theta_propose <- rtruncnorm(length(theta), lower, upper, theta, sd)
         names(theta_propose) <- names(theta)
 
-        posterior_propose <-
-            param_posterior_villages(theta_propose, ...)
-        if (is.finite(posterior_propose))
-        {
-            log.acceptance <- posterior_propose - posterior + dtruncnorm(posterior, loer, upper, posterior_propose, sd / 2, log = TRUE) - dtruncnorm(posterior_propose, loer, upper, posterior, sd / 2, log = TRUE)
-            is.accepted <- (log(runif (1)) < log.acceptance)
-            if (is.accepted)
+        prior_propose <- dprior(theta_propose, log = TRUE)
+
+        if (is.finite(prior_propose)) {
+            hastings_ratio <-
+                ifelse(any(sd > 0),
+                       log(dtruncnorm(theta[sd > 0], lower, upper,
+                                      theta_propose[sd > 0], sd[sd > 0])) -
+                       log(dtruncnorm(theta_propose[sd > 0], lower, upper,
+                                      theta[sd > 0], sd[sd > 0])),
+                       0)
+
+            if (missing(epsilon))
             {
-                accepted <- accepted + 1
-                theta <- theta_propose
-                posterior <- posterior_propose
+                posterior_propose <-
+                    param_posterior_villages(theta_propose, ...)
+                if (is.finite(posterior_propose))
+                {
+                    log.acceptance <- posterior_propose - posterior + hastings_ratio
+                    is.accepted <- (log(runif (1)) < log.acceptance)
+                }
+            } else
+            {
+                sumstats <-
+                    param_sumstat_villages(theta_propose, ...)
+                diff <- sumstats[names(data_summary)] - data_summary
+                pass <- all(diff <= epsilon)
+                if (pass)
+                {
+                    log.acceptance <- prior_propose - dprior(theta) +
+                        hastings_ratio
+                    is.accepted <- (log(runif (1)) < log.acceptance)
+                }
             }
         }
-        chain[[i]] <- list(theta = theta, posterior = posterior)
-        cat(i, "acc:", is.accepted, accepted / i, posterior, "\n")
+        if (is.accepted)
+        {
+            accepted <- accepted + 1
+            theta <- theta_propose
+            prior_theta <- prior_propose
+            if (missing(epsilon)) posterior <- posterior_propose
+        }
+        chain[[i]] <- theta
+        if (verbose) cat(i, "acc:", is.accepted, accepted / i, "\n")
     }
 
     return(chain)
