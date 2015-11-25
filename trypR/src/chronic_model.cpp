@@ -18,7 +18,7 @@ ChronicModel::ChronicModel(std::map<std::string, double> params,
     chronic_infection.addAction("Ic", +1);
     eventList.push_back(chronic_infection);
 
-    Event chronic_infection_from_Ic(params["lambda"] * params["pc"] *
+    Event chronic_infection_from_Ic(params["beta"] * params["pc"] *
                                     params["delta"],
                                     std::vector<std::string>(1, "S"));
     chronic_infection_from_Ic.addAction("S", -1);
@@ -26,7 +26,7 @@ ChronicModel::ChronicModel(std::map<std::string, double> params,
     chronic_infection_from_Ic.addMultiplier("Ic");
     eventList.push_back(chronic_infection_from_Ic);
 
-    Event chronic_infection_from_I1(params["lambda"] * params["pc"],
+    Event chronic_infection_from_I1(params["beta"] * params["pc"],
                                     std::vector<std::string>(1, "S"));
     chronic_infection_from_I1.addAction("S", -1);
     chronic_infection_from_I1.addAction("Ic", +1);
