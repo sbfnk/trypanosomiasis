@@ -41,43 +41,33 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
 
     if (length(villages) == 1)
     {
-        if (background)
-        {
-            param_vector <- c(param_vector,
-                              lambda = 10^(runif(1, -5, -2)))
-        }
-
-        if (passive)
-        {
-            param_vector <- c(param_vector,
-                              p1 = runif(1, 0, 1),
-                              p2 = runif(1, 0, 2))
-        }
+        param_vector <- c(param_vector,
+                          lambda = ifelse(background,
+                                          10^(runif(1, -5, -2)),
+                                          0),
+                          beta = ifelse(transmitted,
+                                        10^(runif(1, -5, -2)),
+                                        0),
+                          p1 = ifelse(passive, runif(1, 0, 52), 0), 
+                          p2 = ifelse(passive, runif(1, 0, 52), 0))
     } else
     {
-        village_vector <- c()
-
-        if (background)
-        {
-            village_vector <- c(village_vector, runif(length(villages), 0, 0.05))
-            rep_names <- "lambda"
-        }
-
-        if (passive)
-        {
-            village_vector <- c(village_vector,
-                                runif(length(villages), 0, 12),
-                                runif(length(villages), 0, 52))
-            rep_names <- c(rep_names, "p1", "p2")
-        }
-
-        if (length(village_vector))
-        {
-            names(village_vector) <-
-                paste(rep(rep_names, each = length(villages)),
-                      villages, sep = ".")
+        village_vector <- c(ifelse(background,
+                                   10^(runif(length(villages), -5,  -2)),
+                                   rep(0, length(villages))), 
+                            ifelse(transmitted,
+                                   10^(runif(length(villages), -5, -2)),
+                                   rep(0, length(villages))), 
+                            ifelse(passive,
+                                   runif(length(villages), 0, 52),
+                                   rep(0, length(villages))),
+                            ifelse(passive,
+                                   runif(length(villages), 0, 52),
+                                   rep(0, length(villages))))
+        names(village_vector) <-
+            paste(rep(c("lambda", "beta", "p1", "p2"), each = length(villages)),
+                  villages, sep = ".")
             param_vector <- c(param_vector, village_vector)
-        }
     }
     param_vector <- c(param_vector,
                       rc = 1/120,
