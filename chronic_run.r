@@ -38,7 +38,8 @@ library('trypR')
 ## lhs <- chronic_carriers_sample(nruns = 1, nsamples = 100, calc.posterior = FALSE,
 ##                                    villages = village, passive = TRUE, sample = "lhs")
 prior <- chronic_carriers_sample(nsamples = 10000, calc.posterior = FALSE,
-                                 villages = village, passive = TRUE, sample = "prior")
+                                 villages = village, passive = TRUE, sample = "prior",
+				 transmitted = TRUE)
 
 ## lhs_new <- chronic_carriers_sample(nruns = 1, nsamples = 10000, calc.posterior = FALSE,
 ##                                    villages = village, passive = TRUE, sample = "lhs",
@@ -138,7 +139,7 @@ prior_upper <- prior_sd
 
 ## cat("Second adaption, epsilon =", epsilon, "\n")
 
-mcmc <- chronic_carriers_mcmc(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]), n_iterations = num_samples, sd = prior_sd / 2, epsilon = epsilon, data_summary = c(active_stage1 = data_stage1_active, passive_stage1 = data_stage1_passive, passive_stage2 = data_stage2_passive), villages = village, verbose = TRUE, lower = prior_zero)
+mcmc <- chronic_carriers_mcmc(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]), n_iterations = num_samples, sd = prior_sd / 2, epsilon = epsilon, data_summary = c(active_stage1 = data_stage1_active, passive_stage1 = data_stage1_passive, passive_stage2 = data_stage2_passive), villages = village, verbose = TRUE, lower = prior_zero, transmitted = TRUE, passive = TRUE)
 
 df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
 colnames(df) <- colnames(prior_parameters)
