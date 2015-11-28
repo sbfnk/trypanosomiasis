@@ -93,22 +93,29 @@ dprior <- function(theta, log = FALSE)
         res <- 0
         res <- res + dunif(theta[["pc"]], 0, 1, TRUE)
         res <- res + dnorm(theta[["rc"]], 1/120, log = TRUE)
-        res <- res + dnorm(theta[["r1"]],  0.0019 * 30.42, log = TRUE)
+        res <- res + dnorm(theta[["r1"]], 0.0019 * 30.42, log = TRUE)
         res <- res + dnorm(theta[["r2"]], 0.0040 * 30.42, log = TRUE)
-        res <- res + dunif(theta[["alpha"]], 0, 1, TRUE)
-        res <- res + dunif(theta[["delta"]], 0, 1, TRUE)
+        if ("alpha" %in% names(theta)) res <- res + dunif(theta[["alpha"]], 0, 1, TRUE)
+        if ("delta" %in% names(theta)) res <- res + dunif(theta[["delta"]], 0, 1, TRUE)
         res <- res + dunif(theta[["screen1"]], 0.86, 0.98, TRUE)
         res <- res + dnorm(theta[["screen2"]], 0.99, log = TRUE)
         if (N == 1)
         {
-            res <- res + dunif(theta[["lambda"]], 0, 0.05, TRUE)
+            if ("lambda" %in% names(theta))
+            {
+                res <- res + dunif(theta[["lambda"]], 10^(-5), 10^(-2), TRUE)
+            }
+            if ("beta" %in% names(theta))
+            {
+                res <- res + dunif(theta[["lambda"]], 10^(-5), 10^(-2), TRUE)
+            }
             if ("p1" %in% names(theta))
             {
-                res <- res + dunif(theta[["p1"]], 0, 1, TRUE)
+                res <- res + dunif(theta[["p1"]], 0, 52, TRUE)
             }
             if ("p2" %in% names(theta))
             {
-                res <- res + dunif(theta[["p2"]], 0, 2, TRUE)
+                res <- res + dunif(theta[["p2"]], 0, 52, TRUE)
             }
         } else
         {
