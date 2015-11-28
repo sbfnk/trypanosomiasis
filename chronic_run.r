@@ -8,7 +8,6 @@ library('docopt')
 Usage: chronic_analysis.r [options]
 Options:
 -v --village=<village>                       number of the village
--e --epsilon=<epislon>                       epsilon
 -n --nsamples=<nsamples>                     number of samples
 -h --help                                    show this message" -> doc
 
@@ -20,13 +19,7 @@ if (opts[["help"]])
     exit()
 }
 
-epsilon <- as.numeric(opts[["epsilon"]])
 num_samples <- as.integer(opts[["nsamples"]])
-
-if (length(epsilon) == 0)
-{
-    epsilon <- 0
-}
 
 if (length(num_samples) == 0)
 {
@@ -41,7 +34,6 @@ if (length(village) == 0)
 
 library('data.table')
 library('trypR')
-library('coda')
 
 ## lhs <- chronic_carriers_sample(nruns = 1, nsamples = 100, calc.posterior = FALSE,
 ##                                    villages = village, passive = TRUE, sample = "lhs")
@@ -95,17 +87,32 @@ dt[, passive_stage2_diff := passive_stage2 - data_stage2_passive]
 ## dt_new[, passive_stage1_diff := passive_stage1 - data_stage1_passive]
 ## dt_new[, passive_stage2_diff := passive_stage2 - data_stage2_passive]
 
-## epsilon <- 0
+success <- FALSE
 
-dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
+epsilon <- 0
+
+while (!success)
+{
+  dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
+  success <- (nrow(dt[accept == TRUE]) > 1)
+  if (nrow(dt[accept == TRUE]) > 1)
+  {
+      success <- TRUE
+  } else
+  {
+      epsilon <- epsilon + 1
+  }
+}
+
+cat("First adaption, epsilon =", epsilon, "\n")
 ## dt_new[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
+dt[, id := 1:nrow(dt)]
 
-prior_samples[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
-prior_samples[, id := 1:nrow(prior_samples)]
-accept_ids <- prior_samples[accept == TRUE, id]
-current_accepted <- data.table(id = 1:nrow(prior_samples))
+accept_ids <- dt[accept == TRUE, id]
+
+current_accepted <- data.table(id = 1:nrow(dt))
 current_accepted[id >= min(accept_ids), accept_id := max(accept_ids[accept_ids <= id]), by = 1:nrow(current_accepted[id >= min(accept_ids)])]
-prior_accepted <- prior_samples[current_accepted[!is.na(accept_id), accept_id]]
+prior_accepted <- dt[current_accepted[!is.na(accept_id), accept_id]]
 
 prior_parameters <- prior_accepted[, list(pc = pc, alpha = alpha, delta = delta, lambda = lambda, p1 = p1, p2 = p2, rc = rc, r1 = r1, r2 = r2, screen1 = screen1, screen2 = screen2, N = N)]
 prior_sd <- apply(prior_parameters, 2, sd)
@@ -114,13 +121,26 @@ prior_zero[] <- 0
 prior_upper <- prior_sd
 
 
-## only needed once, test for epsilon
+## success <- FALSE
 
-## chronic_carriers_mcmc(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]), n_iterations = 100, sd = prior_zero, epsilon = 1, data_summary = c(active_stage1 = data_stage1_active, passive_stage1 = data_stage1_passive, passive_stage2 = data_stage2_passive), villages = village, verbose = TRUE)
+## while (!success)
+## {
+##   mcmc_fixed <- chronic_carriers_mcmc(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]), n_iterations = 1000, sd = prior_zero, epsilon = epsilon, data_summary = c(active_stage1 = data_stage1_active, passive_stage1 = data_stage1_passive, passive_stage2 = data_stage2_passive), villages = village, verbose = TRUE)
+##   if (mcmc_fixed$acceptance.rate > .2)
+##   {
+##       success <- TRUE
+##   } else
+##   {
+##       epsilon <- epsilon + 1
+##       cat("  increasing epsilon to", epsilon, "\n")
+##   }
+## }
 
-x <- chronic_carriers_mcmc(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]), n_iterations = 100000, sd = prior_sd / 2, epsilon = 1, data_summary = c(active_stage1 = data_stage1_active, passive_stage1 = data_stage1_passive, passive_stage2 = data_stage2_passive), villages = village, verbose = TRUE, lower = prior_zero)
+## cat("Second adaption, epsilon =", epsilon, "\n")
 
-df <- data.frame(matrix(unlist(x), ncol = ncol(prior_parameters), byrow = TRUE))
+mcmc <- chronic_carriers_mcmc(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]), n_iterations = num_samples, sd = prior_sd / 2, epsilon = epsilon, data_summary = c(active_stage1 = data_stage1_active, passive_stage1 = data_stage1_passive, passive_stage2 = data_stage2_passive), villages = village, verbose = TRUE, lower = prior_zero)
+
+df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
 colnames(df) <- colnames(prior_parameters)
 
 saveRDS(df, paste0("village_", village, ".rds"))
