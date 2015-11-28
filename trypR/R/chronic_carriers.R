@@ -822,5 +822,5 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
         if (verbose) cat(i, "acc:", is.accepted, accepted / i, "\n")
     }
 
-    return(chain)
+    return(list(acceptance.rate = accepted / n_iterations, trace = chain))
 }
