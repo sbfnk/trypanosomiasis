@@ -769,7 +769,7 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
                 pass <- all(diff <= epsilon)
                 if (pass)
                 {
-                    log.acceptance <- prior_propose - dprior(theta) +
+                    log.acceptance <- prior_propose - dprior(theta, log = TRUE) +
                         hastings_ratio
                     is.accepted <- (log(runif (1)) < log.acceptance)
                 }
