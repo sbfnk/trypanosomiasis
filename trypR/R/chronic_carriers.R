@@ -738,8 +738,11 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
     for (i in seq_len(n_iterations))
     {
         is.accepted <- FALSE
-        theta_propose <- rtruncnorm(length(theta), lower, upper, theta, sd)
-        names(theta_propose) <- names(theta)
+        theta_propose <- rtruncnorm(length(theta[sd > 0]), lower[sd > 0], upper[sd > 0],
+                                    theta[sd > 0], sd[sd > 0])
+        names(theta_propose) <- names(theta[sd > 0])
+        theta_propose <- c(theta_propose, theta[setdiff(names(theta),
+                                                        names(theta_propose))])
 
         prior_propose <- dprior(theta_propose, log = TRUE)
 
