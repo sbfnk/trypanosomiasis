@@ -35,9 +35,12 @@ setnames(runs, 1:2, c("run", "epsilon"))
 
 traces <- list()
 
+## tran_back_chro
+file_nos <- as.integer(gsub("[^0-9]", "", list.files(path = (path.expand("~/Data/Trypanosomiasis/")), pattern = "tran_back_chro_.*")))
+
 for (file_no in file_nos)
 {
-    traces[[file_no]] <- data.table(readRDS(path.expand(paste0("~/Data/Trypanosomiasis/village_", file_no, ".rds"))))
+    traces[[file_no]] <- data.table(readRDS(path.expand(paste0("~/Data/Trypanosomiasis/tran_back_chro_village_", file_no, ".rds"))))
 }
 
 traces <- list()
@@ -50,6 +53,8 @@ for (file_no in file_nos)
     traces[[i]] <- data.table(readRDS(path.expand(paste0("~/Data/Trypanosomiasis/village_", file_no, ".rds"))))
     traces[[i]][, village := file_no]
 }
+
+traces <- rbindlist(traces)
 
 ## Kernel density estimation
 
