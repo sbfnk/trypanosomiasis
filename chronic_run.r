@@ -36,7 +36,6 @@ if (length(village) == 0)
     village <- 1
 }
 
-
 model_options <- list(transmitted = opts[["transmitted"]],
                       background = opts[["background"]],
                       chronic = opts[["chronic"]])
@@ -53,7 +52,7 @@ sample_options <- c(list(nsamples = num_samples,
 
 samples <- do.call(chronic_carriers_sample, sample_options)
 
-dt <- data.table(t(sapply(prior, function(x)
+dt <- data.table(t(sapply(samples, function(x)
 {
     c(x[["parameters"]], unlist(x[["summary_statistics"]]))
 })))
