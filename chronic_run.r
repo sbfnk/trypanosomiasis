@@ -139,9 +139,9 @@ mcmc <- do.call(chronic_carriers_mcmc, mcmc_options)
 df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
 colnames(df) <- colnames(prior_parameters)
 
-saveRDS(df, paste0(ifelse(transmitted, "tran_", ""),
-                   ifelse(background, "back_", ""),
-                   ifelse(chronic, "chro_", ""),
+saveRDS(df, paste0(ifelse(opts[["transmitted"]], "tran_", ""),
+                   ifelse(opts[["background"]], "back_", ""),
+                   ifelse(opts[["chronic"]], "chro_", ""),
                    "village_", village, ".rds"))
 
 ## df_fixed <- data.frame(matrix(unlist(x), ncol = ncol(prior_parameters), byrow = TRUE))
