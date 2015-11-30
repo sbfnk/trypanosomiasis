@@ -48,16 +48,16 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
                           beta = ifelse(transmitted,
                                         10^(runif(1, -5, -2)),
                                         0),
-                          p1 = ifelse(passive, runif(1, 0, 52), 0), 
+                          p1 = ifelse(passive, runif(1, 0, 52), 0),
                           p2 = ifelse(passive, runif(1, 0, 52), 0))
     } else
     {
         village_vector <- c(ifelse(background,
                                    10^(runif(length(villages), -5,  -2)),
-                                   rep(0, length(villages))), 
+                                   rep(0, length(villages))),
                             ifelse(transmitted,
                                    10^(runif(length(villages), -5, -2)),
-                                   rep(0, length(villages))), 
+                                   rep(0, length(villages))),
                             ifelse(passive,
                                    runif(length(villages), 0, 52),
                                    rep(0, length(villages))),
@@ -67,7 +67,7 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
         names(village_vector) <-
             paste(rep(c("lambda", "beta", "p1", "p2"), each = length(villages)),
                   villages, sep = ".")
-            param_vector <- c(param_vector, village_vector)
+        param_vector <- c(param_vector, village_vector)
     }
     param_vector <- c(param_vector,
                       rc = 1/120,
@@ -88,100 +88,67 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
 dprior <- function(theta, log = FALSE)
 {
     N <- round(theta[["N"]])
-    if (log)
+    param_prior <- c()
+    param_prior <- c(param_prior, dunif(theta[["pc"]], 0, 1, log = TRUE))
+    param_prior <- c(param_prior, dnorm(theta[["rc"]], 1/120, log = TRUE))
+    param_prior <- c(param_prior, dnorm(theta[["r1"]], 0.0019 * 30.42, log = TRUE))
+    param_prior <- c(param_prior, dnorm(theta[["r2"]], 0.0040 * 30.42, log = TRUE))
+    if ("alpha" %in% names(theta))
+        param_prior <- c(param_prior, dunif(theta[["alpha"]], 0, 1, log = TRUE))
+    if ("delta" %in% names(theta))
+        param_prior <- c(param_prior, dunif(theta[["delta"]], 0, 1, log = TRUE))
+    param_prior <- c(param_prior, dunif(theta[["screen1"]], 0.86, 0.98, log = TRUE))
+    param_prior <- c(param_prior, dnorm(theta[["screen2"]], 0.99, log = TRUE))
+    if (N == 1)
     {
-        res <- 0
-        res <- res + dunif(theta[["pc"]], 0, 1, TRUE)
-        res <- res + dnorm(theta[["rc"]], 1/120, log = TRUE)
-        res <- res + dnorm(theta[["r1"]], 0.0019 * 30.42, log = TRUE)
-        res <- res + dnorm(theta[["r2"]], 0.0040 * 30.42, log = TRUE)
-        if ("alpha" %in% names(theta)) res <- res + dunif(theta[["alpha"]], 0, 1, TRUE)
-        if ("delta" %in% names(theta)) res <- res + dunif(theta[["delta"]], 0, 1, TRUE)
-        res <- res + dunif(theta[["screen1"]], 0.86, 0.98, TRUE)
-        res <- res + dnorm(theta[["screen2"]], 0.99, log = TRUE)
-        if (N == 1)
+        if ("lambda" %in% names(theta))
         {
-            if ("lambda" %in% names(theta))
-            {
-                res <- res + dunif(theta[["lambda"]], 10^(-5), 10^(-2), TRUE)
-            }
-            if ("beta" %in% names(theta))
-            {
-                res <- res + dunif(theta[["lambda"]], 10^(-5), 10^(-2), TRUE)
-            }
-            if ("p1" %in% names(theta))
-            {
-                res <- res + dunif(theta[["p1"]], 0, 52, TRUE)
-            }
-            if ("p2" %in% names(theta))
-            {
-                res <- res + dunif(theta[["p2"]], 0, 52, TRUE)
-            }
-        } else
+            param_prior <- c(param_prior,
+                             dunif(theta[["lambda"]], 10^(-5), 10^(-2), log = TRUE))
+        }
+        if ("beta" %in% names(theta))
         {
-            lambda_names <-
-                res <- res +
-                    sum(unlist(sapply(grep("^lambda\\.", names(theta), value = TRUE),
-                                      function(x)
-                    {
-                        dunif(theta[[x]], 0, 0.05, TRUE)
-                    })))
-            res <- res +
-                sum(unlist(sapply(grep("^p1\\.", names(theta), value = TRUE),
-                                  function(x)
-                {
-                    dunif(theta[[x]], 0, 1, TRUE)
-                })))
-            res <- res +
-                sum(unlist(sapply(grep("^p2\\.", names(theta), value = TRUE),
-                                  function(x)
-                {
-                    dunif(theta[[x]], 0, 2, TRUE)
-                })))
+            param_prior <- c(param_prior,
+                             dunif(theta[["lambda"]], 10^(-5), 10^(-2), log = TRUE))
+        }
+        if ("p1" %in% names(theta))
+        {
+            param_prior <- c(param_prior, dunif(theta[["p1"]], 0, 52, log = TRUE))
+        }
+        if ("p2" %in% names(theta))
+        {
+            param_prior <- c(param_prior, dunif(theta[["p2"]], 0, 52, log = TRUE))
         }
     } else
     {
-        res <- 1
-        res <- res * dunif(theta[["pc"]], 0, 1, FALSE)
-        res <- res * dnorm(theta[["rc"]], 1/120, log = FALSE)
-        res <- res * dnorm(theta[["r1"]], 0.0019 * 30.42, log = FALSE)
-        res <- res * dnorm(theta[["r2"]], 0.0040 * 30.42, log = FALSE)
-        res <- res * dunif(theta[["alpha"]], 0, 1, FALSE)
-        res <- res * dunif(theta[["delta"]], 0, 1, FALSE)
-        res <- res * dunif(theta[["screen1"]], 0.86, 0.98, FALSE)
-        res <- res * dnorm(theta[["screen2"]], 0.99, log = FALSE)
-        if (N == 1)
-        {
-            res <- res * dunif(theta[["lambda"]], 0, 0.05, FALSE)
-            if ("p1" %in% names(theta))
-            {
-                res <- res * dunif(theta[["p1"]], 0, 1, FALSE)
-            }
-            if ("p2" %in% names(theta))
-            {
-                res <- res * dunif(theta[["p2"]], 0, 2, FALSE)
-            }
-        } else
-        {
-            res <- res *
-                prod(sapply(grep("^lambda\\.", names(theta), value = TRUE), function(x)
-                {
-                    dunif(theta[[x]], 0, 0.05, FALSE)
-                }))
-            res <- res *
-                prod(sapply(grep("^p1\\.", names(theta), value = TRUE), function(x)
-                {
-                    dunif(theta[[x]], 0, 1, FALSE)
-                }))
-            res <- res *
-                prod(sapply(grep("^p2\\.", names(theta), value = TRUE), function(x)
-                {
-                    dunif(theta[[x]], 0, 2, FALSE)
-                }))
-        }
+        lambda_names <-
+            param_prior <-
+                c(param_prior,
+                  unlist(sapply(grep("^lambda\\.", names(theta), value = TRUE),
+                                function(x)
+                  {
+                      dunif(theta[[x]], 0, 0.05, log = TRUE)
+                  })))
+        param_prior <-
+            c(param_prior,
+              unlist(sapply(grep("^p1\\.", names(theta), value = TRUE),
+                            function(x)
+              {
+                  dunif(theta[[x]], 0, 1, log = TRUE)
+              })))
+        param_prior <-
+            c(param_prior,
+              unlist(sapply(grep("^p2\\.", names(theta), value = TRUE),
+                            function(x)
+              {
+                  dunif(theta[[x]], 0, 2, log = TRUE)
+              })))
     }
 
-    return(res)
+    if (log)
+        return(sum(param_prior))
+    else
+        return(prod(param_prior))
 
 }
 
