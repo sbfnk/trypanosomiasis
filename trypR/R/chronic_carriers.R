@@ -36,7 +36,7 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
                    transmitted = FALSE, chronic = TRUE)
 {
     param_vector <-
-        c(pc = runif(1, 0, 1), alpha = runif(1, 0, 1))
+        c(pc = runif(1, 0, 0.5), alpha = runif(1, 0, 1))
     param_vector["delta"] <- ifelse(chronic, runif(1, 0, 1), 0)
 
     if (length(villages) == 1)
@@ -89,7 +89,7 @@ dprior <- function(theta, log = FALSE)
 {
     N <- round(theta[["N"]])
     param_prior <- c()
-    param_prior <- c(param_prior, dunif(theta[["pc"]], 0, 1, log = TRUE))
+    param_prior <- c(param_prior, dunif(theta[["pc"]], 0, 0.5, log = TRUE))
     param_prior <- c(param_prior, dnorm(theta[["rc"]], 1/120, log = TRUE))
     param_prior <- c(param_prior, dnorm(theta[["r1"]], 0.0019 * 30.42, log = TRUE))
     param_prior <- c(param_prior, dnorm(theta[["r2"]], 0.0040 * 30.42, log = TRUE))
