@@ -1,8 +1,7 @@
 library('data.table')
 library('coda')
 library('modeest')
-library('ggthemr')
-ggthemr('fresh')
+library('cowplot')
 
 m <- matrix(c(1,0,
               10,0,
@@ -33,24 +32,17 @@ m <- matrix(c(1,0,
 runs <- data.table(m)
 setnames(runs, 1:2, c("run", "epsilon"))
 
-traces <- list()
-
 ## tran_back_chro
 file_nos <- as.integer(gsub("[^0-9]", "", list.files(path = (path.expand("~/Data/Trypanosomiasis/")), pattern = "tran_back_chro_.*")))
 
-for (file_no in file_nos)
-{
-    traces[[file_no]] <- data.table(readRDS(path.expand(paste0("~/Data/Trypanosomiasis/tran_back_chro_village_", file_no, ".rds"))))
-}
-
 traces <- list()
 i <- 0
-file_nos <- runs[epsilon <= 1, run]
+## file_nos <- runs[epsilon <= 1, run]
 
 for (file_no in file_nos)
 {
     i <- i + 1
-    traces[[i]] <- data.table(readRDS(path.expand(paste0("~/Data/Trypanosomiasis/village_", file_no, ".rds"))))
+    traces[[i]] <- data.table(readRDS(path.expand(paste0("~/Data/Trypanosomiasis/tran_back_chro_village_", file_no, ".rds"))))
     traces[[i]][, village := file_no]
 }
 
@@ -61,19 +53,27 @@ traces <- rbindlist(traces)
 for (param in c("pc", "alpha", "delta"))
 {
     densities <- list()
+    hists <- list()
 
     i <- 0
     for (village.number in file_nos)
     {
         i <- i + 1
         densities[[i]] <- density(traces[village == village.number, get(param)],
-                                  from = -0.1, to=1.1)
+                                  from = -0.2, to=1.2, kernel = "gaussian")
+        hists[[i]] <- hist(traces[village == village.number, get(param)],
+                           breaks = seq(0, 1, 0.001), plot = FALSE)
     }
 
     densm <- sapply(densities, function(x) x[["y"]])
+    histsm <- sapply(hists, function(x) log(x[["density"]]))
     dt <- data.table(x = densities[[1]]$x, y = apply(densm, 1, prod))
+    dtm <- data.table(x = hists[[1]]$breaks[-length(hists[[1]]$breaks)] + 0.0005, y = exp(apply(histsm, 1, sum)))
     dt[, y.norm := y / 427]
+    dtm[, y.norm := y / (sum(y) * 1000)]
 
     p <- ggplot(dt, aes(x = x, y = y.norm))+geom_line()
+    p <- ggplot(dtm, aes(x = x, y = y.norm))+geom_bar(stat = "identity")
     ggsave(paste0("density_", param, ".pdf"))
 }
+
