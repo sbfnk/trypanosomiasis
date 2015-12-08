@@ -32,48 +32,70 @@ m <- matrix(c(1,0,
 runs <- data.table(m)
 setnames(runs, 1:2, c("run", "epsilon"))
 
-## tran_back_chro
-file_nos <- as.integer(gsub("[^0-9]", "", list.files(path = (path.expand("~/Data/Trypanosomiasis/")), pattern = "tran_back_chro_.*")))
-
-traces <- list()
-i <- 0
-## file_nos <- runs[epsilon <= 1, run]
-
-for (file_no in file_nos)
+for (model in c("tran_back_chro", "back"))
 {
-    i <- i + 1
-    traces[[i]] <- data.table(readRDS(path.expand(paste0("~/Data/Trypanosomiasis/tran_back_chro_village_", file_no, ".rds"))))
-    traces[[i]][, village := file_no]
-}
+    file_path <- path.expand("~/Data/Trypanosomiasis/")
+    file_pattern <- paste(model, ".*", sep = "_")
+    file_nos <- as.integer(gsub("[^0-9]", "",
+                                list.files(path = file_path, pattern = file_pattern)))
 
-traces <- rbindlist(traces)
-
-## Kernel density estimation
-
-for (param in c("pc", "alpha", "delta"))
-{
-    densities <- list()
-    hists <- list()
-
+    traces <- list()
     i <- 0
-    for (village.number in file_nos)
+    ## file_nos <- runs[epsilon <= 1, run]
+
+    for (file_no in file_nos)
     {
         i <- i + 1
-        densities[[i]] <- density(traces[village == village.number, get(param)],
-                                  from = -0.2, to=1.2, kernel = "gaussian")
-        hists[[i]] <- hist(traces[village == village.number, get(param)],
-                           breaks = seq(0, 1, 0.001), plot = FALSE)
+        file_name <-
+            path.expand(paste0(file_path, "/", model, "_village_", file_no, ".rds"))
+        traces[[i]] <- data.table(readRDS(file_name))
+        traces[[i]][, village := file_no]
     }
 
-    densm <- sapply(densities, function(x) x[["y"]])
-    histsm <- sapply(hists, function(x) log(x[["density"]]))
-    dt <- data.table(x = densities[[1]]$x, y = apply(densm, 1, prod))
-    dtm <- data.table(x = hists[[1]]$breaks[-length(hists[[1]]$breaks)] + 0.0005, y = exp(apply(histsm, 1, sum)))
-    dt[, y.norm := y / 427]
-    dtm[, y.norm := y / (sum(y) * 1000)]
+    traces <- rbindlist(traces)
+    traces[, id := rep(seq(0, nrow(traces) / length(file_nos) - 1), length(file_nos))]
 
-    p <- ggplot(dt, aes(x = x, y = y.norm))+geom_line()
-    p <- ggplot(dtm, aes(x = x, y = y.norm))+geom_bar(stat = "identity")
-    ggsave(paste0("density_", param, ".pdf"))
+    thin.traces <- traces[id %% 10 == 0]
+    ## ggplot(thin.traces, aes(x = pc))+geom_density()+facet_wrap(~village)
+
+    ## Kernel density estimation
+
+    for (param in c("pc", "alpha", "delta", "p1", "p2"))
+    {
+        densities <- list()
+        hists <- list()
+
+        min <- floor(traces[, min(get(param))])
+        max <- ceiling(traces[, max(get(param))])
+        
+        i <- 0
+        for (village.number in file_nos)
+        {
+            i <- i + 1
+            densities[[i]] <- density(traces[village == village.number, get(param)],
+                                      from = -0.2, to=1.2, kernel = "gaussian")
+            hists[[i]] <- hist(traces[village == village.number, get(param)],
+                               breaks = seq(min, max, length.out = 1000), plot = FALSE)
+        }
+
+        densm <- sapply(densities, function(x) x[["y"]])
+        histsm <- sapply(hists, function(x) log(x[["density"]]))
+
+        dt <- data.table(x = densities[[1]]$x, y = apply(densm, 1, prod))
+        dtm <- data.table(x = hists[[1]]$breaks[-length(hists[[1]]$breaks)] + 0.0005,
+                          y = exp(apply(histsm, 1, sum)))
+        dt[, y.norm := y / 427]
+        dtm[, y.norm := y / (sum(y) * 1000)]
+        
+        p <- ggplot(dt, aes(x = x, y = y.norm))+geom_line()
+        p <- ggplot(dtm, aes(x = x, y = y.norm))+geom_bar(stat = "identity")
+        ggsave(paste0("density_", param, ".pdf"))
+    }
 }
 
+## check caterpillars
+for (i in 1:26)
+{
+    p <- ggplot(thin.traces[village == 3], aes(x = id, y = p1))+geom_line()
+    ggsave(paste0("caterpillar_", i, ".pdf"), p)
+}
