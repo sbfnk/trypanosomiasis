@@ -19,7 +19,7 @@ sim_trajectory <- function(theta, init, village)
         }
     }
 
-    return(do.call(chronic, chronic_options))
+    return(do.call(tryp, chronic_options))
 }
 
 ##' Draw a parameter sample from the prior density
