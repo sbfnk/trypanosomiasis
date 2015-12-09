@@ -1,27 +1,27 @@
-/*! \file chronic_model.hpp
-  \brief Header file for the chronic model
+/*! \file tryp_model.hpp
+  \brief Header file for the trypanosomiasis model
 */
 
-#ifndef CHRONIC_MODEL_HPP
-#define CHRONIC_MODEL_HPP
+#ifndef TRYP_MODEL_HPP
+#define TRYP_MODEL_HPP
 
 #include <map>
 #include <vector>
 
 #include "event.hpp"
 
-class ChronicModel {
+class TrypModel {
 
 public:
 
-    ChronicModel(std::map<std::string, double> params,
-                 std::map<std::string, int> init,
-                 std::vector<unsigned int> p1s =
-                 std::vector<unsigned int>(),
-                 std::vector<unsigned int> p2s =
-                 std::vector<unsigned int>(),
-                 std::vector<unsigned int> verbose =
-                 std::vector<unsigned int>());
+    TrypModel(std::map<std::string, double> params,
+              std::map<std::string, int> init,
+              std::vector<unsigned int> p1s =
+              std::vector<unsigned int>(),
+              std::vector<unsigned int> p2s =
+              std::vector<unsigned int>(),
+              std::vector<unsigned int> verbose =
+              std::vector<unsigned int>());
 
     std::map<std::string, std::vector<double> >
     Simulate(std::vector<int> times);
@@ -39,7 +39,7 @@ private:
     std::vector<Event> eventList;
 
     unsigned int verbose;
-    
+
     std::vector<unsigned int> passive_stage1;
     std::vector<unsigned int> passive_stage2;
 

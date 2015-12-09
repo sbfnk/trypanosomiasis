@@ -1,6 +1,6 @@
 // -*- compile-command: "cd .. ; R CMD INSTALL .; cd -"; -*-
-/*! \file rcpp_chronic.cpp
-  \brief Implementation of the wrapper for running the chronic model form R
+/*! \file rcpp_tryp.cpp
+  \brief Implementation of the wrapper for running the trypanosomiasis model form R
 */
 
 #include <Rcpp.h>
@@ -8,10 +8,10 @@
 #include <string>
 #include <vector>
 
-#include "chronic_model.hpp"
+#include "tryp_model.hpp"
 
 // [[Rcpp::export]]
-SEXP chronic(Rcpp::NumericVector params,
+SEXP tryp(Rcpp::NumericVector params,
              Rcpp::IntegerVector init,
              Rcpp::IntegerVector times,
              Rcpp::IntegerVector stage1_passive = Rcpp::IntegerVector::create(),
@@ -35,7 +35,7 @@ SEXP chronic(Rcpp::NumericVector params,
         cpp_param.emplace(std::string(paramVariables[i]), params[i]);
     }
 
-    ChronicModel model(cpp_param, cpp_init,
+    TrypModel model(cpp_param, cpp_init,
                        Rcpp::as<std::vector<unsigned int> >(stage1_passive),
                        Rcpp::as<std::vector<unsigned int> >(stage2_passive),
                        Rcpp::as<std::vector<unsigned int> >(verbose));
