@@ -94,8 +94,15 @@ for (model in c("tran_back_chro", "back"))
 }
 
 ## check caterpillars
-for (i in 1:26)
+
+for (param in c("pc", "alpha", "delta", "p1", "p2"))
 {
-    p <- ggplot(thin.traces[village == 3], aes(x = id, y = p1))+geom_line()
-    ggsave(paste0("caterpillar_", i, ".pdf"), p)
+    p <- ggplot(thin.traces, aes_string(x = "id", y = param))
+    p <- p + geom_line()
+    p <- p + facet_wrap(~village)
+    ggsave(paste0("caterpillars_", param, ".pdf"), width = 14, height = 14)
+    p <- ggplot(thin.traces, aes_string(x = param))
+    p <- p + geom_density(adjust = 2)
+    p <- p + facet_wrap(~village)
+    ggsave(paste0("densities_", param, ".pdf"), width = 14, height = 14)
 }
