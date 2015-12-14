@@ -60,11 +60,21 @@ for (model in c("tran_back_chro", "back"))
 
     ## Kernel density estimation
 
-    for (param in c("pc", "alpha", "delta", "p1", "p2"))
-    {
-        densities <- list()
-        hists <- list()
+    densities <- list()
+    hists <- list()
 
+    densm <- list()
+    histsm <- list()
+
+    dt <- list()
+    dtm <- list()
+
+    for (param in c("pc", "alpha", "delta", "p1", "p2", "lambda"))
+    {
+
+        densities[[param]] <- list()
+        hists[[param]] <- list()
+        
         min <- floor(traces[, min(get(param))])
         max <- ceiling(traces[, max(get(param))])
         
@@ -72,37 +82,51 @@ for (model in c("tran_back_chro", "back"))
         for (village.number in file_nos)
         {
             i <- i + 1
-            densities[[i]] <- density(traces[village == village.number, get(param)],
+            densities[[param]][[i]] <- density(traces[village == village.number, get(param)],
                                       from = -0.2, to=1.2, kernel = "gaussian")
-            hists[[i]] <- hist(traces[village == village.number, get(param)],
+            hists[[param]][[i]] <- hist(traces[village == village.number, get(param)],
                                breaks = seq(min, max, length.out = 1000), plot = FALSE)
         }
 
-        densm <- sapply(densities, function(x) x[["y"]])
-        histsm <- sapply(hists, function(x) log(x[["density"]]))
+        densm[[param]] <- sapply(densities[[param]], function(x) x[["y"]])
+        histsm[[param]] <- sapply(hists[[param]], function(x) log(x[["density"]]))
 
-        dt <- data.table(x = densities[[1]]$x, y = apply(densm, 1, prod))
-        dtm <- data.table(x = hists[[1]]$breaks[-length(hists[[1]]$breaks)] + 0.0005,
-                          y = exp(apply(histsm, 1, sum)))
-        dt[, y.norm := y / 427]
-        dtm[, y.norm := y / (sum(y) * 1000)]
+        dt[[param]] <- data.table(x = densities[[param]][[1]]$x, y = apply(densm[[param]], 1, prod))
+        dtm[[param]] <- data.table(x = hists[[param]][[1]]$breaks[-length(hists[[param]][[1]]$breaks)] + 0.0005,
+                          y = exp(apply(histsm[[param]], 1, sum)))
+        dt[[param]][, y.norm := y / 427]
+        dtm[[param]][, y.norm := y / (sum(y) * 1000)]
         
-        p <- ggplot(dt, aes(x = x, y = y.norm))+geom_line()
-        p <- ggplot(dtm, aes(x = x, y = y.norm))+geom_bar(stat = "identity")
-        ggsave(paste0("density_", param, ".pdf"))
+        ## p <- ggplot(dt, aes(x = x, y = y.norm))+geom_line()
+        ## p <- ggplot(dtm, aes(x = x, y = y.norm))+geom_bar(stat = "identity")
+        ## ggsave(paste0("density_", param, ".pdf"))
     }
 }
 
 ## check caterpillars
+thin.traces <- traces[id %% 10 == 0]
+thin.traces <- thin.traces[id > 9999]
+p <- list()
 
-for (param in c("pc", "alpha", "delta", "p1", "p2"))
+for (param in c("pc", "alpha", "delta", "p1", "p2", "lambda", "beta"))
 {
-    p <- ggplot(thin.traces, aes_string(x = "id", y = param))
-    p <- p + geom_line()
-    p <- p + facet_wrap(~village)
-    ggsave(paste0("caterpillars_", param, ".pdf"), width = 14, height = 14)
-    p <- ggplot(thin.traces, aes_string(x = param))
-    p <- p + geom_density(adjust = 2)
-    p <- p + facet_wrap(~village)
-    ggsave(paste0("densities_", param, ".pdf"), width = 14, height = 14)
+    p[[param]] <- list()
+    p[[param]][["trace"]] <- ggplot(thin.traces, aes_string(x = "id", y = param))
+    p[[param]][["trace"]] <- p[[param]][["trace"]] + geom_line()
+    p[[param]][["trace"]] <- p[[param]][["trace"]] + facet_wrap(~village,
+                                                                scales = "free")
+    ggsave(paste0("caterpillars_", param, ".pdf"), p[[param]][["trace"]],
+           width = 14, height = 14)
+    p[[param]][["density"]] <- ggplot(thin.traces, aes_string(x = param))
+    p[[param]][["density"]] <- p[[param]][["density"]] + geom_density(adjust = 2)
+    p[[param]][["density"]] <- p[[param]][["density"]] + facet_wrap(~village,
+                                                                    scales = "free")
+    ggsave(paste0("densities_", param, ".pdf"), p[[param]][["density"]],
+           width = 14, height = 14)
+    p[[param]][["histogram"]] <- ggplot(thin.traces, aes_string(x = param))
+    p[[param]][["histogram"]] <- p[[param]][["histogram"]] + geom_histogram()
+    p[[param]][["histogram"]] <- p[[param]][["histogram"]] + facet_wrap(~village,
+                                                                        scales = "free")
+    ggsave(paste0("histograms_", param, ".pdf"), p[[param]][["histogram"]],
+           width = 14, height = 14)
 }
