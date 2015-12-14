@@ -133,12 +133,12 @@ prior_upper <- prior_sd
 
 ## cat("Second adaption, epsilon =", epsilon, "\n")
 
-cat(prior_sd / 2, "\n")
+cat(prior_sd, "\n")
 
 mcmc_options <-
     c(list(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
            n_iterations = num_samples,
-           sd = prior_sd / 2,
+           sd = prior_sd,
            epsilon = epsilon,
            data_summary = c(active_stage1 = data_stage1_active,
                             passive_stage1 = data_stage1_passive,
