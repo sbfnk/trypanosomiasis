@@ -13,6 +13,7 @@ Options:
 -b --background                              have a background force of infection
 -c --chronic                                 let chronically infected cases infect
 -l --lhs                                     lhs (as opposed to prior) sampling
+-a --acceptance=<acceptance>                 require this many acceptances (for setting epsilon, default: 2)
 -h --help                                    show this message" -> doc
 
 opts <- docopt(doc)
@@ -34,6 +35,12 @@ village <- as.integer(opts[["village"]])
 if (length(village) == 0)
 {
     village <- 1
+}
+
+require_acceptances <- as.integer(opts[["acceptance"]])
+if (length(require_acceptances) == 0)
+{
+    require_acceptances <- 1
 }
 
 model_options <- list(transmitted = opts[["transmitted"]],
@@ -75,7 +82,7 @@ while (!success)
 {
     dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
     success <- (nrow(dt[accept == TRUE]) > 1)
-    if (nrow(dt[accept == TRUE]) > 1)
+    if (nrow(dt[accept == TRUE]) > (require_acceptances - 1)) 
     {
         success <- TRUE
     } else
@@ -84,7 +91,7 @@ while (!success)
     }
 }
 
-cat("First adaption, epsilon =", epsilon, "\n")
+cat("First adaptation, epsilon =", epsilon, "\n")
 ## dt_new[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
 dt[, id := 1:nrow(dt)]
 
@@ -121,6 +128,8 @@ prior_upper <- prior_sd
 ## }
 
 ## cat("Second adaption, epsilon =", epsilon, "\n")
+
+cat(prior_sd / 2, "\n")
 
 mcmc_options <-
     c(list(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
