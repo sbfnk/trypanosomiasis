@@ -662,7 +662,7 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
             10^r[, grep("^lambda", colnames(r), value = TRUE)]
     }
 
-    if (progress.bar) pb <- txtProgressBar(min = 0, max = nsamples - 1, style = 3)
+    if (progress.bar && nsamples > 1) pb <- txtProgressBar(min = 0, max = nsamples - 1, style = 3)
 
     i <- 0
     while(i < nsamples)
@@ -693,9 +693,9 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
                                                             villages = villages,
                                                             ...))
         }
-        if (progress.bar) setTxtProgressBar(pb, i)
+        if (progress.bar && nsamples > 1) setTxtProgressBar(pb, i)
     }
-    if (progress.bar) close(pb)
+    if (progress.bar && nsamples > 1) close(pb)
 
     return(samples)
 }
