@@ -2,9 +2,9 @@
 #include <boost/random/uniform_01.hpp>
 #include <boost/random/mersenne_twister.hpp>
 
-#include "chronic_model.hpp"
+#include "tryp_model.hpp"
 
-ChronicModel::ChronicModel(std::map<std::string, double> params,
+TrypModel::TrypModel(std::map<std::string, double> params,
                            std::map<std::string, int> init,
                            std::vector<unsigned int> p1s,
                            std::vector<unsigned int> p2s,
@@ -95,7 +95,7 @@ ChronicModel::ChronicModel(std::map<std::string, double> params,
 }
 
 std::map<std::string, std::vector<double> >
-ChronicModel::Simulate(std::vector<int> times)
+TrypModel::Simulate(std::vector<int> times)
 {
     unsigned int seed;
     struct timeval tv;
@@ -106,7 +106,7 @@ ChronicModel::Simulate(std::vector<int> times)
 }
 
 std::map<std::string, std::vector<double> >
-ChronicModel::Simulate(std::vector<int> times, unsigned int seed)
+TrypModel::Simulate(std::vector<int> times, unsigned int seed)
 {
     boost::mt19937 randGen(seed);
     boost::uniform_01<boost::mt19937> gen(randGen);
@@ -217,7 +217,7 @@ ChronicModel::Simulate(std::vector<int> times, unsigned int seed)
     return(traj);
 }
 
-double ChronicModel::generateEventList(std::vector<double>& result)
+double TrypModel::generateEventList(std::vector<double>& result)
 {
     double sum(0);
 

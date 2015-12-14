@@ -24,6 +24,9 @@ if (opts[["help"]])
     exit()
 }
 
+code_dir <- path.expand("~/code/trypanosomiasis/")
+source(paste(code_dir, "chronic_carriers.R", sep = "/"))
+
 num_samples <- as.integer(opts[["nsamples"]])
 
 if (length(num_samples) == 0)
@@ -106,7 +109,8 @@ village_number <- which(names(prior_parameters) == "village.number")
 prior_parameters <-
     prior_parameters[, -(village_number:ncol(prior_parameters)), with = FALSE]
 
-prior_sd <- apply(prior_parameters, 2, sd)
+## prior_sd <- apply(prior_parameters, 2, sd)
+prior_sd <- c(0.05,0.1,0.1,0.001,0.001,10,5,0,0,0,0,0,0)
 prior_zero <- prior_sd
 prior_zero[] <- 0
 prior_upper <- prior_sd
