@@ -1,3 +1,5 @@
+library('truncnorm')
+
 ##' Produe a single simuation run
 ##'
 ##' @param theta parameter vector
