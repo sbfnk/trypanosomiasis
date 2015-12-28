@@ -105,9 +105,9 @@ current_accepted[id >= min(accept_ids), accept_id := max(accept_ids[accept_ids <
 prior_accepted <- dt[current_accepted[!is.na(accept_id), accept_id]]
 
 prior_parameters <- copy(prior_accepted)
-village_number <- which(names(prior_parameters) == "village.number")
+village_number_col <- which(names(prior_parameters) == "village.number")
 prior_parameters <-
-    prior_parameters[, -(village_number:ncol(prior_parameters)), with = FALSE]
+    prior_parameters[, -(village_number_col:ncol(prior_parameters)), with = FALSE]
 
 prior_sd <- apply(prior_parameters, 2, sd)
 ## prior_sd <- c(0.05,0.1,0.1,0.001,0.001,10,5,0,0,0,0,0,0)
