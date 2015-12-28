@@ -6,7 +6,7 @@ library('truncnorm')
 ##' @return data frame with trajctor
 ##' @author seb
 ##' @export
-sim_trajectory <- function(theta, init, village)
+sim_trajectory <- function(theta, init, village, ...)
 {
     stoptime <- village_screening[village_screening$village.number == village]$stoptime
     if (missing(init)) init <- rinit(theta)
@@ -21,7 +21,7 @@ sim_trajectory <- function(theta, init, village)
         }
     }
 
-    return(do.call(tryp, chronic_options))
+    return(do.call(tryp, c(chronic_options, list(...))))
 }
 
 ##' Draw a parameter sample from the prior density
