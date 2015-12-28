@@ -43,7 +43,7 @@ if (length(village) == 0)
 require_acceptances <- as.integer(opts[["acceptance"]])
 if (length(require_acceptances) == 0)
 {
-    require_acceptances <- 1
+    require_acceptances <- 2
 }
 
 model_options <- list(transmitted = opts[["transmitted"]],
