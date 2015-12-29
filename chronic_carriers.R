@@ -722,6 +722,7 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
                                   verbose = FALSE, ...)
 {
     theta <- init
+    theta <- c(theta[sd > 0], theta[setdiff(names(theta), names(theta[sd > 0]))])
     prior_theta <- dprior(theta, log = TRUE)
 
     accepted <- 0
