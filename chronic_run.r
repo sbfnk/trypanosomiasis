@@ -150,7 +150,7 @@ mcmc_options <-
 mcmc <- do.call(chronic_carriers_mcmc, mcmc_options)
 
 df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
-colnames(df) <- colnames(prior_parameters)
+colnames(df) <- names(mcmc$trace[[1]])
 
 saveRDS(df, paste0(ifelse(opts[["transmitted"]], "tran_", ""),
                    ifelse(opts[["background"]], "back_", ""),
