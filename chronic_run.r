@@ -136,14 +136,14 @@ prior_zero[] <- 0
 cat(prior_sd, "\n")
 
 mcmc_options <-
-    c(list(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
+    c(list(start = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
            n_iterations = num_samples,
            sd = prior_sd,
            epsilon = epsilon,
            data_summary = c(active_stage1 = data_stage1_active,
                             passive_stage1 = data_stage1_passive,
                             passive_stage2 = data_stage2_passive),
-           villages = village,
+           village = village,
            verbose = TRUE,
            lower = prior_zero),
       model_options)
