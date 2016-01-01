@@ -138,7 +138,7 @@ cat(prior_sd, "\n")
 mcmc_options <-
     c(list(start = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
            n_iterations = num_samples,
-           sd = prior_sd,
+           sd = prior_sd / 5,
            epsilon = epsilon,
            data_summary = c(active_stage1 = data_stage1_active,
                             passive_stage1 = data_stage1_passive,

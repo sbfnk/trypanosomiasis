@@ -449,7 +449,7 @@ traj_likelihood <- function(theta, village_number, nruns = 1, log = FALSE, ...)
     {
         init <- rinit(theta, village_number)
         log.init <- dinit(init, village_number, theta, TRUE)
-        if (is.finite(log.init))
+        if (all(is.finite(init)))
         {
             ll <- 0
             run <- sim_trajectory(theta, init, village_number)
@@ -582,25 +582,30 @@ param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
         {
             init <- rinit(theta)
             log.init <- init$logprior
-            if (is.finite(log.init))
+            ret <- list(loginit = log.init)
+            if (all(is.finite(init$state)))
             {
-                sim_trajectory(theta, init$state, village = village_number)
+                ret[["traj"]] <-
+                    sim_trajectory(theta, init$state, village = village_number)
             } else
             {
-                data.frame(init$state)
+                ret[["traj"]] <- data.frame(t(init$state))
             }
+            ret
         })
+
+        res[["loginit"]] <- sapply(sims, function(x) x[["loginit"]])
 
         res[["nneg"]] <- sum(sapply(sims, function(x)
         {
-            any(x[["I1"]] < 0 | x[["I2"]] < 0)
+            any(x[["traj"]][["I1"]] < 0 | x[["traj"]][["I2"]] < 0)
         }))
 
         res[["active_stage1"]] <- sapply(sims, function(x)
         {
-            rbinom(1, x[["Ic"]],
+            rbinom(1, x[["traj"]][["Ic"]],
                    theta[["alpha"]] * theta[["screen1"]] * final.attendance) +
-                rbinom(1, x[["I1"]],
+                rbinom(1, x[["traj"]][["I1"]],
                        theta[["screen1"]] * final.attendance)
         })
 
@@ -611,7 +616,7 @@ param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
                 passive_stage <- paste0("passive_stage", stage)
                 res[[passive_stage]] <- sapply(sims, function(x)
                 {
-                    tail(x[[paste0("Z", stage, "pass")]], 1)
+                    tail(x[["traj"]][[paste0("Z", stage, "pass")]], 1)
                 })
             }
         }
@@ -757,6 +762,8 @@ chronic_carriers_mcmc <- function(start, n_iterations, sd,
 {
     theta <- start
     prior_theta <- dprior(theta, log = TRUE)
+    prior_init <- rinit(theta)$logprior
+    prior_init_propose <- prior_init
 
     accepted <- 0
 
@@ -784,8 +791,6 @@ chronic_carriers_mcmc <- function(start, n_iterations, sd,
         prior_propose <- dprior(theta_propose, log = TRUE)
 
         if (is.finite(prior_propose)) {
-            init_propose <- rinit(theta_propose)
-
             hastings_ratio <-
                 ifelse(any(sd > 0),
                        log(dtruncnorm(theta[sd > 0], lower, upper,
@@ -807,11 +812,12 @@ chronic_carriers_mcmc <- function(start, n_iterations, sd,
             {
                 sumstats <-
                     param_sumstat_villages(theta_propose, ...)
+                prior_init_propose <- sumstats["loginit"]
                 diff <- sumstats[names(data_summary)] - data_summary
                 pass <- all(diff <= epsilon)
                 if (pass)
                 {
-                    log.acceptance <- prior_propose - prior_theta + hastings_ratio
+                    log.acceptance <- prior_propose - prior_theta + hastings_ratio + prior_init_propose - prior_init
                     is.accepted <- (log(runif (1)) < log.acceptance)
                 }
             }
@@ -821,6 +827,7 @@ chronic_carriers_mcmc <- function(start, n_iterations, sd,
             accepted <- accepted + 1
             theta <- theta_propose
             prior_theta <- prior_propose
+            prior_init <- prior_init_propose
             if (missing(epsilon)) posterior <- posterior_propose
         }
         chain[[i]] <- theta
