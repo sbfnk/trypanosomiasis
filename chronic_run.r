@@ -109,8 +109,8 @@ village_number_col <- which(names(prior_parameters) == "village.number")
 prior_parameters <-
     prior_parameters[, -(village_number_col:ncol(prior_parameters)), with = FALSE]
 
-prior_sd <- apply(prior_parameters, 2, sd)
-## prior_sd <- c(0.05,0.1,0.1,0.001,0.001,10,5,0,0,0,0,0,0)
+## prior_sd <- apply(prior_parameters, 2, sd)
+prior_sd <- c(pc = 0.1, alpha = 0.3, delta = ifelse(opts[["chronic"]], 0.3, 0), lambda = ifelse(opts[["background"]], 1e-5, 0), beta = ifelse(opts[["transmitted"]], 0.001, 0), p1 = 0.01, p2 = 0.04, rc = 0, r1 = 0, r2 = 0, screen1 = 0, screen2 = 0, N = 0)
 prior_zero <- prior_sd
 prior_zero[] <- 0
 ##prior_upper <- prior_sd
@@ -138,7 +138,7 @@ cat(prior_sd, "\n")
 mcmc_options <-
     c(list(start = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
            n_iterations = num_samples,
-           sd = prior_sd / 5,
+           sd = prior_sd,
            epsilon = epsilon,
            data_summary = c(active_stage1 = data_stage1_active,
                             passive_stage1 = data_stage1_passive,
