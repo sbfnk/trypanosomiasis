@@ -573,11 +573,11 @@ param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
                 })
             }
         }
-        return(res)
+        return(list(stat = res, traj = lapply(sims, function(x) {x[["traj"]]})))
     })
     if (length(summary.statistics) == 1)
     {
-        summary.statistics <- unlist(summary.statistics)
+        summary.statistics <- summary.statistics[[1]]
     }
     return(summary.statistics)
 }
@@ -685,7 +685,7 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
                                  summary_statistics =
                                      param_sumstat_villages(theta = theta,
                                                             villages = villages,
-                                                            ...))
+                                                            ...)[["stat"]])
         }
         if (progress.bar && nsamples > 1) setTxtProgressBar(pb, i)
     }
