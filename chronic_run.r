@@ -14,6 +14,7 @@ Options:
 -c --chronic                                 let chronically infected cases infect
 -l --lhs                                     lhs (as opposed to prior) sampling
 -a --acceptance=<acceptance>                 require this many acceptances (for setting epsilon, default: 2)
+-t --thin=<thin>                             thinning (1 for no thinning)
 -h --help                                    show this message" -> doc
 
 opts <- docopt(doc)
@@ -38,6 +39,12 @@ village <- as.integer(opts[["village"]])
 if (length(village) == 0)
 {
     village <- 1
+}
+
+thin <- as.integer(opts[["thin"]])
+if (length(thin) == 0)
+{
+    thin <- 1
 }
 
 require_acceptances <- as.integer(opts[["acceptance"]])
@@ -138,24 +145,26 @@ cat(prior_sd, "\n")
 mcmc_options <-
     c(list(start = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
            n_iterations = num_samples,
-           sd = prior_sd,
+           sd = prior_sd / 5,
            epsilon = epsilon,
            data_summary = c(active_stage1 = data_stage1_active,
                             passive_stage1 = data_stage1_passive,
                             passive_stage2 = data_stage2_passive),
            village = village,
            verbose = TRUE,
-           lower = prior_zero),
+           lower = prior_zero,
+           thin = thin,
+           return.traj = TRUE),
       model_options)
-mcmc <- do.call(chronic_carriers_mcmc, mcmc_options)
+mcmc <- do.call(chronic_carriers_abc_mcmc, mcmc_options)
 
-df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
-colnames(df) <- names(mcmc$trace[[1]])
+## df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
+## colnames(df) <- names(mcmc$trace[[1]])
 
-saveRDS(df, paste0(ifelse(opts[["transmitted"]], "tran_", ""),
-                   ifelse(opts[["background"]], "back_", ""),
-                   ifelse(opts[["chronic"]], "chro_", ""),
-                   "village_", village, ".rds"))
+saveRDS(mcmc, paste0(ifelse(opts[["transmitted"]], "tran_", ""),
+                     ifelse(opts[["background"]], "back_", ""),
+                     ifelse(opts[["chronic"]], "chro_", ""),
+                     "village_", village, ".rds"))
 
 ## df_fixed <- data.frame(matrix(unlist(x), ncol = ncol(prior_parameters), byrow = TRUE))
 ## colnames(df_fixed) <- colnames(prior_parameters)
