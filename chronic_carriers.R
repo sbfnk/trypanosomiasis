@@ -266,14 +266,14 @@ rinit <- function(theta, village_number = 1)
 
     initI1 <- rbinom(1, initI, 1 - pc)
     initIc <- initI - initI1
-    
+
     initVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
     ## prior density of initial state is density of initial
     ## observation times likelihood of that state
     ## logprior <- dinit(initVec, village_number, theta, TRUE) +
-    logprior <- 
-        dpois(initIc, Ic_eq, log = TRUE) + 
-        dpois(initI1, I1_eq, log = TRUE) + 
+    logprior <-
+        dpois(initIc, Ic_eq, log = TRUE) +
+        dpois(initI1, I1_eq, log = TRUE) +
         dpois(initI2, I2_eq, log = TRUE)
 
     Ic_ind <- c(rep(1, initIc), rep(0, initI1))
