@@ -55,7 +55,7 @@ for (model in c("tran_back_chro", "back"))
     traces <- rbindlist(traces)
     traces[, id := rep(seq(0, nrow(traces) / length(file_nos) - 1), length(file_nos))]
 
-    thin.traces <- traces[id %% 10 == 0]
+    thin.traces <- traces[id %% 100 == 0]
     ## ggplot(thin.traces, aes(x = pc))+geom_density()+facet_wrap(~village)
 
     ## Kernel density estimation
