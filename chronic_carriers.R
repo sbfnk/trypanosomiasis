@@ -556,9 +556,9 @@ param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
 
         res[["active_stage1"]] <- sapply(sims, function(x)
         {
-            rbinom(1, x[["traj"]][["Ic"]],
+            rbinom(1, tail(x[["traj"]][["Ic"]], 1),
                    theta[["alpha"]] * theta[["screen1"]] * final.attendance) +
-                rbinom(1, x[["traj"]][["I1"]],
+                rbinom(1, tail(x[["traj"]][["I1"]], 1),
                        theta[["screen1"]] * final.attendance)
         })
 
