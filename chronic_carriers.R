@@ -110,7 +110,7 @@ dprior <- function(theta, log = FALSE)
         if ("beta" %in% names(theta))
         {
             param_prior <- c(param_prior,
-                             dunif(theta[["lambda"]], 10^(-5), 10^(-2), log = TRUE))
+                             dunif(theta[["beta"]], 10^(-5), 10^(-2), log = TRUE))
         }
         if ("p1" %in% names(theta))
         {
