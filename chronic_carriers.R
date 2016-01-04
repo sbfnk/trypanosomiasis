@@ -694,23 +694,26 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
     return(samples)
 }
 
-##' run MCMC on the model for chronic carriers of trypanosomiasis
+##' run ABC-MCMC on the model for chronic carriers of trypanosomiasis
 ##'
 ##' @param start initial state of the chain
 ##' @param n_iterations number of iterations
 ##' @param sd standard deviation of each parameter
 ##' @param upper upper limit on parameters (if given)
 ##' @param lower lower limit on parameters (if given)
-##' @param epsilon value of epsilon (if ABC is run)
-##' @param data_summary summary statistic of the data (if ABC is run)
+##' @param epsilon value of epsilon
+##' @param data_summary summary statistic of the data
+##' @param thin thinning (1 for no thinning)
+##' @param return.traj whether to return trajectories
 ##' @param verbose whether to print verbose output
-##' @param ... parameters to be passed to \code{param_posterior_villages}
+##' @param ... parameters to be passed to \code{param_sumstat_villages}
 ##' @return chain
 ##' @importFrom truncnorm rtruncnorm dtruncnorm
 ##' @author Sebastian Funk
-chronic_carriers_mcmc <- function(start, n_iterations, sd,
+chronic_carriers_abc_mcmc <- function(start, n_iterations, sd,
                                   upper, lower,
                                   epsilon, data_summary,
+                                  thin = 1, return.traj = FALSE, 
                                   verbose = FALSE, ...)
 {
     theta <- start
@@ -731,6 +734,10 @@ chronic_carriers_mcmc <- function(start, n_iterations, sd,
         lower <- rep(-Inf, length(theta))
     }
 
+    trajectories <- list()
+    traj <- NULL
+
+    chain_counter <- 0
     for (i in seq_len(n_iterations))
     {
         is.accepted <- FALSE
@@ -752,27 +759,17 @@ chronic_carriers_mcmc <- function(start, n_iterations, sd,
                                       theta[sd > 0], sd[sd > 0])),
                        0)
 
-            if (missing(epsilon))
+            sumstats <-
+                param_sumstat_villages(theta_propose, ...)
+            prior_init_propose <- sumstats[["stat"]][["loginit"]]
+            
+            diff <- unlist(sumstats[["stat"]])[names(data_summary)] - data_summary
+            pass <- all(diff <= epsilon)
+            if (pass)
             {
-                posterior_propose <-
-                    param_posterior_villages(theta_propose, ...)
-                if (is.finite(posterior_propose))
-                {
-                    log.acceptance <- posterior_propose - posterior + hastings_ratio
-                    is.accepted <- (log(runif (1)) < log.acceptance)
-                }
-            } else
-            {
-                sumstats <-
-                    param_sumstat_villages(theta_propose, ...)
-                prior_init_propose <- sumstats["loginit"]
-                diff <- sumstats[names(data_summary)] - data_summary
-                pass <- all(diff <= epsilon)
-                if (pass)
-                {
-                    log.acceptance <- prior_propose - prior_theta + hastings_ratio + prior_init_propose - prior_init
-                    is.accepted <- (log(runif (1)) < log.acceptance)
-                }
+                log.acceptance <- prior_propose - prior_theta + hastings_ratio + prior_init_propose - prior_init
+                is.accepted <- (log(runif (1)) < log.acceptance)
+                traj <- sumstats[["traj"]][[1]]
             }
         }
         if (is.accepted)
@@ -783,9 +780,30 @@ chronic_carriers_mcmc <- function(start, n_iterations, sd,
             prior_init <- prior_init_propose
             if (missing(epsilon)) posterior <- posterior_propose
         }
-        chain[[i]] <- theta
+        if (i %% thin == 0)
+        {
+            chain_counter <- chain_counter + 1
+            chain[[chain_counter]] <- theta
+            if (return.traj)
+            {
+                trajectories[[chain_counter]] <- traj
+            }
+        }
         if (verbose) cat(i, "acc:", is.accepted, accepted / i, "\n")
     }
 
-    return(list(acceptance.rate = accepted / n_iterations, trace = chain))
+    if (length(chain) > 0)
+    {
+        chain_names <- names(chain[[1]])
+        df_chain <- data.frame(matrix(unlist(chain), ncol = length(chain_names), byrow = TRUE))
+        colnames(df_chain) <- chain_names
+    }
+
+    if (return.traj)
+    {
+        return(list(acceptance.rate = accepted / n_iterations, trace = df_chain, trajectories = trajectories))
+    } else
+    {
+        return(list(acceptance.rate = accepted / n_iterations, trace = df_chain))
+    }
 }
