@@ -502,60 +502,12 @@ traj_likelihood <- function(theta, village_number, nruns = 1, log = FALSE, ...)
     }
 }
 
-##' Calculate the posterior density for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages
-##'
-##' @param theta parameter vector
-##' @param villages villages to simuate
-##' @param log whether to return the logarithm
-##' @param ... further options for traj_likelihood
-##' @return posterior density
-##' @author Sebastian Funk
-param_posterior_villages <- function(theta, villages, log = TRUE, ...)
-{
-    data(village_data)
-
-    if (missing(villages))
-    {
-        sim_village_screening <- village_screening
-    } else
-    {
-        sim_village_screening <- village_screening[village.number %in% villages]
-    }
-
-    res <- 0
-    log.prior <- dprior(theta, log = TRUE)
-    posteriors <- c()
-    if (is.finite(log.prior))
-    {
-        village.posteriors <- apply(sim_village_screening, 1, function(village)
-        {
-            village_number <- village[["village.number"]]
-            stoptime <- village[["stoptime"]]
-
-            final.attendance <- min(village[["sigma.end"]], 1)
-
-            posterior <- traj_likelihood(theta, village_number, log = TRUE, ...)
-        })
-        res <- village.posteriors
-    } else
-    {
-        res <- rep(0, nrow(sim_village_screening))
-    }
-
-    if (log)
-    {
-        return(res)
-    } else
-    {
-        return(exp(res))
-    }
-}
-
 ##' Calculate summary statistic for a given set of parameters for the trypanosomiasis model, using a model that encompasses all villages
 ##'
 ##' @param theta parameter vector
 ##' @param nruns number of runs
 ##' @param villages villages to simuate
+##' @param ... 
 ##' @return posterior density
 ##' @author Sebastian Funk
 param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
