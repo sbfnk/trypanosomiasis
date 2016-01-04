@@ -2,6 +2,7 @@ library('data.table')
 library('coda')
 library('modeest')
 library('cowplot')
+library('bde')
 
 ## m <- matrix(c(1,0,
 ##               10,0,
@@ -32,6 +33,8 @@ library('cowplot')
 ## runs <- data.table(m)
 ## setnames(runs, 1:2, c("run", "epsilon"))
 
+limits <- list(pc = c(0, 0.5), alpha = c(0, 1), delta = c(0, 1), p1 = c(0, 1/7), p2 = c(0, 1/7), beta = c(0, 0.05), lambda = c(10^(-5), 10^(-2)))
+
 for (model in c("tran_back_chro", "back"))
 {
     file_path <- path.expand("~/Data/Trypanosomiasis/")
@@ -55,6 +58,9 @@ for (model in c("tran_back_chro", "back"))
     traces <- rbindlist(traces)
     traces[, id := rep(seq(0, nrow(traces) / length(file_nos) - 1), length(file_nos))]
 
+    ## burn-in
+    traces <- traces[id > 9999]
+    ## thin
     thin.traces <- traces[id %% 100 == 0]
     ## ggplot(thin.traces, aes(x = pc))+geom_density()+facet_wrap(~village)
 
@@ -69,7 +75,7 @@ for (model in c("tran_back_chro", "back"))
     dt <- list()
     dtm <- list()
 
-    for (param in c("pc", "alpha", "delta", "p1", "p2", "lambda"))
+    for (param in c("pc", "alpha", "delta", "p1", "p2", "beta", "lambda"))
     {
 
         densities[[param]] <- list()
@@ -82,30 +88,37 @@ for (model in c("tran_back_chro", "back"))
         for (village.number in file_nos)
         {
             i <- i + 1
-            densities[[param]][[i]] <- density(traces[village == village.number, get(param)],
-                                      from = -0.2, to=1.2, kernel = "gaussian")
+            densities[[param]][[i]] <- bde(traces[village == village.number, get(param)],
+                                           estimator = "vitale", lower.limit = limits[[param]][1],
+                                           upper.limit = limits[[param]][2])
             hists[[param]][[i]] <- hist(traces[village == village.number, get(param)],
-                               breaks = seq(min, max, length.out = 1000), plot = FALSE)
+                                        breaks = seq(limits[[param]][1], limits[[param]][2],
+                                                     length.out = 101),
+                                        plot = FALSE)
         }
 
-        densm[[param]] <- sapply(densities[[param]], function(x) x[["y"]])
+        densm[[param]] <- sapply(densities[[param]], function(x) {x@densityCache})
         histsm[[param]] <- sapply(hists[[param]], function(x) log(x[["density"]]))
 
-        dt[[param]] <- data.table(x = densities[[param]][[1]]$x, y = apply(densm[[param]], 1, prod))
+        dt[[param]] <- data.table(x = seq(limits[[param]][1], limits[[param]][2],
+                                          length.out = 101), y = apply(densm[[param]], 1, prod))
         dtm[[param]] <- data.table(x = hists[[param]][[1]]$breaks[-length(hists[[param]][[1]]$breaks)] + 0.0005,
-                          y = exp(apply(histsm[[param]], 1, sum)))
-        dt[[param]][, y.norm := y / 427]
-        dtm[[param]][, y.norm := y / (sum(y) * 1000)]
+                                   y = exp(apply(histsm[[param]], 1, sum)))
+        dt[[param]][, y.norm := y * 100 / (sum(y) * (limits[[param]][2] - limits[[param]][1]))]
+        dtm[[param]][, y.norm := y * 100 / (sum(y) * (limits[[param]][2] - limits[[param]][1]))]
         
-        ## p <- ggplot(dt, aes(x = x, y = y.norm))+geom_line()
-        ## p <- ggplot(dtm, aes(x = x, y = y.norm))+geom_bar(stat = "identity")
-        ## ggsave(paste0("density_", param, ".pdf"))
     }
 }
 
+for (param in c("pc", "alpha", "delta", "p1", "p2", "beta", "lambda"))
+{
+    p <- ggplot(dt[[param]], aes(x = x, y = y.norm))+geom_line()
+    ggsave(paste0("density_", param, ".pdf"))
+    p <- ggplot(dtm[[param]], aes(x = x, y = y.norm))+geom_bar(stat = "identity")
+    ggsave(paste0("histogram_", param, ".pdf"))
+}
+
 ## check caterpillars
-thin.traces <- traces[id %% 10 == 0]
-thin.traces <- thin.traces[id > 9999]
 p <- list()
 
 for (param in c("pc", "alpha", "delta", "p1", "p2", "lambda", "beta"))
