@@ -6,10 +6,9 @@ library('truncnorm')
 ##' @return data frame with trajctor
 ##' @author seb
 ##' @export
-sim_trajectory <- function(theta, init, village)
+sim_trajectory <- function(theta, init, village, ...)
 {
     stoptime <- village_screening[village_screening$village.number == village]$stoptime
-    if (missing(init)) init <- rinit(theta)
 
     chronic_options <- list(params = theta, init = init, times = seq(0, stoptime))
     for (stage in 1:2)
@@ -21,7 +20,7 @@ sim_trajectory <- function(theta, init, village)
         }
     }
 
-    return(do.call(tryp, chronic_options))
+    return(do.call(tryp, c(chronic_options, list(...))))
 }
 
 ##' Draw a parameter sample from the prior density
@@ -50,8 +49,8 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
                           beta = ifelse(transmitted,
                                         10^(runif(1, -5, -2)),
                                         0),
-                          p1 = ifelse(passive, runif(1, 0, 52), 0),
-                          p2 = ifelse(passive, runif(1, 0, 52), 0))
+                          p1 = ifelse(passive, runif(1, 0, 1/7), 0),
+                          p2 = ifelse(passive, runif(1, 0, 1/7), 0))
     } else
     {
         village_vector <- c(ifelse(background,
@@ -61,10 +60,10 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
                                    10^(runif(length(villages), -5, -2)),
                                    rep(0, length(villages))),
                             ifelse(passive,
-                                   runif(length(villages), 0, 52),
+                                   runif(length(villages), 0, 1/7),
                                    rep(0, length(villages))),
                             ifelse(passive,
-                                   runif(length(villages), 0, 52),
+                                   runif(length(villages), 0, 1/7),
                                    rep(0, length(villages))))
         names(village_vector) <-
             paste(rep(c("lambda", "beta", "p1", "p2"), each = length(villages)),
@@ -115,11 +114,11 @@ dprior <- function(theta, log = FALSE)
         }
         if ("p1" %in% names(theta))
         {
-            param_prior <- c(param_prior, dunif(theta[["p1"]], 0, 52, log = TRUE))
+            param_prior <- c(param_prior, dunif(theta[["p1"]], 0, 1/7, log = TRUE))
         }
         if ("p2" %in% names(theta))
         {
-            param_prior <- c(param_prior, dunif(theta[["p2"]], 0, 52, log = TRUE))
+            param_prior <- c(param_prior, dunif(theta[["p2"]], 0, 1/7, log = TRUE))
         }
     } else
     {
@@ -157,13 +156,11 @@ dprior <- function(theta, log = FALSE)
 ##' Draw an initial condition sample from the prior density distribution of the trypanosomiasis model
 ##'
 ##' @param theta Parameter vector
-##' @param rand A list of combinations for how infections are distributed between chronic and symptomatic infections, with corresponding probabilities
-##' @param equilibrium whether the initial conditions should be derived from equilibrium states
 ##' @param village_number village number (if parameters for multiple villages are given
 ##' @param passive whether to accumulate infections for passive detection (Z1pass, Z2pass)
 ##' @return initial conditions vector
 ##' @author Sebastian Funk
-rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
+rinit <- function(theta, village_number = 1)
 {
 
     data(village_data)
@@ -171,94 +168,125 @@ rinit <- function(theta, rand = NULL, equilibrium = TRUE, village_number = 1)
     N <- village_screening[village.number == village_number, N]
 
     village_lambda <- paste("lambda", village_number, sep = ".")
-    if (!(village_lambda %in% names(theta)))
+    if (village_lambda %in% names(theta))
     {
-        village_lambda <- "lambda"
-    }
-
-    if (equilibrium)
+        lambda <- theta[[village_lambda]]
+    } else if ("lambda" %in% names(theta))
     {
-        Ic_weight <- theta[["pc"]] / theta[["rc"]]
-        I1_weight <- (1 - theta[["pc"]]) / theta[["r1"]]
-        I2_weight <- (1 - theta[["pc"]]) / theta[["r2"]]
-
-        sum_weights <- Ic_weight + I1_weight + I2_weight
-
-        eq_I <- N * (1 - 1 / (1 + theta[[village_lambda]] * sum_weights))
-
-        stage1_detected <- village_screening[village.number == village_number,
-                                             detected1_1]
-        stage2_detected <- village_screening[village.number == village_number,
-                                             detected1_2]
-
-        found.OK <- FALSE
-
-        while(!found.OK) {
-            initIc <- rpois(1, Ic_weight * eq_I / sum_weights)
-            initI1 <- rpois(1, I1_weight * eq_I / sum_weights)
-            initI2 <- rpois(1, I2_weight * eq_I / sum_weights)
-
-            found.OK <- (initIc + initI1 >= stage1_detected) &&
-                (initI2 >= stage2_detected)
-        }
-        Ic_ind <- c(rep(1, initIc), rep(0, initI1))
-        Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
-        Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
-        I1_det <- stage1_detected - Ic_det
-        initIc <- initIc - Ic_det
-        initI1 <- initI1 - I1_det
-        initI2 <- initI2 - stage2_detected
+        lambda <- theta[["lambda"]]
     } else
     {
-        Ic_weight <- theta[["pc"]] / theta[["rc"]]
-        I1_weight <- (1 - theta[["pc"]]) / theta[["r1"]]
-
-        proportion_chronic <- Ic_weight / (Ic_weight + I1_weight)
-
-        attendance <- min(village_screening[village.number == village_number,
-                                            sigma.start], 1)
-
-        initI2 <-
-            stage2_detected + rnbinom(1, stage2_detected,
-                                      attendance * theta[["screen2"]])
-        ## sample Ic and I1
-
-        max.I <- N - stage2_detected
-        if (is.null(rand))
-        {
-            rand <- list(dist = list(), prob = c())
-            k <- 0
-            for (i in seq_len(stage1_detected))
-            {
-                for (j in seq(stage1_detected, max.I))
-                {
-                    k <- k + 1
-                    rand$prob[k] <-
-                        dbinom(i, round(proportion_chronic * j),
-                               attendance * theta[["alpha"]] * theta[["screen1"]])
-                    rand$prob[k] <- rand$prob[k] *
-                        dbinom(stage1_detected - i,
-                               round((1 - proportion_chronic) * j),
-                               attendance * theta[["screen1"]])
-                    rand$dist[[k]] <- c(i = i, j = j)
-                }
-            }
-        }
-        pick <- sample(seq_len(k), 1, prob = rand$prob)
-
-        initIc <-
-            round(proportion_chronic * rand$dist[[pick]][["j"]]) -
-            rand$dist[[pick]][["i"]]
-        initI1 <-
-            round((1 - proportion_chronic) * rand$dist[[pick]][["j"]]) -
-            (stage1_detected - rand$dist[[pick]][["i"]])
+        lambda <- 0
     }
 
-    initS <- N - initIc - initI1 - initI2
+    village_beta <- paste("beta", village_number, sep = ".")
+    if (village_beta %in% names(theta))
+    {
+        beta <- theta[[village_beta]]
+    } else if ("beta" %in% names(theta))
+    {
+        beta <- theta[["beta"]]
+    } else
+    {
+        beta <- 0
+    }
 
+    if ("pc" %in% names(theta))
+    {
+        pc <- theta[["pc"]]
+        rc <- theta[["rc"]]
+    } else
+    {
+        pc <- 0
+        rc <- 1
+    }
+
+    r1 <- theta[["r1"]]
+    r2 <- theta[["r2"]]
+
+    if ("p1" %in% names(theta))
+    {
+        p1 <- theta[["p1"]]
+    } else
+    {
+        p1 <- 0
+    }
+    if ("p2" %in% names(theta))
+    {
+        p2 <- theta[["p2"]]
+    } else
+    {
+        p2 <- 0
+    }
+    if ("delta" %in% names(theta))
+    {
+        delta <- theta[["delta"]]
+    } else
+    {
+        delta <- 0
+    }
+
+    x1 <- pc / (1 - pc) * rc / (r1 + p1)
+    x2 <- r1 / (r2 + p2)
+    x3 <- x1 + x2 + 1
+    x4 <- beta * (1 + delta * x1)
+    x5 <- (1 - pc) * lambda * N
+    x6 <- r1 + p1 - (1 - pc) * (x4 * N - x3 * lambda)
+
+    if (beta > 0)
+    {
+        ## beta > 0
+        x7 <- (1 - pc) * x3 * x4
+        p <- - x6 * (2 * x7)
+        q <- - x5 / x7
+
+        I1_eq <- p + sqrt(p**2 - q)
+    } else
+    {
+        I1_eq <- x5 / x6
+    }
+
+    Ic_eq <- x1 * I1_eq
+    I2_eq <- x2 * I1_eq
+
+    stage1_detected <- village_screening[village.number == village_number,
+                                         detected1_1]
+    stage2_detected <- village_screening[village.number == village_number,
+                                         detected2_1]
+
+    ## generate random initial conditions that are consistent with the
+    ## initial number of detected
+
+    prob_poisson_I <- ifelse(stage1_detected > 0, sum(sapply(seq_len(stage1_detected) - 1, function(x) dpois(x, lambda = Ic_eq + I1_eq))), 0)
+    initI <- qpois(runif(1, min = prob_poisson_I, max = 1), Ic_eq + I1_eq)
+    prob_poisson_I2 <- ifelse(stage2_detected > 0, sum(sapply(seq_len(stage2_detected) - 1, function(x) dpois(x, lambda = I2_eq))), 0)
+    initI2 <- qpois(runif(1, min = prob_poisson_I2, max = 1), I2_eq)
+
+    initS <- N - initI - initI2 + stage1_detected + stage2_detected
+
+    initI1 <- rbinom(1, initI, 1 - pc)
+    initIc <- initI - initI1
+    
     initVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
+    ## prior density of initial state is density of initial
+    ## observation times likelihood of that state
+    ## logprior <- dinit(initVec, village_number, theta, TRUE) +
+    logprior <- 
+        dpois(initIc, Ic_eq, log = TRUE) + 
+        dpois(initI1, I1_eq, log = TRUE) + 
+        dpois(initI2, I2_eq, log = TRUE)
 
-    return(initVec)
+    Ic_ind <- c(rep(1, initIc), rep(0, initI1))
+    Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
+    Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
+    I1_det <- stage1_detected - Ic_det
+    initIc <- initIc - Ic_det
+    initI1 <- initI1 - I1_det
+    initI2 <- initI2 - stage2_detected
+
+    modInitVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
+
+    return(list(state = modInitVec, logprior = logprior))
 }
 
 ##' Evaluate the likelihood of a model state of the trypanosomiasis model
@@ -283,7 +311,7 @@ likelihood <- function(state, stage1_detected, stage2_detected,
         res <- 1
     }
 
-    if (!any(state < 0))
+    if (!any(is.na(state)) && !any(state < 0))
     {
         if (!missing(stage1_detected))
         {
@@ -422,7 +450,7 @@ traj_likelihood <- function(theta, village_number, nruns = 1, log = FALSE, ...)
     {
         init <- rinit(theta, village_number)
         log.init <- dinit(init, village_number, theta, TRUE)
-        if (is.finite(log.init))
+        if (all(is.finite(init)))
         {
             ll <- 0
             run <- sim_trajectory(theta, init, village_number)
@@ -553,20 +581,32 @@ param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
 
         sims <- lapply(seq_len(nruns), function(x)
         {
-            sim_trajectory(theta, village = village_number)
+            init <- rinit(theta)
+            log.init <- init$logprior
+            ret <- list(loginit = log.init)
+            if (all(is.finite(init$state)))
+            {
+                ret[["traj"]] <-
+                    sim_trajectory(theta, init$state, village = village_number)
+            } else
+            {
+                ret[["traj"]] <- data.frame(t(init$state))
+            }
+            ret
         })
 
+        res[["loginit"]] <- sapply(sims, function(x) x[["loginit"]])
 
         res[["nneg"]] <- sum(sapply(sims, function(x)
         {
-            any(x[["I1"]] < 0 | x[["I2"]] < 0)
+            any(x[["traj"]][["I1"]] < 0 | x[["traj"]][["I2"]] < 0)
         }))
 
         res[["active_stage1"]] <- sapply(sims, function(x)
         {
-            rbinom(1, x[["Ic"]],
+            rbinom(1, x[["traj"]][["Ic"]],
                    theta[["alpha"]] * theta[["screen1"]] * final.attendance) +
-                rbinom(1, x[["I1"]],
+                rbinom(1, x[["traj"]][["I1"]],
                        theta[["screen1"]] * final.attendance)
         })
 
@@ -577,7 +617,7 @@ param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
                 passive_stage <- paste0("passive_stage", stage)
                 res[[passive_stage]] <- sapply(sims, function(x)
                 {
-                    tail(x[[paste0("Z", stage, "pass")]], 1)
+                    tail(x[["traj"]][[paste0("Z", stage, "pass")]], 1)
                 })
             }
         }
@@ -704,7 +744,7 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
 
 ##' run MCMC on the model for chronic carriers of trypanosomiasis
 ##'
-##' @param init initial state of the chain
+##' @param start initial state of the chain
 ##' @param n_iterations number of iterations
 ##' @param sd standard deviation of each parameter
 ##' @param upper upper limit on parameters (if given)
@@ -716,13 +756,15 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
 ##' @return chain
 ##' @importFrom truncnorm rtruncnorm dtruncnorm
 ##' @author Sebastian Funk
-chronic_carriers_mcmc <- function(init, n_iterations, sd,
+chronic_carriers_mcmc <- function(start, n_iterations, sd,
                                   upper, lower,
                                   epsilon, data_summary,
                                   verbose = FALSE, ...)
 {
-    theta <- init
+    theta <- start
     prior_theta <- dprior(theta, log = TRUE)
+    prior_init <- rinit(theta)$logprior
+    prior_init_propose <- prior_init
 
     accepted <- 0
 
@@ -745,6 +787,7 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
         names(theta_propose) <- names(theta[sd > 0])
         theta_propose <- c(theta_propose, theta[setdiff(names(theta),
                                                         names(theta_propose))])
+        theta_propose <- theta_propose[names(theta)]
 
         prior_propose <- dprior(theta_propose, log = TRUE)
 
@@ -770,11 +813,12 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
             {
                 sumstats <-
                     param_sumstat_villages(theta_propose, ...)
+                prior_init_propose <- sumstats["loginit"]
                 diff <- sumstats[names(data_summary)] - data_summary
                 pass <- all(diff <= epsilon)
                 if (pass)
                 {
-                    log.acceptance <- prior_propose - prior_theta + hastings_ratio
+                    log.acceptance <- prior_propose - prior_theta + hastings_ratio + prior_init_propose - prior_init
                     is.accepted <- (log(runif (1)) < log.acceptance)
                 }
             }
@@ -784,6 +828,7 @@ chronic_carriers_mcmc <- function(init, n_iterations, sd,
             accepted <- accepted + 1
             theta <- theta_propose
             prior_theta <- prior_propose
+            prior_init <- prior_init_propose
             if (missing(epsilon)) posterior <- posterior_propose
         }
         chain[[i]] <- theta
