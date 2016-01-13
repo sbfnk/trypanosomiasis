@@ -229,18 +229,18 @@ rinit <- function(theta, village_number = 1)
     x1 <- pc / (1 - pc) * (r1 + p1) / rc
     x2 <- r1 / (r2 + p2)
     x3 <- x1 + x2 + 1
-    x4 <- beta * (1 + delta * x2)
+    x4 <- beta * (1 + delta * x1)
     x5 <- N * pc * lambda
     x6 <- pc * (x4 * N - x3 * lambda) - r1 - p1
 
     if (beta > 0)
     {
         ## beta > 0
-        x7 <- -pc * x3 * x4
-        p <- - x6 / (2 * x7)
+        x7 <- - pc * x3 * x4
+        p <- x6 / x7
         q <- x5 / x7
 
-        I1_eq <- p + sqrt(p**2 - q)
+        I1_eq <- - p/2 + sqrt((p**2)/4 - q)
     } else
     {
         ## beta == 0
@@ -258,11 +258,17 @@ rinit <- function(theta, village_number = 1)
     ## generate random initial conditions that are consistent with the
     ## initial number of detected
 
-    prob_poisson_I <- ifelse(stage1_detected > 0, sum(sapply(seq_len(stage1_detected) - 1, function(x) dpois(x, lambda = Ic_eq + I1_eq))), 0)
-    initI <- qpois(runif(1, min = prob_poisson_I, max = 1), Ic_eq + I1_eq)
-    prob_poisson_I2 <- ifelse(stage2_detected > 0, sum(sapply(seq_len(stage2_detected) - 1, function(x) dpois(x, lambda = I2_eq))), 0)
-    initI2 <- qpois(runif(1, min = prob_poisson_I2, max = 1), I2_eq)
+    done <- FALSE
 
+    while(!done || initI + initI2 > N)
+    {
+        prob_poisson_I <- ifelse(stage1_detected > 0, sum(sapply(seq_len(stage1_detected) - 1, function(x) dpois(x, lambda = Ic_eq + I1_eq))), 0)
+        initI <- qpois(runif(1, min = prob_poisson_I, max = 1), Ic_eq + I1_eq)
+        prob_poisson_I2 <- ifelse(stage2_detected > 0, sum(sapply(seq_len(stage2_detected) - 1, function(x) dpois(x, lambda = I2_eq))), 0)
+        initI2 <- qpois(runif(1, min = prob_poisson_I2, max = 1), I2_eq)
+        done <- TRUE
+    }
+    
     initS <- N - initI - initI2 + stage1_detected + stage2_detected
 
     initI1 <- rbinom(1, initI, 1 - pc)
