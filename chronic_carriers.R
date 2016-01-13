@@ -226,23 +226,24 @@ rinit <- function(theta, village_number = 1)
         delta <- 0
     }
 
-    x1 <- pc / (1 - pc) * rc / (r1 + p1)
+    x1 <- pc / (1 - pc) * (r1 + p1) / rc
     x2 <- r1 / (r2 + p2)
     x3 <- x1 + x2 + 1
-    x4 <- beta * (1 + delta * x1)
-    x5 <- (1 - pc) * lambda * N
-    x6 <- r1 + p1 - (1 - pc) * (x4 * N - x3 * lambda)
+    x4 <- beta * (1 + delta * x2)
+    x5 <- N * pc * lambda
+    x6 <- pc * (x4 * N - x3 * lambda) - r1 - p1
 
     if (beta > 0)
     {
         ## beta > 0
-        x7 <- (1 - pc) * x3 * x4
-        p <- - x6 * (2 * x7)
-        q <- - x5 / x7
+        x7 <- -pc * x3 * x4
+        p <- - x6 / (2 * x7)
+        q <- x5 / x7
 
         I1_eq <- p + sqrt(p**2 - q)
     } else
     {
+        ## beta == 0
         I1_eq <- x5 / x6
     }
 
