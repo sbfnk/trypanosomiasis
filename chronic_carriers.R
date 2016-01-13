@@ -44,26 +44,26 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
     {
         param_vector <- c(param_vector,
                           lambda = ifelse(background,
-                                          10^(runif(1, -5, -2)),
+                                          10^(runif(1, -5, 0)),
                                           0),
                           beta = ifelse(transmitted,
-                                        10^(runif(1, -5, -2)),
+                                        10^(runif(1, -5, 0)),
                                         0),
-                          p1 = ifelse(passive, runif(1, 0, 1/7), 0),
-                          p2 = ifelse(passive, runif(1, 0, 1/7), 0))
+                          p1 = ifelse(passive, runif(1, 0, 30), 0),
+                          p2 = ifelse(passive, runif(1, 0, 30), 0))
     } else
     {
         village_vector <- c(ifelse(background,
-                                   10^(runif(length(villages), -5,  -2)),
+                                   10^(runif(length(villages), -5,  0)),
                                    rep(0, length(villages))),
                             ifelse(transmitted,
-                                   10^(runif(length(villages), -5, -2)),
+                                   10^(runif(length(villages), -5, 0)),
                                    rep(0, length(villages))),
                             ifelse(passive,
-                                   runif(length(villages), 0, 1/7),
+                                   runif(length(villages), 0, 30),
                                    rep(0, length(villages))),
                             ifelse(passive,
-                                   runif(length(villages), 0, 1/7),
+                                   runif(length(villages), 0, 30),
                                    rep(0, length(villages))))
         names(village_vector) <-
             paste(rep(c("lambda", "beta", "p1", "p2"), each = length(villages)),
@@ -105,20 +105,20 @@ dprior <- function(theta, log = FALSE)
         if ("lambda" %in% names(theta))
         {
             param_prior <- c(param_prior,
-                             dunif(theta[["lambda"]], 10^(-5), 10^(-2), log = TRUE))
+                             dunif(theta[["lambda"]], 10^(-5), 10^(0), log = TRUE))
         }
         if ("beta" %in% names(theta))
         {
             param_prior <- c(param_prior,
-                             dunif(theta[["beta"]], 10^(-5), 10^(-2), log = TRUE))
+                             dunif(theta[["beta"]], 10^(-5), 10^(0), log = TRUE))
         }
         if ("p1" %in% names(theta))
         {
-            param_prior <- c(param_prior, dunif(theta[["p1"]], 0, 1/7, log = TRUE))
+            param_prior <- c(param_prior, dunif(theta[["p1"]], 0, 30, log = TRUE))
         }
         if ("p2" %in% names(theta))
         {
-            param_prior <- c(param_prior, dunif(theta[["p2"]], 0, 1/7, log = TRUE))
+            param_prior <- c(param_prior, dunif(theta[["p2"]], 0, 30, log = TRUE))
         }
     } else
     {
@@ -128,21 +128,21 @@ dprior <- function(theta, log = FALSE)
                   unlist(sapply(grep("^lambda\\.", names(theta), value = TRUE),
                                 function(x)
                   {
-                      dunif(theta[[x]], 0, 0.05, log = TRUE)
+                      dunif(theta[[x]], 10^(-5), 10^(0), log = TRUE)
                   })))
         param_prior <-
             c(param_prior,
               unlist(sapply(grep("^p1\\.", names(theta), value = TRUE),
                             function(x)
               {
-                  dunif(theta[[x]], 0, 1, log = TRUE)
+                  dunif(theta[[x]], 0, 30, log = TRUE)
               })))
         param_prior <-
             c(param_prior,
               unlist(sapply(grep("^p2\\.", names(theta), value = TRUE),
                             function(x)
               {
-                  dunif(theta[[x]], 0, 2, log = TRUE)
+                  dunif(theta[[x]], 0, 30, log = TRUE)
               })))
     }
 
