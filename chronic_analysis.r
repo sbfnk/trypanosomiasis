@@ -33,7 +33,7 @@ library('bde')
 ## runs <- data.table(m)
 ## setnames(runs, 1:2, c("run", "epsilon"))
 
-limits <- list(pc = c(0, 0.5), alpha = c(0, 1), delta = c(0, 1), p1 = c(0, 1/7), p2 = c(0, 1/7), beta = c(0, 0.05), lambda = c(10^(-5), 10^(-2)))
+limits <- list(pc = c(0, 0.5), alpha = c(0, 1), delta = c(0, 1), p1 = c(0, 30), p2 = c(0, 30), beta = c(10^(-5), 10^(0)), lambda = c(10^(-5), 10^(0)))
 
 ## for (model in c("tran_back_chro", "back"))
 for (model in c("tran_back_chro"))
