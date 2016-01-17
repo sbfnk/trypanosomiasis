@@ -255,6 +255,7 @@ rinit <- function(theta, village_number = 1)
     stage2_detected <- village_screening[village.number == village_number,
                                          detected2_1]
 
+
     ## generate random initial conditions that are consistent with the
     ## initial number of detected
 
@@ -267,6 +268,16 @@ rinit <- function(theta, village_number = 1)
         prob_poisson_I2 <- ifelse(stage2_detected > 0, sum(sapply(seq_len(stage2_detected) - 1, function(x) dpois(x, lambda = I2_eq))), 0)
         initI2 <- qpois(runif(1, min = prob_poisson_I2, max = 1), I2_eq)
         done <- TRUE
+    }
+
+    if (stage1_detected > initI)
+    {
+        initI <- stage1_detected
+    }
+    
+    if (stage2_detected > initI2)
+    {
+        initI2 <- stage2_detected
     }
     
     initS <- N - initI - initI2 + stage1_detected + stage2_detected
