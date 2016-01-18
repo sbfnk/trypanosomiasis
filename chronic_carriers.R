@@ -782,7 +782,7 @@ chronic_carriers_abc_mcmc <- function(start, n_iterations, sd,
             prior_init_propose <- sumstats[["stat"]][["loginit"]]
             
             diff <- unlist(sumstats[["stat"]])[names(data_summary)] - data_summary
-            pass <- all(diff <= epsilon)
+            pass <- all(abs(diff) <= epsilon)
             if (pass)
             {
                 log.acceptance <- prior_propose - prior_theta + hastings_ratio + prior_init_propose - prior_init

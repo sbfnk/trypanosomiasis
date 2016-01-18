@@ -14,7 +14,7 @@ Options:
 -c --chronic                                 let chronically infected cases infect
 -l --lhs                                     lhs (as opposed to prior) sampling
 -a --acceptance=<acceptance>                 require this many acceptances (for setting epsilon, default: 2)
--t --thin=<thin>                             thinning (1 for no thinning)
+-i --thin=<thin>                             thinning (1 for no thinning)
 -h --help                                    show this message" -> doc
 
 opts <- docopt(doc)
