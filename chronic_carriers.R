@@ -244,7 +244,7 @@ rinit <- function(theta, village_number = 1)
     } else
     {
         ## beta == 0
-        I1_eq <- x5 / x6
+        I1_eq <- - x5 / x6
     }
 
     Ic_eq <- x1 * I1_eq
