@@ -74,7 +74,7 @@ dt <- data.table(t(sapply(samples, function(x)
     c(x[["parameters"]], unlist(x[["summary_statistics"]]))
 })))
 
-data_stage1_active <- village_screening[village.number == village, detected1_1]
+data_stage1_active <- village_screening[village.number == village, detected1_2]
 data_stage1_passive <-
     village_cases[village.number == village & stage == 1, sum(cases)]
 data_stage2_passive <-
@@ -117,7 +117,15 @@ prior_parameters <-
     prior_parameters[, -(village_number_col:ncol(prior_parameters)), with = FALSE]
 
 ## prior_sd <- apply(prior_parameters, 2, sd)
-prior_sd <- c(pc = 0.1, alpha = 0.3, delta = ifelse(opts[["chronic"]], 0.3, 0), lambda = ifelse(opts[["background"]], 1e-5, 0), beta = ifelse(opts[["transmitted"]], 0.001, 0), p1 = 0.01, p2 = 0.04, rc = 0, r1 = 0, r2 = 0, screen1 = 0, screen2 = 0, N = 0)
+prior_sd <- c(pc = 0.1, alpha = 0.3, delta = ifelse(opts[["chronic"]], 0.3, 0), p1 = 0.01, p2 = 0.04, rc = 0, r1 = 0, r2 = 0, screen1 = 0, screen2 = 0, N = 0)
+if (opts[["background"]])
+{
+    prior_sd["lambda"] = 1e-5
+}
+if (opts[["background"]])
+{
+    prior_sd["transmitted"] = 1e-5
+}
 prior_zero <- prior_sd
 prior_zero[] <- 0
 ##prior_upper <- prior_sd
@@ -140,7 +148,7 @@ prior_zero[] <- 0
 
 ## cat("Second adaption, epsilon =", epsilon, "\n")
 
-cat(prior_sd, "\n")
+print(prior_sd)
 
 mcmc_options <-
     c(list(start = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),

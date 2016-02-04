@@ -43,30 +43,37 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
     if (length(villages) == 1)
     {
         param_vector <- c(param_vector,
-                          lambda = ifelse(background,
-                                          10^(runif(1, -5, 0)),
-                                          0),
-                          beta = ifelse(transmitted,
-                                        10^(runif(1, -5, 0)),
-                                        0),
                           p1 = ifelse(passive, runif(1, 0, 30), 0),
                           p2 = ifelse(passive, runif(1, 0, 30), 0))
+        if (background)
+        {
+            param_vector["lambda"] <- 10^(runif(1, -5, 0))
+        }
+        if (transmitted)
+        {
+            param_vector["beta"] <- 10^(runif(1, -5, 0))
+        }
     } else
     {
-        village_vector <- c(ifelse(background,
-                                   10^(runif(length(villages), -5,  0)),
-                                   rep(0, length(villages))),
-                            ifelse(transmitted,
-                                   10^(runif(length(villages), -5, 0)),
-                                   rep(0, length(villages))),
-                            ifelse(passive,
+        village_vector <- c(ifelse(passive,
                                    runif(length(villages), 0, 30),
                                    rep(0, length(villages))),
                             ifelse(passive,
                                    runif(length(villages), 0, 30),
                                    rep(0, length(villages))))
+        name_vector <- c("p1", "p2")
+        if (background)
+        {
+            village_vector <- c(village_vector, 10^(runif(length(villages), -5,  0)))
+            name_vector <- c(name_vector, "lambda")
+        }
+        if (transmitted)
+        {
+            village_vector <- c(village_vector, 10^(runif(length(villages), -5,  0)))
+            name_vector <- c(name_vector, "beta")
+        }
         names(village_vector) <-
-            paste(rep(c("lambda", "beta", "p1", "p2"), each = length(villages)),
+            paste(rep(name_vector, each = length(villages)),
                   villages, sep = ".")
         param_vector <- c(param_vector, village_vector)
     }
@@ -753,7 +760,9 @@ chronic_carriers_abc_mcmc <- function(start, n_iterations, sd,
     }
 
     trajectories <- list()
+    summary_statistics <- list()
     traj <- NULL
+    stat <- NULL
 
     chain_counter <- 0
     for (i in seq_len(n_iterations))
@@ -780,14 +789,15 @@ chronic_carriers_abc_mcmc <- function(start, n_iterations, sd,
             sumstats <-
                 param_sumstat_villages(theta_propose, ...)
             prior_init_propose <- sumstats[["stat"]][["loginit"]]
-            
-            diff <- unlist(sumstats[["stat"]])[names(data_summary)] - data_summary
+
+            diff <- unlist(stat)[names(data_summary)] - data_summary
             pass <- all(abs(diff) <= epsilon)
             if (pass)
             {
                 log.acceptance <- prior_propose - prior_theta + hastings_ratio + prior_init_propose - prior_init
                 is.accepted <- (log(runif (1)) < log.acceptance)
                 traj <- sumstats[["traj"]][[1]]
+                stat <- sumstats[["stat"]]
             }
         }
         if (is.accepted)
@@ -806,6 +816,7 @@ chronic_carriers_abc_mcmc <- function(start, n_iterations, sd,
             {
                 trajectories[[chain_counter]] <- traj
             }
+            summary_statistics[[chain_counter]] <- stat
         }
         if (verbose) cat(i, "acc:", is.accepted, accepted / i, "\n")
     }
@@ -817,11 +828,12 @@ chronic_carriers_abc_mcmc <- function(start, n_iterations, sd,
         colnames(df_chain) <- chain_names
     }
 
+    ret <- list(acceptance.rate = accepted / n_iterations,
+                trace = df_chain,
+                summary.statistics = summary_statistics)
     if (return.traj)
     {
-        return(list(acceptance.rate = accepted / n_iterations, trace = df_chain, trajectories = trajectories))
-    } else
-    {
-        return(list(acceptance.rate = accepted / n_iterations, trace = df_chain))
+        ret[["trajectories"]] <- trajectories
     }
+    return(ret)
 }
