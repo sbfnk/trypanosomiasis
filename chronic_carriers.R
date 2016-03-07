@@ -47,11 +47,11 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
                           p2 = ifelse(passive, runif(1, 0, 30), 0))
         if (background)
         {
-            param_vector["lambda"] <- 10^(runif(1, -5, 0))
+            param_vector["lambda"] <- runif(1, 0, 1e-2)
         }
         if (transmitted)
         {
-            param_vector["beta"] <- 10^(runif(1, -5, 0))
+            param_vector["beta"] <- runif(1, 0, 1e-2)
         }
     } else
     {
@@ -64,12 +64,12 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
         name_vector <- c("p1", "p2")
         if (background)
         {
-            village_vector <- c(village_vector, 10^(runif(length(villages), -5,  0)))
+            village_vector <- c(village_vector, 0,  1e-2)
             name_vector <- c(name_vector, "lambda")
         }
         if (transmitted)
         {
-            village_vector <- c(village_vector, 10^(runif(length(villages), -5,  0)))
+            village_vector <- c(village_vector, 0,  1e-2)
             name_vector <- c(name_vector, "beta")
         }
         names(village_vector) <-
@@ -112,12 +112,12 @@ dprior <- function(theta, log = FALSE)
         if ("lambda" %in% names(theta))
         {
             param_prior <- c(param_prior,
-                             dunif(theta[["lambda"]], 10^(-5), 10^(0), log = TRUE))
+                             dunif(theta[["lambda"]], 0, 1e-2, log = TRUE))
         }
         if ("beta" %in% names(theta))
         {
             param_prior <- c(param_prior,
-                             dunif(theta[["beta"]], 10^(-5), 10^(0), log = TRUE))
+                             dunif(theta[["beta"]], 0, 1e-2, log = TRUE))
         }
         if ("p1" %in% names(theta))
         {
@@ -268,50 +268,70 @@ rinit <- function(theta, village_number = 1)
 
     done <- FALSE
 
-    while(!done || initI + initI2 > N)
+    prob_poisson_I1c <- ifelse(stage1_detected > 0, sum(sapply(seq_len(stage1_detected) - 1, function(x) dpois(x, lambda = Ic_eq + I1_eq))), 0)
+    prob_poisson_I2 <- ifelse(stage2_detected > 0, sum(sapply(seq_len(stage2_detected) - 1, function(x) dpois(x, lambda = I2_eq))), 0)
+
+    eq <- c(I1 = I1_eq, Ic = Ic_eq, I2 = I2_eq)
+    
+    if (suppressWarnings(is.finite(qpois(prob_poisson_I1c, I1_eq + Ic_eq) + qpois(prob_poisson_I2, I2_eq))))
     {
-        prob_poisson_I <- ifelse(stage1_detected > 0, sum(sapply(seq_len(stage1_detected) - 1, function(x) dpois(x, lambda = Ic_eq + I1_eq))), 0)
-        initI <- qpois(runif(1, min = prob_poisson_I, max = 1), Ic_eq + I1_eq)
-        prob_poisson_I2 <- ifelse(stage2_detected > 0, sum(sapply(seq_len(stage2_detected) - 1, function(x) dpois(x, lambda = I2_eq))), 0)
+        initI1 <- 0
+        initI2 <- 0
+
+        while(!done || initI1c + initI2 > N)
+    {
+        initI1c <- qpois(runif(1, min = prob_poisson_I1c, max = 1), Ic_eq + I1_eq)
         initI2 <- qpois(runif(1, min = prob_poisson_I2, max = 1), I2_eq)
         done <- TRUE
     }
 
-    if (stage1_detected > initI)
+        ## rounding errors??
+        ## if (stage1_detected > initI)
+        ## {
+        ##     initI <- stage1_detected
+        ## }
+        
+        ## if (stage2_detected > initI2)
+        ## {
+        ##     initI2 <- stage2_detected
+        ## }
+        
+        initS <- N - initI1c - initI2 + stage1_detected + stage2_detected
+
+        initI1 <- rbinom(1, initI1c, 1 - pc)
+        initIc <- initI1c - initI1
+
+        initVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
+        ## prior density of initial state is density of initial
+        ## observation times likelihood of that state
+        ## logprior <- dinit(initVec, village_number, theta, TRUE) +
+        logprior <-
+            dpois(initIc, Ic_eq, log = TRUE) +
+            dpois(initI1, I1_eq, log = TRUE) +
+            dpois(initI2, I2_eq, log = TRUE)
+
+        Ic_ind <- c(rep(1, initIc), rep(0, initI1))
+        Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
+        if (length(Ic_ind) == 0)
+        {
+            Ic_det <-  0
+        } else
+        {
+            Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
+        }
+        I1_det <- stage1_detected - Ic_det
+        initIc <- initIc - Ic_det
+        initI1 <- initI1 - I1_det
+        initI2 <- initI2 - stage2_detected
+
+        modInitVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
+    } else
     {
-        initI <- stage1_detected
+        logprior <- Inf
+        modInitVec <- c(S = Inf, Ic = Inf, I1 = Inf, I2 = Inf)
     }
-    
-    if (stage2_detected > initI2)
-    {
-        initI2 <- stage2_detected
-    }
-    
-    initS <- N - initI - initI2 + stage1_detected + stage2_detected
 
-    initI1 <- rbinom(1, initI, 1 - pc)
-    initIc <- initI - initI1
-
-    initVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
-    ## prior density of initial state is density of initial
-    ## observation times likelihood of that state
-    ## logprior <- dinit(initVec, village_number, theta, TRUE) +
-    logprior <-
-        dpois(initIc, Ic_eq, log = TRUE) +
-        dpois(initI1, I1_eq, log = TRUE) +
-        dpois(initI2, I2_eq, log = TRUE)
-
-    Ic_ind <- c(rep(1, initIc), rep(0, initI1))
-    Ic_prob <- c(rep(theta[["alpha"]], initIc), rep(1, initI1))
-    Ic_det <- sum(Ic_ind[sample(Ic_ind, stage1_detected, prob = Ic_prob)])
-    I1_det <- stage1_detected - Ic_det
-    initIc <- initIc - Ic_det
-    initI1 <- initI1 - I1_det
-    initI2 <- initI2 - stage2_detected
-
-    modInitVec <- c(S = initS, Ic = initIc, I1 = initI1, I2 = initI2)
-
-    return(list(state = modInitVec, logprior = logprior))
+    return(list(state = modInitVec, logprior = logprior, eq = eq))
 }
 
 ##' Evaluate the likelihood of a model state of the trypanosomiasis model
@@ -558,10 +578,10 @@ param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
 
         sims <- lapply(seq_len(nruns), function(x)
         {
-            init <- rinit(theta)
+            init <- rinit(theta,  village_number)
             log.init <- init$logprior
-            ret <- list(loginit = log.init)
-            if (all(is.finite(init$state)))
+            ret <- list(loginit = log.init, init.eq = init$eq)
+            if (all(is.finite(init$state)) && is.finite(log.init))
             {
                 ret[["traj"]] <-
                     sim_trajectory(theta, init$state, village = village_number)
@@ -573,29 +593,42 @@ param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
         })
 
         res[["loginit"]] <- sapply(sims, function(x) x[["loginit"]])
+        res[["init.eq"]] <- t(sapply(sims, function(x) x[["init.eq"]]))
 
-        res[["nneg"]] <- sum(sapply(sims, function(x)
+        if (is.finite(sum(res[["loginit"]])))
         {
-            any(x[["traj"]][["I1"]] < 0 | x[["traj"]][["I2"]] < 0)
-        }))
+            res[["nneg"]] <- sum(sapply(sims, function(x)
+            {
+                any(x[["traj"]][["I1"]] < 0 | x[["traj"]][["I2"]] < 0)
+            }))
 
-        res[["active_stage1"]] <- sapply(sims, function(x)
+            res[["active_stage1"]] <- sapply(sims, function(x)
+            {
+                rbinom(1, tail(x[["traj"]][["Ic"]], 1),
+                       theta[["alpha"]] * theta[["screen1"]] * final.attendance) +
+                    rbinom(1, tail(x[["traj"]][["I1"]], 1),
+                           theta[["screen1"]] * final.attendance)
+            })
+            
+            for (stage in 1:2)
+            {
+                if (grep(paste0("^p", stage), names(theta)))
+                {
+                    passive_stage <- paste0("passive_stage", stage)
+                    res[[passive_stage]] <- sapply(sims, function(x)
+                    {
+                        tail(x[["traj"]][[paste0("Z", stage, "pass")]], 1)
+                    })
+                }
+            }
+        } else
         {
-            rbinom(1, tail(x[["traj"]][["Ic"]], 1),
-                   theta[["alpha"]] * theta[["screen1"]] * final.attendance) +
-                rbinom(1, tail(x[["traj"]][["I1"]], 1),
-                       theta[["screen1"]] * final.attendance)
-        })
-
-        for (stage in 1:2)
-        {
-            if (grep(paste0("^p", stage), names(theta)))
+            res[["nneg"]] <- NA_real_
+            res[["active_stage1"]] <- NA_real_
+            for (stage in 1:2)
             {
                 passive_stage <- paste0("passive_stage", stage)
-                res[[passive_stage]] <- sapply(sims, function(x)
-                {
-                    tail(x[["traj"]][[paste0("Z", stage, "pass")]], 1)
-                })
+                res[[passive_stage]] <- NA_real_
             }
         }
         return(list(stat = res, traj = lapply(sims, function(x) {x[["traj"]]})))
