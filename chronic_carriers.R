@@ -837,3 +837,13 @@ chronic_carriers_abc_mcmc <- function(start, n_iterations, sd,
     }
     return(ret)
 }
+
+sample_equilibrium <- function(theta, village)
+{
+  sim_village_screening <- village_screening[village.number %in% village]
+
+  stage1_active <- sim_village_screening[["detected1_1"]]
+  stage2_active <- sim_village_screening[["detected2_1"]]
+
+  
+}
