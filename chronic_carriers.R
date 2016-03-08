@@ -875,8 +875,138 @@ sample_equilibrium <- function(theta, village)
 {
   sim_village_screening <- village_screening[village.number %in% village]
 
-  stage1_active <- sim_village_screening[["detected1_1"]]
-  stage2_active <- sim_village_screening[["detected2_1"]]
+  N <- sim_village_screening[["N"]]
+  detectedI1c <- sim_village_screening[["detected1_1"]] ## number of people detected with stage 1 or chronic
+  detectedI2<- sim_village_screening[["detected2_1"]] ## number of people detected with stage 2
 
+  attendance <-  sim_village_screening[["sigma.start"]]
+
+  stage1_prob <- theta[["screen1"]] * attendance
+  stagec_prob <- theta[["screen1"]] * attendance * theta[["alpha"]]
+  stage2_prob <- theta[["screen2"]] * attendance
+
+  ## sample stage1
+  initI1c_random <- runif(1, min = 0, max = detectedI1c / (stage1_prob * stagec_prob))
+
+  found <- FALSE
+  prob_sum <- 0
+
+  scenarios <- list()
+
+  initI1 <- 0 ## number of people initially in stage 1 (not chronic)
+  initI1c <- detectedI1c ## number of people initially in stage 1 or chronic, this must be >= detectedI1c
+
+  ## loop for total number if people initially in stage 1 (including chronic)
+  while (!found)
+  {
+    initIc <- -1 ## number of people initially chronic
+    ## loop over initIc
+    while (!found && (initIc <- initIc + 1) <= initI1c)
+    {
+      ## number of chronic people detected in active screening (as stage 1);
+      ## this must be <= detectedI1c and InitIc, also detectedI1 (= detectedI1c
+      ## - detectedIc) must be <= initI1 => detectedIc must be
+      ## >= detectedI1c - initI1 
+      detectedIc <- max(0, detectedI1c - (initI1c - initIc)) - 1
+      ## loop over detectedIc
+      while (!found && (detectedIc <- detectedIc + 1) <= min(detectedI1c, initIc))
+      {
+        prob <- dbinom(detectedI1c - detectedIc, initI1c - initIc, stage1_prob) *
+          dbinom(detectedIc, initIc, stagec_prob)
+        scenarios <- c(scenarios,
+                       list(prob = prob,
+                            vector = c(initI1 = initI1c - initIc,
+                                       initIc = initIc,
+                                       detectedI1 = detectedI1c - detectedIc,
+                                       detectedIc = detectedIc)))
+        prob_sum <- prob_sum + prob
+        if (prob_sum > initI1c_random)
+        {
+          found <- TRUE
+        }
+      }
+    }
+    initI1c <- initI1c + 1
+  }
+
+  initI1c <- initI1c - 1
+  initI1 <- initI1c - initIc
+
+  ## sample stage2
+  found <- FALSE
+  prob_sum <- 0
   
+  initI2 <- detectedI2
+  min_initI2 <- theta[["r2"]] / theta[["r1"]] * initI1
+  while (!found)
+  {
+    if (initI2 < min_initI2)
+    {
+      prob <- dbinom(detectedI2, initI2, stage2_prob)
+      prob_sum <- prob_sum + prob
+      initI2 <- initI2 + 1
+    } else {
+      found <- TRUE
+    }
+  }
+
+  initI2_random <- runif(1, min = prob_sum, max = 1 / stage2_prob)
+
+  found <- FALSE
+  while (!found)
+  {
+    prob <- dbinom(detectedI2, initI2,  stage2_prob)
+    prob_sum <- prob_sum + prob
+    if (prob_sum > initI2_random && init) {
+      found <- TRUE
+    } else {
+      initI2 <- initI2 + 1
+    }
+  }
+
+  return(list(eq = c(S = N - initI1 - initIc - initI2, I1 = initI1, Ic = initIc,
+                     I2 = initI2),
+              init = c(S = N - initI1 - initIc - initI2 - detectedI1c -
+                         detectedI2,
+                       I1 = initI1 - detectedI1c + detectedIc,
+                       Ic = initIc - detectedIc,
+                       I2 = initI2 - detectedI2)))
+}
+
+rprior_conditional <- function(village)
+{
+  theta <- c(rc = 1/120,
+             r1 = 0.0019 * 30.42,
+             r2 = 0.0040 * 30.42,
+             screen1 = 0.95,
+             screen2 = 0.99)
+  theta["alpha"] <- runif(1, 0, 1)
+  theta["delta"] <- runif(1, 0, 1)
+  init <- sample_equilibrium(theta, village)
+  eq <- init[["eq"]]
+
+  if (eq[["I1"]] > 0)
+  {
+    x1 <- eq[["Ic"]] / eq[["I1"]]
+  } else if (eq[["Ic"]] > 0)
+  {
+    theta[["pc"]] <- x1 / (theta[["r1"]] + theta[["p1"]] + x1)
+  }
+  
+  x2 <- eq[["I2"]] / eq[["I1"]]
+  theta[["p2"]] <- min(x2 * theta[["r1"]] - theta[["r2"]],  0)
+
+  theta[["p1"]] <- runif(1, 0, theta[["p2"]])
+
+  prop_background <- runif(1, 0, 1)
+
+  lambda <- (theta[["rc"]] * eq[["Ic"]] + theta[["p1"]] * eq[["I1"]] +
+             (theta[["p2"]] + theta[["r2"]]) * eq[["I2"]]) / eq[["S"]]
+
+  theta[["lambda"]] <- lambda * prop_background
+  theta[["beta"]] <- lambda - theta[["lambda"]] /
+    (eq[["I1"]] + theta[["delta"]] * eq[["Ic"]])
+
+
+  return(list(theta = theta, init = init[["init"]]))
 }
