@@ -75,12 +75,14 @@ dt <- data.table(t(sapply(samples, function(x)
 })))
 
 data_stage1_active <- village_screening[village.number == village, detected1_2]
+data_stage2_active <- village_screening[village.number == village, detected.2_2]
 data_stage1_passive <-
     village_cases[village.number == village & stage == 1, sum(cases)]
 data_stage2_passive <-
     village_cases[village.number == village & stage == 2, sum(cases)]
 
 dt[, active_stage1_diff := active_stage1 - data_stage1_active]
+dt[, active_stage2_diff := active_stage2 - data_stage2_active]
 dt[, passive_stage1_diff := passive_stage1 - data_stage1_passive]
 dt[, passive_stage2_diff := passive_stage2 - data_stage2_passive]
 
@@ -90,7 +92,7 @@ epsilon <- 0
 
 while (!success)
 {
-    dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
+    dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(active_stage2_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
     success <- (nrow(dt[accept == TRUE]) > 1)
     if (nrow(dt[accept == TRUE]) > (require_acceptances - 1)) 
     {

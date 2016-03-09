@@ -37,14 +37,14 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
                    transmitted = FALSE, chronic = TRUE)
 {
     param_vector <-
-        c(pc = runif(1, 0, 0.5), alpha = runif(1, 0, 1))
+        c(pc = runif(1, 0, 1), alpha = runif(1, 0, 0.5))
     param_vector["delta"] <- ifelse(chronic, runif(1, 0, 1), 0)
 
     if (length(villages) == 1)
     {
         param_vector <- c(param_vector,
-                          p1 = ifelse(passive, runif(1, 0, 30), 0),
-                          p2 = ifelse(passive, runif(1, 0, 30), 0))
+                          p1 = ifelse(passive, runif(1, 0, 100), 0),
+                          p2 = ifelse(passive, runif(1, 0, 100), 0))
         if (background)
         {
             param_vector["lambda"] <- runif(1, 0, 1e-2)
@@ -95,14 +95,14 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
 ##' @author Sebastian Funk
 dprior <- function(theta, log = FALSE)
 {
-    N <- round(theta[["N"]])
+    if ("N" %in% names(theta)) N <- round(theta[["N"]]) else N <- 1
     param_prior <- c()
-    param_prior <- c(param_prior, dunif(theta[["pc"]], 0, 0.5, log = TRUE))
+    param_prior <- c(param_prior, dunif(theta[["pc"]], 0, 1, log = TRUE))
     param_prior <- c(param_prior, dnorm(theta[["rc"]], 1/120, log = TRUE))
     param_prior <- c(param_prior, dnorm(theta[["r1"]], 0.0019 * 30.42, log = TRUE))
     param_prior <- c(param_prior, dnorm(theta[["r2"]], 0.0040 * 30.42, log = TRUE))
     if ("alpha" %in% names(theta))
-        param_prior <- c(param_prior, dunif(theta[["alpha"]], 0, 1, log = TRUE))
+        param_prior <- c(param_prior, dunif(theta[["alpha"]], 0, 0.5, log = TRUE))
     if ("delta" %in% names(theta))
         param_prior <- c(param_prior, dunif(theta[["delta"]], 0, 1, log = TRUE))
     param_prior <- c(param_prior, dunif(theta[["screen1"]], 0.86, 0.98, log = TRUE))
@@ -121,11 +121,11 @@ dprior <- function(theta, log = FALSE)
         }
         if ("p1" %in% names(theta))
         {
-            param_prior <- c(param_prior, dunif(theta[["p1"]], 0, 30, log = TRUE))
+            param_prior <- c(param_prior, dunif(theta[["p1"]], 0, 100, log = TRUE))
         }
         if ("p2" %in% names(theta))
         {
-            param_prior <- c(param_prior, dunif(theta[["p2"]], 0, 30, log = TRUE))
+            param_prior <- c(param_prior, dunif(theta[["p2"]], 0, 100, log = TRUE))
         }
     } else
     {
@@ -142,14 +142,14 @@ dprior <- function(theta, log = FALSE)
               unlist(sapply(grep("^p1\\.", names(theta), value = TRUE),
                             function(x)
               {
-                  dunif(theta[[x]], 0, 30, log = TRUE)
+                  dunif(theta[[x]], 0, 100, log = TRUE)
               })))
         param_prior <-
             c(param_prior,
               unlist(sapply(grep("^p2\\.", names(theta), value = TRUE),
                             function(x)
               {
-                  dunif(theta[[x]], 0, 30, log = TRUE)
+                  dunif(theta[[x]], 0, 100, log = TRUE)
               })))
     }
 
@@ -555,89 +555,87 @@ traj_likelihood <- function(theta, village_number, nruns = 1, log = FALSE, ...)
 ##' @param ... 
 ##' @return posterior density
 ##' @author Sebastian Funk
-param_sumstat_villages <- function(theta, nruns = 1, villages, ...)
+param_sumstat_villages <- function(theta, init, nruns = 1, village_number, ...)
 {
     data(village_data)
 
-    if (missing(villages))
+    village <- village_screening[village.number == village_number]
+
+    res <- list()
+
+    final.attendance <- min(village[["sigma.end"]], 1)
+    passive_data <- village_cases[village.number == village_number]
+
+    missing_init <- missing(init)
+
+    cat("sims\n")
+    sims <- lapply(seq_len(nruns), function(x)
     {
-        sim_village_screening <- village_screening
+      if (missing_init) init <- rinit(theta,  village_number)
+      log.init <- init$logprior
+      ret <- list(loginit = log.init, init.eq = init$eq)
+      if (all(is.finite(init$state)) && is.finite(log.init))
+      {
+        cat("traj\n")
+        cat(theta, "\n")
+        cat(init$state, "\n")
+        ret[["traj"]] <-
+          sim_trajectory(theta, init$state, village = village_number)
+        cat("traj done\n")
+      } else
+      {
+        ret[["traj"]] <- data.frame(t(init$state))
+      }
+      ret
+    })
+    cat("sims done\n")
+
+    res[["loginit"]] <- sapply(sims, function(x) x[["loginit"]])
+    res[["init.eq"]] <- t(sapply(sims, function(x) x[["init.eq"]]))
+
+    if (is.finite(res[["loginit"]]))
+    {
+      res[["nneg"]] <- sum(sapply(sims, function(x)
+      {
+        any(x[["traj"]][["I1"]] < 0 | x[["traj"]][["I2"]] < 0)
+      }))
+      
+      res[["active_stage1"]] <- sapply(sims, function(x)
+      {
+        rbinom(1, tail(x[["traj"]][["Ic"]], 1),
+               theta[["alpha"]] * theta[["screen1"]] * final.attendance) +
+          rbinom(1, tail(x[["traj"]][["I1"]], 1),
+                 theta[["screen1"]] * final.attendance)
+      })
+            
+      res[["active_stage2"]] <- sapply(sims, function(x)
+      {
+        rbinom(1, tail(x[["traj"]][["I2"]], 1),
+               theta[["screen2"]] * final.attendance)
+      })
+      
+      for (stage in 1:2)
+      {
+        if (grep(paste0("^p", stage), names(theta)))
+        {
+          passive_stage <- paste0("passive_stage", stage)
+          res[[passive_stage]] <- sapply(sims, function(x)
+          {
+            tail(x[["traj"]][[paste0("Z", stage, "pass")]], 1)
+          })
+        }
+      }
     } else
     {
-        sim_village_screening <- village_screening[village.number %in% villages]
+      res[["nneg"]] <- NA_real_
+      res[["active_stage1"]] <- NA_real_
+      for (stage in 1:2)
+      {
+        passive_stage <- paste0("passive_stage", stage)
+        res[[passive_stage]] <- NA_real_
+      }
     }
-
-    summary.statistics <- apply(sim_village_screening, 1, function(village)
-    {
-        village_number <- village[["village.number"]]
-        res <- list(village.number = village_number)
-        stoptime <- village[["stoptime"]]
-
-        final.attendance <- min(village[["sigma.end"]], 1)
-        passive_data <- village_cases[village.number == village_number]
-
-        sims <- lapply(seq_len(nruns), function(x)
-        {
-            init <- rinit(theta,  village_number)
-            log.init <- init$logprior
-            ret <- list(loginit = log.init, init.eq = init$eq)
-            if (all(is.finite(init$state)) && is.finite(log.init))
-            {
-                ret[["traj"]] <-
-                    sim_trajectory(theta, init$state, village = village_number)
-            } else
-            {
-                ret[["traj"]] <- data.frame(t(init$state))
-            }
-            ret
-        })
-
-        res[["loginit"]] <- sapply(sims, function(x) x[["loginit"]])
-        res[["init.eq"]] <- t(sapply(sims, function(x) x[["init.eq"]]))
-
-        if (is.finite(sum(res[["loginit"]])))
-        {
-            res[["nneg"]] <- sum(sapply(sims, function(x)
-            {
-                any(x[["traj"]][["I1"]] < 0 | x[["traj"]][["I2"]] < 0)
-            }))
-
-            res[["active_stage1"]] <- sapply(sims, function(x)
-            {
-                rbinom(1, tail(x[["traj"]][["Ic"]], 1),
-                       theta[["alpha"]] * theta[["screen1"]] * final.attendance) +
-                    rbinom(1, tail(x[["traj"]][["I1"]], 1),
-                           theta[["screen1"]] * final.attendance)
-            })
-            
-            for (stage in 1:2)
-            {
-                if (grep(paste0("^p", stage), names(theta)))
-                {
-                    passive_stage <- paste0("passive_stage", stage)
-                    res[[passive_stage]] <- sapply(sims, function(x)
-                    {
-                        tail(x[["traj"]][[paste0("Z", stage, "pass")]], 1)
-                    })
-                }
-            }
-        } else
-        {
-            res[["nneg"]] <- NA_real_
-            res[["active_stage1"]] <- NA_real_
-            for (stage in 1:2)
-            {
-                passive_stage <- paste0("passive_stage", stage)
-                res[[passive_stage]] <- NA_real_
-            }
-        }
-        return(list(stat = res, traj = lapply(sims, function(x) {x[["traj"]]})))
-    })
-    if (length(summary.statistics) == 1)
-    {
-        summary.statistics <- summary.statistics[[1]]
-    }
-    return(summary.statistics)
+    return(list(stat = res, traj = lapply(sims, function(x) {x[["traj"]]})))
 }
 
 
@@ -719,8 +717,8 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
     i <- 0
     while(i < nsamples)
     {
-        i <- i + 1
-        theta <- rprior(villages = villages, passive = passive, ...)
+      i <- i + 1
+        prior_draw <- rprior_conditional(village = villages)
         if (sample == "lhs") {
             theta[colnames(r)] <- r[i, ]
         }
@@ -739,11 +737,14 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
             }
         } else
         {
-            samples[[i]] <- list(parameters = theta,
-                                 summary_statistics =
-                                     param_sumstat_villages(theta = theta,
-                                                            villages = villages,
-                                                            ...)[["stat"]])
+          cat("sumstat\n")
+          samples[[i]] <- list(parameters = prior_draw$theta, 
+                               summary_statistics =
+                                 param_sumstat_villages(theta = prior_draw$theta,
+                                                        init = prior_draw$init, 
+                                                        village_number = villages,
+                                                        ...)[["stat"]])
+          cat("sumstat done\n")
         }
         if (progress.bar && nsamples > 1) setTxtProgressBar(pb, i)
     }
@@ -873,6 +874,7 @@ chronic_carriers_abc_mcmc <- function(start, n_iterations, sd,
 
 sample_equilibrium <- function(theta, village)
 {
+  cat ("enter sample_equilibrium\n")
   sim_village_screening <- village_screening[village.number %in% village]
 
   N <- sim_village_screening[["N"]]
@@ -896,6 +898,7 @@ sample_equilibrium <- function(theta, village)
   initI2 <- detectedI2
 
   found <- FALSE
+  cat ("I2\n")
   while (!found)
   {
     prob <- dbinom(detectedI2, initI2,  stage2_prob)
@@ -912,12 +915,13 @@ sample_equilibrium <- function(theta, village)
   prob_sum <- 0
   initI1 <- detectedI1c - detectedIc
 
+  cat ("I1 norm\n")
   ## normalisation
   while (!found)
   {
-    if (initI1 < initI2 * theta[["r1"]] / theta[["r2"]])
+    if (initI1 < initI2 * theta[["r2"]] / theta[["r1"]])
     {
-      prob <- dbinom(detectedI2, initI2, stage2_prob)
+      prob <- dbinom(detectedI1c - detectedIc, initI1, stage1_prob)
       prob_sum <- prob_sum + prob
       initI1 <- initI1 + 1
     } else {
@@ -925,17 +929,21 @@ sample_equilibrium <- function(theta, village)
     }
   }
 
-  initI1_random <- runif(1, min = prob_sum, max = 1 / stage1_prob)
-
-  found <- FALSE
-  while (!found)
+  cat ("I1\n")
+  if (prob_sum < (1 / stage1_prob - 1e-15))
   {
-    prob <- dbinom(detectedI1c - detectedIc, initI1,  stage1_prob)
-    prob_sum <- prob_sum + prob
-    if (prob_sum > initI1_random) {
-      found <- TRUE
-    } else {
-      initI1 <- initI1 + 1
+    initI1_random <- runif(1, min = prob_sum, max = 1 / stage1_prob)
+    
+    found <- FALSE
+    while (!found)
+    {
+      prob <- dbinom(detectedI1c - detectedIc, initI1,  stage1_prob)
+      prob_sum <- prob_sum + prob
+      if (prob_sum > initI1_random) {
+        found <- TRUE
+      } else {
+        initI1 <- initI1 + 1
+      }
     }
   }
 
@@ -945,62 +953,85 @@ sample_equilibrium <- function(theta, village)
   found <- FALSE
   prob_sum <- 0
   initIc <- detectedIc
+  cat ("Ic\n")
 
   while (!found)
   {
     prob <- dbinom(detectedIc, initIc, stagec_prob)
     prob_sum <- prob_sum + prob
-    if (prob_sum > initIc_random) {
+    if (prob_sum > initIc_random || (initIc + initI1 + initI2 == N)) { 
       found <- TRUE
     } else {
       initIc <- initIc + 1
     }
   }
 
+  loginit <- dbinom(detectedI1c - detectedIc, initI1, stage1_prob, log = TRUE) +
+    dbinom(detectedIc, initIc, stagec_prob, log = TRUE) +
+    dbinom(detectedI2, initI2, stage2_prob, log = TRUE)
+
+  cat ("return from sample_equilibrium\n")
   return(list(eq = c(S = N - initI1 - initIc - initI2, I1 = initI1, Ic = initIc,
                      I2 = initI2),
-              init = c(S = N - initI1 - initIc - initI2 - detectedI1c -
+              state = c(S = N - initI1 - initIc - initI2 + detectedI1c +
                          detectedI2,
                        I1 = initI1 - detectedI1c + detectedIc,
                        Ic = initIc - detectedIc,
-                       I2 = initI2 - detectedI2)))
+                       I2 = initI2 - detectedI2),
+              logprior = loginit))
 }
 
 rprior_conditional <- function(village)
 {
+  cat ("enter rprior_conditional\n")
   theta <- c(rc = 1/120,
              r1 = 0.0019 * 30.42,
              r2 = 0.0040 * 30.42,
              screen1 = 0.95,
              screen2 = 0.99)
-  theta["alpha"] <- runif(1, 0, 1)
+  theta["alpha"] <- runif(1, 0, 0.5)
   theta["delta"] <- runif(1, 0, 1)
+  cat ("sample\n")
   init <- sample_equilibrium(theta, village)
+  cat ("sampled\n")
 
   found <- FALSE
+  counter <- 0
   while (!found)
   {
     eq <- abs(runif(length(init[["eq"]]), init[["eq"]] - 0.5, init[["eq"]] + 0.5))
+    ##    eq <- init[["eq"]]
     names(eq) <- names(init[["eq"]])
     x2 <- eq[["I2"]] / eq[["I1"]]
     theta["p2"] <- (theta[["r1"]] - x2 * theta[["r2"]]) / x2
     found <- (theta[["p2"]] > 0)
+    cat(counter, "\n")
+    counter <- counter + 1
   }
 
   theta["p1"] <- runif(1, 0, theta[["p2"]])
 
   x1 <- eq[["Ic"]] / eq[["I1"]]
-  theta["pc"] <- x1 / (theta[["r1"]] + theta[["p1"]] + x1)
-  
+  if (is.finite(x1))
+  {
+    theta["pc"] <- x1 / (theta[["r1"]] + theta[["p1"]] + x1)
+  } else
+  {
+    theta["pc"] <- 1
+  }
   prop_background <- runif(1, 0, 1)
 
   lambda <- (theta[["rc"]] * eq[["Ic"]] + theta[["p1"]] * eq[["I1"]] +
              (theta[["p2"]] + theta[["r2"]]) * eq[["I2"]]) / eq[["S"]]
 
   theta["lambda"] <- lambda * prop_background
-  theta["beta"] <- lambda - theta[["lambda"]] /
+  theta["beta"] <- (lambda - theta[["lambda"]]) /
     (eq[["I1"]] + theta[["delta"]] * eq[["Ic"]])
 
+  log.prior <- dprior(theta, log = TRUE) + init[["logprior"]] 
 
-  return(list(theta = theta, init = init[["init"]]))
+  cat("return from rprior_conditional\n")
+
+  return(list(theta = theta, init = init,
+              log.prior = log.prior))
 }
