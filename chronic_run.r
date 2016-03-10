@@ -61,7 +61,7 @@ library('data.table')
 library('trypR')
 
 sample_options <- c(list(nsamples = num_samples,
-                         calc.posterior = FALSE,
+                         calc.posterior = TRUE,
                          villages = village,
                          sample = ifelse(opts[["lhs"]], "lhs", "prior")
                          ),
@@ -69,22 +69,7 @@ sample_options <- c(list(nsamples = num_samples,
 
 samples <- do.call(chronic_carriers_sample, sample_options)
 
-dt <- data.table(t(sapply(samples, function(x)
-{
-    c(x[["parameters"]], unlist(x[["summary_statistics"]]))
-})))
-
-data_stage1_active <- village_screening[village.number == village, detected1_2]
-data_stage2_active <- village_screening[village.number == village, detected.2_2]
-data_stage1_passive <-
-    village_cases[village.number == village & stage == 1, sum(cases)]
-data_stage2_passive <-
-    village_cases[village.number == village & stage == 2, sum(cases)]
-
-dt[, active_stage1_diff := active_stage1 - data_stage1_active]
-dt[, active_stage2_diff := active_stage2 - data_stage2_active]
-dt[, passive_stage1_diff := passive_stage1 - data_stage1_passive]
-dt[, passive_stage2_diff := passive_stage2 - data_stage2_passive]
+dt <- data.table(t(sapply(samples, function(x) {unlist(x)})))
 
 success <- FALSE
 
@@ -92,8 +77,7 @@ epsilon <- 0
 
 while (!success)
 {
-    dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(active_stage2_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
-    success <- (nrow(dt[accept == TRUE]) > 1)
+  dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(active_stage2_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
     if (nrow(dt[accept == TRUE]) > (require_acceptances - 1)) 
     {
         success <- TRUE
@@ -104,6 +88,7 @@ while (!success)
 }
 
 cat("First adaptation, epsilon =", epsilon, "\n")
+
 ## dt_new[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
 dt[, id := 1:nrow(dt)]
 
@@ -114,12 +99,15 @@ current_accepted[id >= min(accept_ids), accept_id := max(accept_ids[accept_ids <
 prior_accepted <- dt[current_accepted[!is.na(accept_id), accept_id]]
 
 prior_parameters <- copy(prior_accepted)
-village_number_col <- which(names(prior_parameters) == "village.number")
+logprior_col <- which(names(prior_parameters) == "logprior")
 prior_parameters <-
-    prior_parameters[, -(village_number_col:ncol(prior_parameters)), with = FALSE]
+    prior_parameters[, -(logprior_col:ncol(prior_parameters)), with = FALSE]
 
 ## prior_sd <- apply(prior_parameters, 2, sd)
 prior_sd <- c(pc = 0.1, alpha = 0.3, delta = ifelse(opts[["chronic"]], 0.3, 0), p1 = 0.01, p2 = 0.04, rc = 0, r1 = 0, r2 = 0, screen1 = 0, screen2 = 0, N = 0)
+
+
+
 if (opts[["background"]])
 {
     prior_sd["lambda"] = 1e-5
