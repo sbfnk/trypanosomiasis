@@ -701,9 +701,10 @@ param_posterior <- function(theta, init, village_number, ...)
         init <- init + c(sum(init_detected), -init_detected)
         traj <- sim_trajectory(theta, init, village = village_number)
         modelled[["final"]] <- unlist(tail(traj, 1))
+        res[["final"]] <- modelled[["final"]]
         
         ## active screening posterior
-        res[["log.posterior"]] <- 0
+        res[["log.posterior"]] <- log.prior + log.init
         for (moment in names(modelled))
         {
             I1c_seq <- seq_len(data_detected[[moment]][["I1c"]] + 1) - 1
@@ -794,7 +795,6 @@ param_sumstat_villages <- function(theta, init, nruns = 1, village_number, ...)
     })
 
     res[["logprior"]] <- sapply(sims, function(x) x[["logprior"]])
-    ## res[["init.eq"]] <- t(sapply(sims, function(x) x[["init.eq"]]))
 
     if (is.finite(res[["logprior"]]))
     {
@@ -868,20 +868,14 @@ param_sumstat_villages <- function(theta, init, nruns = 1, village_number, ...)
 ##' @author Sebastian Funk
 chronic_carriers_sample <- function(nsamples = 1, seed,
                                     verbose = FALSE, passive = TRUE,
-                                    calc.posterior = TRUE,
-                                    villages, progress.bar = TRUE,
+                                    calc.posterior = TRUE, demand.finite = FALSE, 
+                                    village_number, progress.bar = TRUE,
                                     sample = c("lhs", "prior"),
                                     ...)
 {
     data(village_data)
 
     sample <- match.arg(sample)
-
-    if (missing(villages))
-    {
-        villages <- seq_len(nrow(village_screening))
-    }
-    nb_villages <- length(villages)
 
     samples <- list()
     likelihoods <- c()
@@ -894,32 +888,19 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
 
     if (sample == "lhs")
     {
-        if (passive)
-        {
-            repeat_vec_upper <- c(1e-2, 1, 2)
-            repeat_vec_lower <- c(0, 0, 0)
-            repeat_names <- c("lambda", "p1", "p2")
-        } else
-        {
-            repeat_vec_upper <- -2
-            repeat_vec_lower <- -4
-            repeat_names <- c("lambda")
-        }
-
-        r <- lhs::randomLHS(nsamples, nb_villages * length(repeat_names) + 3)
-        upper <- c(1, 1, 1, rep(repeat_vec_upper, each = nb_villages))
-        lower <- c(0, 0, 0, rep(repeat_vec_lower, each = nb_villages))
-        r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
-        theta_names <- c("pc", "alpha", "delta")
-        if (nb_villages > 1)
-        {
-            theta_names <- c(theta_names,
-                             paste(rep(repeat_names, each = nb_villages),
-                                   villages, sep = "."))
-        } else {
-            theta_names <- c(theta_names, repeat_names)
-        }
-        colnames(r) <- theta_names
+      upper <- c(0.5, 0.5, 1, 1e-2, 1e-2)
+      lower <- c(0, 0, 0, 0, 0)
+      theta_names <- c("pc", "alpha", "delta", "lambda", "beta")
+      if (passive)
+      {
+        upper <- c(upper, c(30, 30))
+        lower <- c(lower, c(0, 0))
+        theta_names <- c(theta_names, c("p1", "p2"))
+      }
+      
+      r <- lhs::randomLHS(nsamples, length(theta_names))
+      r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
+      colnames(r) <- theta_names
     }
 
     if (progress.bar && nsamples > 1) pb <- txtProgressBar(min = 0, max = nsamples - 1, style = 3)
@@ -928,40 +909,34 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
     while(i < nsamples)
     {
         i <- i + 1
-        theta <- rprior(villages = 1, ...)
+        theta <- rprior(villages = village_number, ...)
         if (sample == "lhs") {
             theta[colnames(r)] <- r[i, ]
         }
-        init <- rinit(theta, villages)
+        init <- rinit(theta, village_number)
         if (calc.posterior)
         {
-            posterior <- param_posterior(theta, init = init,
+            samples[[i]] <- param_posterior(theta, init = init,
                                          log = TRUE,
-                                         village_number = villages, 
+                                         village_number = village_number, 
                                          ...)
-            samples[[i]] <- posterior
 
             if (verbose)
             {
                 message(i, samples[[i]][["posterior"]], "\n")
             }
-            if (!is.finite(samples[[i]][["log.prior"]]))
-            {
-                i <- i - 1
-            }
         } else
         {
-            samples[[i]] <-
-                list(parameters = theta, init = init, 
-                     summary_statistics =
-                         param_sumstat_villages(theta = theta, 
-                                                init = init, 
-                                                village_number = villages,
-                                                ...)[["stat"]])
-            if (!is.finite(samples[[i]]$summary_statistics$logprior))
-            {
-                i <- i - 1
-            }
+          samples[[i]] <-
+            c(list(parameters = theta, init = init), 
+              param_sumstat_villages(theta = theta, 
+                                     init = init, 
+                                     village_number = village_number,
+                                     ...)[["stat"]])
+        }
+        if (demand.finite && !is.finite(samples[[i]][["log.prior"]]))
+        {
+          i <- i - 1
         }
         if (progress.bar && nsamples > 1) setTxtProgressBar(pb, i)
     }
