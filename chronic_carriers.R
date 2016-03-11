@@ -700,7 +700,7 @@ param_posterior <- function(theta, init, village_number, ...)
         modelled <- list(init = init)
         init <- init + c(sum(init_detected), -init_detected)
         traj <- sim_trajectory(theta, init, village = village_number)
-        modelled[["final"]] <- unlist(tail(traj, 1))
+        modelled[["final"]] <- unlist(tail(traj, 1))[names(init)]
         res[["final"]] <- modelled[["final"]]
         
         ## active screening posterior
@@ -898,33 +898,46 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
         theta_names <- c(theta_names, c("p1", "p2"))
       }
       
-      r <- lhs::randomLHS(nsamples, length(theta_names))
-      r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
-      colnames(r) <- theta_names
     }
 
     if (progress.bar && nsamples > 1) pb <- txtProgressBar(min = 0, max = nsamples - 1, style = 3)
 
     i <- 0
-    while(i < nsamples)
+    accepted <- 0
+    tosample <- nsamples
+    while (tosample > 0)
     {
+      if (sample == "lhs")
+      {
+        r <- lhs::randomLHS(tosample, length(theta_names))
+        r <- t(apply(r, 1, function(x) { lower + (upper - lower) * x}))
+        colnames(r) <- theta_names
+      }
+      i <- 0
+      while(i < tosample)
+      {
         i <- i + 1
         theta <- rprior(villages = village_number, ...)
         if (sample == "lhs") {
-            theta[colnames(r)] <- r[i, ]
+          theta[colnames(r)] <- r[i, ]
         }
         init <- rinit(theta, village_number)
         if (calc.posterior)
         {
-            samples[[i]] <- param_posterior(theta, init = init,
-                                         log = TRUE,
-                                         village_number = village_number, 
-                                         ...)
-
+          posterior <- param_posterior(theta, init = init,
+                                       log = TRUE,
+                                       village_number = village_number, 
+                                       ...)
+          
+          if (!demand.finite || is.finite(posterior[["log.posterior"]]))
+          {
+            accepted <- accepted + 1
+            samples[[accepted]] <- posterior
             if (verbose)
             {
-                message(i, samples[[i]][["posterior"]], "\n")
+              message(i, samples[[i]][["log.posterior"]], "\n")
             }
+          }
         } else
         {
           samples[[i]] <-
@@ -933,12 +946,11 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
                                      init = init, 
                                      village_number = village_number,
                                      ...)[["stat"]])
+          accepted <- accepted + 1
         }
-        if (demand.finite && !is.finite(samples[[i]][["log.prior"]]))
-        {
-          i <- i - 1
-        }
-        if (progress.bar && nsamples > 1) setTxtProgressBar(pb, i)
+        if (progress.bar && nsamples > 1) setTxtProgressBar(pb, accepted)
+      }
+      tosample <- nsamples - accepted
     }
     if (progress.bar && nsamples > 1) close(pb)
 
