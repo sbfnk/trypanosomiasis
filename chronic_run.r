@@ -29,7 +29,6 @@ code_dir <- path.expand("~/code/trypanosomiasis/")
 source(paste(code_dir, "chronic_carriers.R", sep = "/"))
 
 num_samples <- as.integer(opts[["nsamples"]])
-
 if (length(num_samples) == 0)
 {
     num_samples <- 1
@@ -62,109 +61,116 @@ library('trypR')
 
 sample_options <- c(list(nsamples = num_samples,
                          calc.posterior = TRUE,
-                         villages = village,
-                         sample = ifelse(opts[["lhs"]], "lhs", "prior")
+                         village_number = village,
+                         sample = ifelse(opts[["lhs"]], "lhs", "prior"),
+                         demand.finite = TRUE
                          ),
                     model_options)
 
 samples <- do.call(chronic_carriers_sample, sample_options)
+dt <- rbindlist(lapply(samples, function(x) {data.frame(t(unlist(x)))}), fill = TRUE)
+saveRDS(dt, paste0("prior_", village, ".rds"))
 
-dt <- data.table(t(sapply(samples, function(x) {unlist(x)})))
-
-success <- FALSE
-
-epsilon <- 0
-
-while (!success)
-{
-  dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(active_stage2_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
-    if (nrow(dt[accept == TRUE]) > (require_acceptances - 1)) 
-    {
-        success <- TRUE
-    } else
-    {
-        epsilon <- epsilon + 1
-    }
-}
-
-cat("First adaptation, epsilon =", epsilon, "\n")
-
-## dt_new[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
-dt[, id := 1:nrow(dt)]
-
-accept_ids <- dt[accept == TRUE, id]
-
-current_accepted <- data.table(id = 1:nrow(dt))
-current_accepted[id >= min(accept_ids), accept_id := max(accept_ids[accept_ids <= id]), by = 1:nrow(current_accepted[id >= min(accept_ids)])]
-prior_accepted <- dt[current_accepted[!is.na(accept_id), accept_id]]
-
-prior_parameters <- copy(prior_accepted)
-logprior_col <- which(names(prior_parameters) == "logprior")
-prior_parameters <-
-    prior_parameters[, -(logprior_col:ncol(prior_parameters)), with = FALSE]
-
-## prior_sd <- apply(prior_parameters, 2, sd)
-prior_sd <- c(pc = 0.1, alpha = 0.3, delta = ifelse(opts[["chronic"]], 0.3, 0), p1 = 0.01, p2 = 0.04, rc = 0, r1 = 0, r2 = 0, screen1 = 0, screen2 = 0, N = 0)
-
-
-
-if (opts[["background"]])
-{
-    prior_sd["lambda"] = 1e-5
-}
-if (opts[["background"]])
-{
-    prior_sd["transmitted"] = 1e-5
-}
-prior_zero <- prior_sd
-prior_zero[] <- 0
-##prior_upper <- prior_sd
+sample_options[["sample"]] <- "lhs"
+samples_lhs <- do.call(chronic_carriers_sample, sample_options)
+dt_lhs <- rbindlist(lapply(samples_lhs, function(x) {data.frame(t(unlist(x)))}), fill = TRUE)
+saveRDS(dt, paste0("lhs_", village, ".rds"))
 
 
 ## success <- FALSE
 
+## epsilon <- 0
+
 ## while (!success)
 ## {
-##   mcmc_fixed <- chronic_carriers_mcmc(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]), n_iterations = 1000, sd = prior_zero, epsilon = epsilon, data_summary = c(active_stage1 = data_stage1_active, passive_stage1 = data_stage1_passive, passive_stage2 = data_stage2_passive), villages = village, verbose = TRUE)
-##   if (mcmc_fixed$acceptance.rate > .2)
-##   {
-##       success <- TRUE
-##   } else
-##   {
-##       epsilon <- epsilon + 1
-##       cat("  increasing epsilon to", epsilon, "\n")
-##   }
+##   dt[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(active_stage2_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
+##     if (nrow(dt[accept == TRUE]) > (require_acceptances - 1)) 
+##     {
+##         success <- TRUE
+##     } else
+##     {
+##         epsilon <- epsilon + 1
+##     }
 ## }
 
-## cat("Second adaption, epsilon =", epsilon, "\n")
+## cat("First adaptation, epsilon =", epsilon, "\n")
 
-print(prior_sd)
+## ## dt_new[, accept := (abs(active_stage1_diff) <= epsilon) & (abs(passive_stage1_diff) <= epsilon) & (abs(passive_stage2_diff) <= epsilon)]
+## dt[, id := 1:nrow(dt)]
 
-mcmc_options <-
-    c(list(start = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
-           n_iterations = num_samples,
-           sd = prior_sd / 5,
-           epsilon = epsilon,
-           data_summary = c(active_stage1 = data_stage1_active,
-                            passive_stage1 = data_stage1_passive,
-                            passive_stage2 = data_stage2_passive),
-           village = village,
-           verbose = TRUE,
-           lower = prior_zero,
-           thin = thin,
-           return.traj = TRUE),
-      model_options)
-mcmc <- do.call(chronic_carriers_abc_mcmc, mcmc_options)
+## accept_ids <- dt[accept == TRUE, id]
 
-## df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
-## colnames(df) <- names(mcmc$trace[[1]])
+## current_accepted <- data.table(id = 1:nrow(dt))
+## current_accepted[id >= min(accept_ids), accept_id := max(accept_ids[accept_ids <= id]), by = 1:nrow(current_accepted[id >= min(accept_ids)])]
+## prior_accepted <- dt[current_accepted[!is.na(accept_id), accept_id]]
 
-saveRDS(mcmc, paste0(ifelse(opts[["transmitted"]], "tran_", ""),
-                     ifelse(opts[["background"]], "back_", ""),
-                     ifelse(opts[["chronic"]], "chro_", ""),
-                     "village_", village, ".rds"))
+## prior_parameters <- copy(prior_accepted)
+## logprior_col <- which(names(prior_parameters) == "logprior")
+## prior_parameters <-
+##     prior_parameters[, -(logprior_col:ncol(prior_parameters)), with = FALSE]
 
-## df_fixed <- data.frame(matrix(unlist(x), ncol = ncol(prior_parameters), byrow = TRUE))
-## colnames(df_fixed) <- colnames(prior_parameters)
-## mcmc_fixed <- mcmc(df_fixed)
-## accRate <- 1 - min(rejectionRate(mcmc_fixed))
+## ## prior_sd <- apply(prior_parameters, 2, sd)
+## prior_sd <- c(pc = 0.1, alpha = 0.3, delta = ifelse(opts[["chronic"]], 0.3, 0), p1 = 0.01, p2 = 0.04, rc = 0, r1 = 0, r2 = 0, screen1 = 0, screen2 = 0, N = 0)
+
+
+
+## if (opts[["background"]])
+## {
+##     prior_sd["lambda"] = 1e-5
+## }
+## if (opts[["background"]])
+## {
+##     prior_sd["transmitted"] = 1e-5
+## }
+## prior_zero <- prior_sd
+## prior_zero[] <- 0
+## ##prior_upper <- prior_sd
+
+
+## ## success <- FALSE
+
+## ## while (!success)
+## ## {
+## ##   mcmc_fixed <- chronic_carriers_mcmc(init = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]), n_iterations = 1000, sd = prior_zero, epsilon = epsilon, data_summary = c(active_stage1 = data_stage1_active, passive_stage1 = data_stage1_passive, passive_stage2 = data_stage2_passive), villages = village, verbose = TRUE)
+## ##   if (mcmc_fixed$acceptance.rate > .2)
+## ##   {
+## ##       success <- TRUE
+## ##   } else
+## ##   {
+## ##       epsilon <- epsilon + 1
+## ##       cat("  increasing epsilon to", epsilon, "\n")
+## ##   }
+## ## }
+
+## ## cat("Second adaption, epsilon =", epsilon, "\n")
+
+## print(prior_sd)
+
+## mcmc_options <-
+##     c(list(start = unlist(prior_parameters[floor(runif(1, 1, 1:nrow(prior_parameters)))]),
+##            n_iterations = num_samples,
+##            sd = prior_sd / 5,
+##            epsilon = epsilon,
+##            data_summary = c(active_stage1 = data_stage1_active,
+##                             passive_stage1 = data_stage1_passive,
+##                             passive_stage2 = data_stage2_passive),
+##            village = village,
+##            verbose = TRUE,
+##            lower = prior_zero,
+##            thin = thin,
+##            return.traj = TRUE),
+##       model_options)
+## mcmc <- do.call(chronic_carriers_abc_mcmc, mcmc_options)
+
+## ## df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
+## ## colnames(df) <- names(mcmc$trace[[1]])
+
+## saveRDS(mcmc, paste0(ifelse(opts[["transmitted"]], "tran_", ""),
+##                      ifelse(opts[["background"]], "back_", ""),
+##                      ifelse(opts[["chronic"]], "chro_", ""),
+##                      "village_", village, ".rds"))
+
+## ## df_fixed <- data.frame(matrix(unlist(x), ncol = ncol(prior_parameters), byrow = TRUE))
+## ## colnames(df_fixed) <- colnames(prior_parameters)
+## ## mcmc_fixed <- mcmc(df_fixed)
+## ## accRate <- 1 - min(rejectionRate(mcmc_fixed))
