@@ -69,12 +69,21 @@ sample_options <- c(list(nsamples = num_samples,
 
 samples <- do.call(chronic_carriers_sample, sample_options)
 dt <- rbindlist(lapply(samples, function(x) {data.frame(t(unlist(x)))}), fill = TRUE)
-saveRDS(dt, paste0("prior_", village, ".rds"))
+saveRDS(dt, paste0("prior_",
+                   ifelse(opts[["transmitted"]], "tran_", ""),
+                   ifelse(opts[["background"]], "back_", ""),
+                   ifelse(opts[["chronic"]], "chro_", ""),
+                   "village_", village, ".rds"))
 
 sample_options[["sample"]] <- "lhs"
 samples_lhs <- do.call(chronic_carriers_sample, sample_options)
 dt_lhs <- rbindlist(lapply(samples_lhs, function(x) {data.frame(t(unlist(x)))}), fill = TRUE)
-saveRDS(dt, paste0("lhs_", village, ".rds"))
+saveRDS(dt_lhs, paste0("lhs_",
+                       ifelse(opts[["transmitted"]], "tran_", ""),
+                       ifelse(opts[["background"]], "back_", ""),
+                       ifelse(opts[["chronic"]], "chro_", ""),
+                       "village_", village, ".rds"))
+
 
 
 ## success <- FALSE
