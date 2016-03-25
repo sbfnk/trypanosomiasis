@@ -42,7 +42,8 @@ rprior <- function(villages = 1, passive = TRUE, background = TRUE,
 {
     param_vector <-
         c(pc = runif(1, 0, 0.5), alpha = runif(1, 0, 0.5))
-    param_vector["delta"] <- ifelse(chronic, runif(1, 0, 1), 0)
+    ## param_vector["delta"] <- ifelse(chronic, runif(1, 0, 1), 0)
+    param_vector["delta"] <- param_vector["alpha"]
 
     if (length(villages) == 1)
     {
@@ -472,7 +473,7 @@ likelihood <- function(state, stage1_detected, stage2_detected,
                 }
             } else
             {
-                stage1_ll <- dbinom(stage1_detected, state[["I1"]] + stage1_detected,
+                stage1_ll <- dbinom(stage1_detected, state[["I1"]],
                                     detection_probability, log = log)
                 if (log)
                 {
@@ -486,12 +487,12 @@ likelihood <- function(state, stage1_detected, stage2_detected,
         if (!missing(stage2_detected))
         {
             if (active) {
-                detection_probability <- theta[["screen1"]] * attendance
+                detection_probability <- theta[["screen2"]] * attendance
             } else
             {
                 detection_probability <- 1 ## sensitivity of passive screening
             }
-            stage2_ll <- dbinom(stage2_detected, state[["I2"]] + stage2_detected,
+            stage2_ll <- dbinom(stage2_detected, state[["I2"]],
                                 detection_probability, log = log)
             if (log)
             {
@@ -529,7 +530,7 @@ dinit <- function(init, village_number, theta, log = FALSE)
     stage1_detected <- village_screening[village.number == village_number,
                                          detected1_1]
     stage2_detected <- village_screening[village.number == village_number,
-                                         detected1_2]
+                                         detected2_1]
 
     attendance <- min(village_screening[village.number == village_number,
                                         sigma.start], 1)
@@ -665,7 +666,7 @@ param_posterior <- function(theta, init, village_number, ...)
     log.prior <- dprior(theta, log = TRUE)
     res <- list(theta = theta, log.prior = log.prior)
     if (missing(init)) init <- rinit(theta, village_number)
-    log.init <- dinit(init, 1, theta, log = TRUE)
+    log.init <- dinit(init, village_number, theta, log = TRUE)
     res[["log.init"]] <- log.init
     res[["init"]] <- init
 
@@ -683,43 +684,48 @@ param_posterior <- function(theta, init, village_number, ...)
                       min(attendance[[moment]], 1))
         }
 
+        ## detected in screening
         data_detected <-
             list(init = c(I1c = sim_village_screening[["detected1_1"]],
                           I2 = sim_village_screening[["detected2_1"]]),
                  final = c(I1c = sim_village_screening[["detected1_2"]],
                            I2 = sim_village_screening[["detected.2_2"]]))
-                
-        init_detected <- c()
-        for (compartment in names(screening_prob[["init"]]))
-        {
-            init_detected[compartment] <-
-                rbinom(1, init[[compartment]],
-                       screening_prob[["init"]][[compartment]])
-        }
-            
+
+        ## randomly sample initially detected between Ic and I1
+        init_I1 <-
+          sum(sample(c(rep("I1", init["I1"]), rep("Ic", init["Ic"])),
+                     data_detected[["init"]]["I1c"], FALSE,
+                     c(rep(screening_prob[["init"]]["I1"], init["I1"]),
+                       rep(screening_prob[["init"]]["Ic"], init[["Ic"]])))
+              == "I1")
+        init_detected <- c(I1 = init_I1,
+                           Ic = data_detected[["init"]]["I1c"] - init_I1,
+                           I2 = data_detected[["init"]]["I2"])
+
         modelled <- list(init = init)
         init <- init + c(sum(init_detected), -init_detected)
         traj <- sim_trajectory(theta, init, village = village_number)
-        modelled[["final"]] <- unlist(tail(traj, 1))[names(init)]
-        res[["final"]] <- modelled[["final"]]
-        
+        final <- unlist(tail(traj, 1))[names(init)]
+        modelled[["final"]] <- final
+        res[["final"]] <- final
+
         ## active screening posterior
         res[["log.posterior"]] <- log.prior + log.init
         for (moment in names(modelled))
         {
             I1c_seq <- seq_len(data_detected[[moment]][["I1c"]] + 1) - 1
             res[["log.posterior"]] <- res[["log.posterior"]] +
-                sum(sapply(I1c_seq, function(x) {
+                log(sum(exp(sapply(I1c_seq, function(x) {
                     dbinom(x, modelled[[moment]]["Ic"], 
                            screening_prob[[moment]][["Ic"]], log = TRUE) +
                     dbinom(x, modelled[[moment]]["I1"], 
                            screening_prob[[moment]][["I1"]], log = TRUE)
-                })) +
+                })))) +
                 dbinom(data_detected[[moment]][["I2"]],
                        modelled[[moment]]["I2"],
                        screening_prob[[moment]][["I2"]], log = TRUE)
         }
-        
+
         ## passive screening posterior
         for (passive.stage in 1:2)
         {
@@ -888,9 +894,9 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
 
     if (sample == "lhs")
     {
-      upper <- c(0.5, 0.5, 1, 1e-2, 1e-2)
-      lower <- c(0, 0, 0, 0, 0)
-      theta_names <- c("pc", "alpha", "delta", "lambda", "beta")
+      upper <- c(0.5, 0.5, 1e-2, 1e-2)
+      lower <- c(0, 0, 0, 0)
+      theta_names <- c("pc", "alpha", "lambda", "beta")
       if (passive)
       {
         upper <- c(upper, c(30, 30))
@@ -920,6 +926,7 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
         theta <- rprior(villages = village_number, ...)
         if (sample == "lhs") {
           theta[colnames(r)] <- r[i, ]
+          theta["delta"] <- theta["alpha"]
         }
         init <- rinit(theta, village_number)
         if (calc.posterior)
@@ -1225,3 +1232,5 @@ rprior_conditional <- function(village)
 
   return(list(theta = theta, init = init))
 }
+
+chronic_carriers_mcmc()
