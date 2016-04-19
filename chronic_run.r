@@ -63,7 +63,8 @@ sample_options <- c(list(nsamples = 1,
                          calc.posterior = TRUE,
                          village_number = village,
                          sample = "prior", 
-                         demand.finite = TRUE 
+                         demand.finite = TRUE, 
+                         n = 1 
                          ),
                     model_options)
 
@@ -86,6 +87,7 @@ prior_sd <- apply(dt, 2, sd)
 prior_sd <- prior_sd[is.finite(prior_sd)]
 prior_sd <- prior_sd[grep("^theta", names(prior_sd))]
 prior_sd <- prior_sd[prior_sd > 0]
+names(prior_sd) <- sub("^theta\\.", "", names(prior_sd))
 prior <- prior[, names(prior_sd), with = FALSE]
 
 setnames(prior, colnames(prior), sub("^theta\\.", "", colnames(prior)))
@@ -95,23 +97,33 @@ start <- unlist(dt[log.posterior == max(log.posterior)])
 start <- start[grep("^theta", names(start))]
 names(start) <- sub("^theta.", "", names(start))
 
-prior_zero <- prior_sd
+prior_zero <- start
 prior_zero[] <- 0
 
 print(prior_sd)
 
+mcmc_posterior <- function(theta)
+{
+  theta["delta"] = theta["alpha"]
+  post <- do.call(param_posterior,
+                  c(list(theta, village_number = village, n = 10),
+                    model_options))
+  return(list(log.density = post[["log.posterior"]],
+              trace = c(theta, log.prior = post[["log.prior"]])))
+}
+
 mcmc_options <-
-  c(list(start = start, 
-         n_iterations = num_samples,
-         sd = prior_sd, 
-         lower = prior_zero,
-         village = village,
-         verbose = TRUE,
-         thin = thin,
-         return.traj = TRUE,
-         adapt = TRUE),
-    model_options)
-mcmc <- do.call(chronic_carriers_mcmc, mcmc_options)
+  list(target = mcmc_posterior,
+       init.theta = start, 
+       proposal.sd = prior_sd,
+       n.iterations = num_samples,
+       limits = list(lower = prior_zero),
+       adapt.size.start = 100,
+       adapt.shape.start = 500,
+       verbose = TRUE) 
+mcmc <- do.call(mcmcMH, mcmc_options)
+
+
 
 ## ## df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
 ## ## colnames(df) <- names(mcmc$trace[[1]])
@@ -125,3 +137,40 @@ mcmc <- do.call(chronic_carriers_mcmc, mcmc_options)
 ## ## colnames(df_fixed) <- colnames(prior_parameters)
 ## ## mcmc_fixed <- mcmc(df_fixed)
 ## ## accRate <- 1 - min(rejectionRate(mcmc_fixed))
+
+system.time(init_test <- lapply(1:10000,  function(x) {
+theta <- rprior(villages = village, background = TRUE, transmitted = TRUE, chronic = TRUE)
+init <- rinit(theta)
+return(list(theta = theta, init = init, log.init = dinit(init, village, theta, TRUE)))}))
+
+param_bounds <- list(
+  pc = c(0, 0.5), 
+  alpha = c(0, 0.5), 
+  delta = c(0, 0.5), 
+  p1 = c(0, 30), 
+  p2 = c(0, 30), 
+  lambda = c(0, 0.01), 
+  beta = c(0, 0.01))
+
+bounds_to_grid <- function(bounds, n)
+{
+  grid <- expand.grid(lapply(param_bounds, function(x)
+  {
+    if (x[1] == 0) {
+      x[1] <- 10**(log10(x[2]) - n + 1)
+    }
+    return(10**seq(log10(x[1]), log10(x[2]), length.out = n))
+  }))
+  return(grid)
+}
+
+system.time(scan <- apply(grid, 1, function(x)
+{
+  theta <- rprior(village, transmitted = TRUE)
+  theta[names(x)] <- x
+  log.posterior <- param_posterior(theta, village_number = village)
+  return(log.posterior)
+}))
+
+dt <- rbindlist(lapply(scan, function(x) {data.frame(t(unlist(x)))}), fill = TRUE)
+id <- melt(dt, id.vars = "log.init")

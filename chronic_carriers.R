@@ -350,8 +350,21 @@ rinit <- function(theta, village_number = 1)
 
     N <- sim_village_screening[["N"]]
 
-    lambda <- theta[["lambda"]]
-    beta <- theta[["beta"]]
+    if ("lambda" %in% names(theta))
+    {
+        lambda <- theta[["lambda"]]   
+    } else
+    {
+        lambda <- 0
+    }
+
+    if ("beta" %in% names(theta))
+    {
+        beta <- theta[["beta"]]
+    } else
+    {
+        beta <- 0
+    }
 
     if ("pc" %in% names(theta))
     {
@@ -642,8 +655,10 @@ traj_likelihood <- function(theta, village_number, nruns = 1, log = FALSE, ...)
 ##' @param ... 
 ##' @return posterior density
 ##' @author Sebastian Funk
-param_posterior <- function(theta, init, village_number, ...)
+param_posterior <- function(theta, init, n, village_number, ...)
 {
+    if (missing(n)) n <- 1
+
     data(village_data)
 
     sim_village_screening <- village_screening[village.number %in% village]
@@ -665,86 +680,116 @@ param_posterior <- function(theta, init, village_number, ...)
     ## sample
     log.prior <- dprior(theta, log = TRUE)
     res <- list(theta = theta, log.prior = log.prior)
-    if (missing(init)) init <- rinit(theta, village_number)
-    log.init <- dinit(init, village_number, theta, log = TRUE)
-    res[["log.init"]] <- log.init
-    res[["init"]] <- init
-
-    ## work out initial detected
-    if (is.finite(log.prior) && is.finite(log.init))
+    if (!missing(init))
     {
-        for (moment in c("init", "final"))
-        {
-            screening_prob[[moment]] <- 
-                c(I1 = theta[["screen1"]] *
-                      min(attendance[[moment]], 1),
-                  Ic = theta[["screen1"]] *
-                      min(attendance[[moment]] * theta[["alpha"]], 1), 
-                  I2 = theta[["screen2"]] *
-                      min(attendance[[moment]], 1))
-        }
-
-        ## detected in screening
-        data_detected <-
-            list(init = c(I1c = sim_village_screening[["detected1_1"]],
-                          I2 = sim_village_screening[["detected2_1"]]),
-                 final = c(I1c = sim_village_screening[["detected1_2"]],
-                           I2 = sim_village_screening[["detected.2_2"]]))
-
-        ## randomly sample initially detected between Ic and I1
-        init_I1 <-
-          sum(sample(c(rep("I1", init["I1"]), rep("Ic", init["Ic"])),
-                     data_detected[["init"]]["I1c"], FALSE,
-                     c(rep(screening_prob[["init"]]["I1"], init["I1"]),
-                       rep(screening_prob[["init"]]["Ic"], init[["Ic"]])))
-              == "I1")
-        init_detected <- c(I1 = init_I1,
-                           Ic = data_detected[["init"]]["I1c"] - init_I1,
-                           I2 = data_detected[["init"]]["I2"])
-
-        modelled <- list(init = init)
-        init <- init + c(sum(init_detected), -init_detected)
-        traj <- sim_trajectory(theta, init, village = village_number)
-        final <- unlist(tail(traj, 1))[names(init)]
-        modelled[["final"]] <- final
-        res[["final"]] <- final
-
-        ## active screening posterior
-        res[["log.posterior"]] <- log.prior + log.init
-        for (moment in names(modelled))
-        {
-            I1c_seq <- seq_len(data_detected[[moment]][["I1c"]] + 1) - 1
-            res[["log.posterior"]] <- res[["log.posterior"]] +
-                log(sum(exp(sapply(I1c_seq, function(x) {
-                    dbinom(x, modelled[[moment]]["Ic"], 
-                           screening_prob[[moment]][["Ic"]], log = TRUE) +
-                    dbinom(x, modelled[[moment]]["I1"], 
-                           screening_prob[[moment]][["I1"]], log = TRUE)
-                })))) +
-                dbinom(data_detected[[moment]][["I2"]],
-                       modelled[[moment]]["I2"],
-                       screening_prob[[moment]][["I2"]], log = TRUE)
-        }
-
-        ## passive screening posterior
-        for (passive.stage in 1:2)
-        {
-            if (grep(paste0("^p", passive.stage), names(theta)))
-            {
-                passive <-
-                    unlist(tail(traj[[paste0("Z", passive.stage, "pass")]],
-                                1))
-                res[["log.posterior"]] <- res[["log.posterior"]] +
-                    dpois(passive_data[stage == passive.stage, cases],
-                          passive, log = TRUE)
-            }
-        }
+        log.init <- dinit(init, village_number, theta, log = TRUE)
+        init_state <- init
+        res[["log.init"]] <- log.init
+        res[["init"]] <- init
     } else
     {
-        traj <- data.frame(t(init))
-        res[["log.posterior"]] <- log.prior + log.init
+        log.init <- 0
     }
-           
+
+    for (moment in c("init", "final"))
+    {
+        screening_prob[[moment]] <- 
+            c(I1 = theta[["screen1"]] *
+                  min(attendance[[moment]], 1),
+              Ic = theta[["screen1"]] *
+                  min(attendance[[moment]] * theta[["alpha"]], 1), 
+              I2 = theta[["screen2"]] *
+                  min(attendance[[moment]], 1))
+    }
+
+    ## detected in screening
+    data_detected <-
+        list(init = c(I1c = sim_village_screening[["detected1_1"]],
+                      I2 = sim_village_screening[["detected2_1"]]),
+             final = c(I1c = sim_village_screening[["detected1_2"]],
+                       I2 = sim_village_screening[["detected.2_2"]]))
+
+    log_posterior <- c()
+    for (i in 1:n)
+    {
+        if (missing(init))
+        {
+            init_state <- rinit(theta, village_number)
+            log.init <- dinit(init_state, village_number, theta, log = TRUE)
+            if (n == 1)
+            {
+                res[["log.init"]] <- log.init
+                res[["init"]] <- init_state
+            }
+        }
+
+        if (is.finite(log.init))
+        {
+            ## randomly sample initially detected between Ic and I1
+            init_I1 <-
+                sum(sample(c(rep("I1", init_state["I1"]),
+                             rep("Ic", init_state["Ic"])),
+                           data_detected[["init"]]["I1c"], FALSE,
+                           c(rep(screening_prob[["init"]]["I1"],
+                                 init_state["I1"]),
+                             rep(screening_prob[["init"]]["Ic"],
+                                 init_state[["Ic"]])))
+                    == "I1")
+            init_detected <- c(I1 = init_I1,
+                               Ic = data_detected[["init"]]["I1c"] - init_I1,
+                               I2 = data_detected[["init"]]["I2"])
+
+            modelled <- list(init = init_state)
+            init_state <- init_state + c(sum(init_detected), -init_detected)
+            traj <- sim_trajectory(theta, init_state,
+                                   village = village_number)
+            final <- unlist(tail(traj, 1))[names(init_state)]
+            modelled[["final"]] <- final
+            if (n == 1) res[["final"]] <- final
+
+            ## active screening posterior
+            log_posterior[i] <- log.prior + log.init
+            for (moment in names(modelled))
+            {
+                I1c_seq <- seq_len(data_detected[[moment]][["I1c"]] + 1) - 1
+                log_posterior[i] <- log_posterior[i] + 
+                    log(sum(exp(sapply(I1c_seq, function(x) {
+                        dbinom(x, modelled[[moment]]["Ic"], 
+                               screening_prob[[moment]][["Ic"]], log = TRUE) +
+                            dbinom(x, modelled[[moment]]["I1"], 
+                                   screening_prob[[moment]][["I1"]],
+                                   log = TRUE)
+                    })))) +
+                    dbinom(data_detected[[moment]][["I2"]],
+                           modelled[[moment]]["I2"],
+                           screening_prob[[moment]][["I2"]], log = TRUE)
+            }
+
+            ## passive screening posterior
+            for (passive.stage in 1:2)
+            {
+                if (grep(paste0("^p", passive.stage), names(theta)))
+                {
+                    passive <-
+                        unlist(tail(traj[[paste0("Z", passive.stage,
+                                                 "pass")]], 1))
+                    log_posterior[i] <- log_posterior[i] + 
+                        dpois(passive_data[stage == passive.stage, cases],
+                              passive, log = TRUE)
+                }
+            }
+        } else {
+            log_posterior[i] <- log.prior + log.init
+        }
+    }
+    
+    if (n == 1)
+    {
+        res[["log.posterior"]] <- log_posterior
+    } else
+    {
+        res[["log.posterior"]] <- log(mean(exp(log_posterior)))
+    }
     return(res)
 }
 
@@ -874,7 +919,7 @@ param_sumstat_villages <- function(theta, init, nruns = 1, village_number, ...)
 ##' @author Sebastian Funk
 chronic_carriers_sample <- function(nsamples = 1, seed,
                                     verbose = FALSE, passive = TRUE,
-                                    calc.posterior = TRUE, demand.finite = FALSE, 
+                                    calc.posterior = TRUE, demand.finite = FALSE, n, 
                                     village_number, progress.bar = TRUE,
                                     sample = c("lhs", "prior"),
                                     ...)
@@ -928,13 +973,12 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
           theta[colnames(r)] <- r[i, ]
           theta["delta"] <- theta["alpha"]
         }
-        init <- rinit(theta, village_number)
         if (calc.posterior)
         {
-          posterior <- param_posterior(theta, init = init,
+          posterior <- param_posterior(theta,
                                        log = TRUE,
                                        village_number = village_number, 
-                                       ...)
+                                       n = n) 
           
           if (!demand.finite || is.finite(posterior[["log.posterior"]]))
           {
@@ -947,6 +991,7 @@ chronic_carriers_sample <- function(nsamples = 1, seed,
           }
         } else
         {
+          init <- rinit(theta, village_number)
           samples[[i]] <-
             c(list(parameters = theta, init = init), 
               param_sumstat_villages(theta = theta, 
@@ -1233,4 +1278,3 @@ rprior_conditional <- function(village)
   return(list(theta = theta, init = init))
 }
 
-chronic_carriers_mcmc()
