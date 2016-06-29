@@ -13,3 +13,4 @@
 # compiled files
 *.o
 *.so
+bin/
