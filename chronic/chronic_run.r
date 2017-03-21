@@ -62,9 +62,9 @@ library('trypR')
 sample_options <- c(list(nsamples = 1,
                          calc.posterior = TRUE,
                          village_number = village,
-                         sample = "prior", 
-                         demand.finite = TRUE, 
-                         n = 1 
+                         sample = "prior",
+                         demand.finite = TRUE,
+                         n = 1
                          ),
                     model_options)
 
@@ -114,16 +114,14 @@ mcmc_posterior <- function(theta)
 
 mcmc_options <-
   list(target = mcmc_posterior,
-       init.theta = start, 
+       init.theta = start,
        proposal.sd = prior_sd,
        n.iterations = num_samples,
        limits = list(lower = prior_zero),
        adapt.size.start = 100,
        adapt.shape.start = 500,
-       verbose = TRUE) 
+       verbose = TRUE)
 mcmc <- do.call(mcmcMH, mcmc_options)
-
-
 
 ## ## df <- data.frame(matrix(unlist(mcmc$trace), ncol = ncol(prior_parameters), byrow = TRUE))
 ## ## colnames(df) <- names(mcmc$trace[[1]])
@@ -139,18 +137,18 @@ mcmc <- do.call(mcmcMH, mcmc_options)
 ## ## accRate <- 1 - min(rejectionRate(mcmc_fixed))
 
 system.time(init_test <- lapply(1:10000,  function(x) {
-theta <- rprior(villages = village, background = TRUE, transmitted = TRUE, chronic = TRUE)
-init <- rinit(theta)
-return(list(theta = theta, init = init, log.init = dinit(init, village, theta, TRUE)))}))
+  theta <- rprior(villages = village, background = TRUE, transmitted = TRUE, chronic = TRUE)
+  init <- rinit(theta)
+  return(list(theta = theta, init = init, log.init = dinit(init, village, theta, TRUE)))}))
 
 param_bounds <- list(
-  pc = c(0, 0.5), 
-  alpha = c(0, 0.5), 
-  delta = c(0, 0.5), 
-  p1 = c(0, 30), 
-  p2 = c(0, 30), 
-  lambda = c(0, 0.01), 
-  beta = c(0, 0.01))
+  pc = c(0, 0.5),
+  alpha = c(0, 0.5),
+  delta = c(0, 0.5),
+  p1 = c(0, 30),
+  p2 = c(0, 30),
+  lambda = c(0, 0.01),
+  beta = c(0, 0.01)
 
 bounds_to_grid <- function(bounds, n)
 {

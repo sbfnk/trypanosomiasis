@@ -1,7 +1,9 @@
-library('XLConnect')
+library('readxl')
 
-wb <- loadWorkbook(path.expand("~/Research/Analysis/Sleeping_Sickness/Chronic/Village input data.xlsx"))
-village_screening <- data.table(readWorksheet(wb, "Sheet1"))
+file.name <- path.expand("~/Research/Francesco/MSc project Rebecca Oettle/Paper/Submission to TRSTMH/Files for Francesco/Village input data.xlsx")
+
+village_screening <- data.table(read_excel(path = file.name, sheet = "Sheet1"))
+setnames(village_screening, colnames(village_screening), gsub(" ", ".", colnames(village_screening)))
 
 village_dirs <- list.files(path = path.expand("~/Research/Analysis/Sleeping_Sickness/Chronic/passive_screening_datasets/"))
 village_ids <- as.integer(gsub("^village ", "", village_dirs))

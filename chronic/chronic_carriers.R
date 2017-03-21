@@ -662,7 +662,7 @@ param_posterior <- function(theta, init, n, village_number, ...)
     data(village_data)
 
     sim_village_screening <- village_screening[village.number %in% village]
-    
+
     N <- sim_village_screening[["N"]]
 
     res <- list()
