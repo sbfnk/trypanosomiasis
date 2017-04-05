@@ -27,9 +27,9 @@ lambda_hist <- lambda %>%
 
 p <- ggplot(lambda_hist, aes(x=lambda_ML_range, y=prop, fill=project)) +
   geom_bar(position="dodge", stat="identity") +
-  scale_fill_brewer("Project", palette="Set1") +
+  scale_fill_brewer("Project", palette="Dark2") +
   scale_y_continuous("Proportion of villages", labels=percent) +
-  scale_x_discrete(expression(atop(Force~of~infection~(lambda[i])~"in cases",
+  scale_x_discrete(expression(atop(Incidence~(lambda[i])~"in cases",
                                    per~"1,000"~susceptible~"person-months")),
                    drop=FALSE) +
   theme(legend.justification=c(1, 1), legend.position=c(1, 1),
@@ -38,7 +38,7 @@ save_plot("Passive/foi_dist.pdf", p)
 
 lambda %<>%
   arrange(project, lambda_ML) %>%
-  mutate(id=1:n()) %>%
+  mutate(id=1:n())
 
 p <- ggplot(lambda, aes(x=id)) +
   geom_point(aes(y=lambda_median), shape=4, color="black", alpha=0.5) +
@@ -48,8 +48,8 @@ p <- ggplot(lambda, aes(x=id)) +
   facet_grid(~project, scales="free_x", space="free_x") +
   scale_x_continuous("Village") +
   scale_y_continuous(
-    expression(atop(Force~of~infection~(lambda[i])~"in cases",
+    expression(atop(Incidence~(lambda[i])~"in cases",
                     per~"1,000"~susceptible~"person-months"))) +
   theme(axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
-ggsave("Passive/foi_villages.pdf", p, width=11, height=3.5)
+ggsave("Passive/foi_villages.pdf", p, width=8.2, height=3.8)
